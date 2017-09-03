@@ -86,7 +86,7 @@ const
 { TfPreview }
 procedure TfPreview.FormCreate(Sender: TObject);
 var
-  loc_SBInfo : 		TNonCLientMetrics;
+  loc_SBInfo :    TNonCLientMetrics;
 begin
   loc_SBInfo.cbSize := SizeOf(loc_SBInfo);
   SystemParametersInfo(SPI_GetNonClientMetrics,0,@loc_SBInfo,0);
@@ -103,18 +103,18 @@ var
   fw, w, h : integer;
 begin
   // set size of pbPreview to max zoom out for bmpPage
-	w := floor(bmpPage.Width * Zoom * XScale);
+  w := floor(bmpPage.Width * Zoom * XScale);
   h := floor(bmpPage.Height * Zoom);
   fw := w + 8;
 
   if h > ScrollBox1.ClientHeight then
-  	fw += ScrollWidth + 2;
+    fw += ScrollWidth + 2;
 
   self.Constraints.MaxWidth:=fw;
   self.Constraints.MinWidth:=fw;
   self.Width := fw;
 
-	pbPreview.Width := w;
+  pbPreview.Width := w;
   pbPreview.Height := h;
 end;
 
@@ -128,8 +128,8 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   tmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
-	tmp.Draw(cnv, 0, 0);
-	tmp.free;
+  tmp.Draw(cnv, 0, 0);
+  tmp.free;
 end;
 
 procedure TfPreview.FormResize(Sender: TObject);
@@ -143,18 +143,18 @@ var
 begin
   if bmpPage = nil then exit;
 
-	w := floor(bmpPage.Width * Zoom * XScale);
+  w := floor(bmpPage.Width * Zoom * XScale);
   h := floor(bmpPage.Height * Zoom);
   fw := w + 8;
 
   if h > ScrollBox1.ClientHeight then
-  	fw += ScrollWidth + 2;
+    fw += ScrollWidth + 2;
 
   self.Constraints.MaxWidth:=fw;
   self.Constraints.MinWidth:=fw;
   self.Width := fw;
 
-	pbPreview.Width := w;
+  pbPreview.Width := w;
   pbPreview.Height := h;
 end;
 
@@ -169,7 +169,7 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   r := pb.ClientRect;
-	captionCloseUp.Draw(cnv, r);
+  captionCloseUp.Draw(cnv, r);
 end;
 
 procedure TfPreview.pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
@@ -202,7 +202,7 @@ end;
 
 procedure TfPreview.pbCloseClick(Sender: TObject);
 begin
-	Hide;
+  Hide;
 end;
 
 // resize grabber
