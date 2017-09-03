@@ -1,0 +1,8 @@
+object fPreview: TfPreview
+  Left = 550
+  Height = 240
+  Top = 388
+  Width = 320
+  Caption = 'fPreview'
+  LCLVersion = '1.6.4.0'
+end

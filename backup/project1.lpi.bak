@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="10"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <AlwaysBuild Value="True"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <Title Value="VTXEdit"/>
+      <ResourceType Value="res"/>
+      <UseXPManifest Value="True"/>
+      <Icon Value="0"/>
+      <Resources Count="4">
+        <Resource_0 FileName="buttons.png" Type="RCDATA" ResourceName="BUTTONS"/>
+        <Resource_1 FileName="ruler.png" Type="RCDATA" ResourceName="RULER"/>
+        <Resource_2 FileName="captionbuttons.png" Type="RCDATA" ResourceName="BUTTONS2"/>
+        <Resource_3 FileName="icons.png" Type="RCDATA" ResourceName="ICONS"/>
+      </Resources>
+    </General>
+    <i18n>
+      <EnableI18N LFM="False"/>
+    </i18n>
+    <VersionInfo>
+      <StringTable ProductVersion=""/>
+    </VersionInfo>
+    <BuildModes Count="1">
+      <Item1 Name="Default" Default="True"/>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+      </local>
+    </RunParams>
+    <RequiredPackages Count="2">
+      <Item1>
+        <PackageName Value="BGRABitmapPack"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="LCL"/>
+      </Item2>
+    </RequiredPackages>
+    <Units Count="13">
+      <Unit0>
+        <Filename Value="project1.lpr"/>
+        <IsPartOfProject Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="vtxedit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fMain"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXEdit"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="vtxedit.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="vtxattrbox.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fAttr"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXAttrBox"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="vtxcolorbox.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fColor"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXColorBox"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="vtxconst.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="VTXConst"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="vtxcharbox.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fChar"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXCharBox"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="vtxpreviewbox.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fPreview"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXPreviewBox"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="vtxsupport.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="VTXSupport"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="vtxedit.ini"/>
+        <IsPartOfProject Value="True"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="vtxencdetect.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="VTXEncDetect"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="unicodehelper.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="UnicodeHelper"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="vtxfonts.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="fFonts"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="VTXFonts"/>
+      </Unit12>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="vtxedit"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir)"/>
+      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <IncludeAssertionCode Value="True"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <Checks>
+        <IOChecks Value="True"/>
+        <RangeChecks Value="True"/>
+        <OverflowChecks Value="True"/>
+        <StackChecks Value="True"/>
+      </Checks>
+      <VerifyObjMethodCallValidity Value="True"/>
+    </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <UseHeaptrc Value="True"/>
+      </Debugging>
+      <Options>
+        <Win32>
+          <GraphicApplication Value="True"/>
+        </Win32>
+      </Options>
+    </Linking>
+  </CompilerOptions>
+  <Debugging>
+    <Exceptions Count="4">
+      <Item1>
+        <Name Value="EAbort"/>
+      </Item1>
+      <Item2>
+        <Name Value="ECodetoolError"/>
+      </Item2>
+      <Item3>
+        <Name Value="EFOpenError"/>
+      </Item3>
+      <Item4>
+        <Name Value="RunError(201)"/>
+      </Item4>
+    </Exceptions>
+  </Debugging>
+</CONFIG>

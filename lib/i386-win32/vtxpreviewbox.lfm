@@ -1,0 +1,84 @@
+object fPreview: TfPreview
+  Left = 280
+  Height = 363
+  Top = 503
+  Width = 300
+  BorderIcons = []
+  BorderStyle = bsNone
+  ClientHeight = 363
+  ClientWidth = 300
+  FormStyle = fsStayOnTop
+  OnActivate = FormActivate
+  OnCreate = FormCreate
+  OnResize = FormResize
+  OnShow = FormShow
+  ShowInTaskBar = stNever
+  LCLVersion = '1.6.4.0'
+  object ScrollBox1: TScrollBox
+    Left = 0
+    Height = 343
+    Top = 16
+    Width = 300
+    HorzScrollBar.Increment = 10
+    HorzScrollBar.Page = 105
+    HorzScrollBar.Smooth = True
+    HorzScrollBar.Tracking = True
+    VertScrollBar.Increment = 10
+    VertScrollBar.Page = 105
+    VertScrollBar.Smooth = True
+    VertScrollBar.Tracking = True
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    ClientHeight = 339
+    ClientWidth = 296
+    Color = clBlack
+    ParentColor = False
+    TabOrder = 0
+    OnPaint = ScrollBox1Paint
+    object pbPreview: TPaintBox
+      Left = 0
+      Height = 105
+      Top = 0
+      Width = 105
+      Align = alCustom
+      Color = clBlack
+      ParentColor = False
+      OnPaint = pbPreviewPaint
+    end
+  end
+  object pbTitleBar: TPaintBox
+    Left = 0
+    Height = 16
+    Top = 0
+    Width = 300
+    Anchors = [akTop, akLeft, akRight]
+    OnMouseDown = pbTitleBarMouseDown
+    OnPaint = pbTitleBarPaint
+  end
+  object pbClose: TPaintBox
+    Left = 286
+    Height = 12
+    Top = 2
+    Width = 12
+    Anchors = [akTop, akRight]
+    OnClick = pbCloseClick
+    OnPaint = pbClosePaint
+  end
+  object pbTopResizer: TPaintBox
+    Cursor = crSizeNS
+    Left = 0
+    Height = 6
+    Top = 0
+    Width = 390
+    Anchors = [akTop, akLeft, akRight]
+    OnMouseDown = pbTopResizerMouseDown
+  end
+  object pbBottomResizer: TPaintBox
+    Cursor = crSizeNS
+    Left = 0
+    Height = 6
+    Top = 358
+    Width = 390
+    Anchors = [akLeft, akRight, akBottom]
+    OnMouseDown = pbBottomResizerMouseDown
+  end
+end

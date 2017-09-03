@@ -1,0 +1,203 @@
+unit AttrBox;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ComCtrls,
+  Windows, Messages, VTXConst, VTXSupport;
+
+type
+
+  { TfAttr }
+
+  TfAttr = class(TForm)
+    ilAttrNormal: TImageList;
+    ilAttrInactive: TImageList;
+    ilAttrHover: TImageList;
+    tbAttr: TToolBar;
+    bBold: TToolButton;
+    bFaint: TToolButton;
+    bItalics: TToolButton;
+    bUnderline: TToolButton;
+    bBlinkSlow: TToolButton;
+    bBlinkFast: TToolButton;
+    bReverse: TToolButton;
+    bConceal: TToolButton;
+    bStrikethrough: TToolButton;
+    bDoublestrike: TToolButton;
+    bShadow: TToolButton;
+    bTopHalf: TToolButton;
+    bBottomHalf: TToolButton;
+    procedure bButtonClick(Sender: TObject);
+  private
+    { private declarations }
+  public
+    { public declarations }
+    procedure WndProc(var Msg: TMessage); override;
+    var
+	    Bold, Faint, Italics, Underline, BlinkSlow, BlinkFast, Reverse, Conceal,
+  	  StriketHrough, Doublestrike, Shadow, TopHalf, BottomHalf : boolean;
+  end;
+
+
+var
+  fAttr: TfAttr;
+
+implementation
+
+{$R *.lfm}
+
+{ TfAttr }
+
+procedure TfAttr.WndProc(var Msg:TMessage);
+var
+  attr : Uint32;
+begin
+  if Msg.msg = WM_VTXEDIT then
+    begin
+      case Msg.wParam of
+        WA_ATTR_ENABLEALL:
+          begin
+            bBold.Enabled := true;
+            bFaint.Enabled := true;
+            bItalics.Enabled := true;
+            bUnderline.Enabled := true;
+            bBlinkSlow.Enabled := true;
+            bBlinkFast.Enabled := true;
+            bReverse.Enabled := true;
+            bConceal.Enabled := true;
+            bStrikethrough.Enabled := true;
+            bDoublestrike.Enabled := true;
+            bShadow.Enabled := true;
+            bTopHalf.Enabled := true;
+            bBottomHalf.Enabled := true;
+          end;
+
+        WA_ATTR_DISABLENONVTX:
+          begin
+            bBold.Enabled := false;						bBold.Down := false;
+            bFaint.Enabled := false; 					bFaint.Down := false;
+            bItalics.Enabled := false; 				bItalics.Down := false;
+            bUnderline.Enabled := false;     	bUnderline.Down := false;
+            bBlinkSlow.Enabled := false;			bBlinkSlow.Down := false;
+            bBlinkFast.Enabled := true;
+            bReverse.Enabled := true;
+            bConceal.Enabled := true;
+            bStrikethrough.Enabled := false;  bStrikethrough.Down := false;
+            bDoublestrike.Enabled := false;		bDoublestrike.Down := false;
+            bShadow.Enabled := false;    			bShadow.Down := false;
+            bTopHalf.Enabled := false;     		bTopHalf.Down := false;
+            bBottomHalf.Enabled := false;    	bBottomHalf.Down := false;
+          end;
+
+        WA_ATTR_SETVALS:
+          begin
+						attr := Msg.lParam;
+            if HasBits(attr, A_CELL_BOLD) and bBold.Enabled then
+              bBold.Down := true;
+
+            if HasBits(attr, A_CELL_FAINT) and bFaint.Enabled then
+              bFaint.Down := true;
+
+            if HasBits(attr, A_CELL_ITALICS) and bItalics.Enabled then
+              bItalics.Down := true;
+
+            if HasBits(attr, A_CELL_UNDERLINE) and bUnderline.Enabled then
+              bUnderline.Down := true;
+
+            if HasBits(attr, A_CELL_BLINKSLOW) and bBlinkSlow.Enabled then
+              bBlinkSlow.Down := true;
+
+            if HasBits(attr, A_CELL_BLINKFAST) and bBlinkFast.Enabled then
+              bBlinkFast.Down := true;
+
+            if HasBits(attr, A_CELL_REVERSE) and bReverse.Enabled then
+              bReverse.Down := true;
+
+            if (GetBits(attr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_CONCEAL)
+            and bConceal.Enabled then
+              bConceal.Down := true;
+
+            if HasBits(attr, A_CELL_STRIKETHROUGH)
+            and bStrikethrough.Enabled then
+              bStrikethrough.Down := true;
+
+            if HasBits(attr, A_CELL_DOUBLESTRIKE) and bDoublestrike.Enabled then
+              bDoublestrike.Down := true;
+
+            if HasBits(attr, A_CELL_SHADOW) and bShadow.Enabled then
+              bShadow.Down := true;
+
+            if (GetBits(attr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_TOP)
+            and bTopHalf.Enabled then
+              bTopHalf.Down := true;
+
+            if (GetBits(attr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_BOTTOM)
+            and bBottomHalf.Enabled then
+              bBottomHalf.Down := true;
+          end;
+      end;
+    end
+  else
+    inherited WndProc(Msg);
+end;
+
+// enable / disable control based on mode
+procedure TfAttr.bButtonClick(Sender: TObject);
+var
+  tb : TToolButton;
+begin
+	tb := TToolButton(Sender);
+
+  if tb.Down then
+  	case tb.Name of
+    	'bConceal':
+        begin
+          bTopHalf.Down := false;
+          bBottomHalf.Down := false;
+        end;
+
+      'bTopHalf':
+        begin
+          bConceal.Down := false;
+          bBottomHalf.Down := false;
+        end;
+
+      'bBottomHalf':
+        begin
+          bConceal.Down := false;
+          bTopHalf.Down := false;
+        end;
+
+      'bBlinkSlow':
+        	bBlinkFast.Down := false;
+
+      'bBlinkFast':
+        	bBlinkSlow.Down := false;
+    end;
+
+	// build CurrAttr based on controls
+	Bold := bBold.Down;
+  Faint := bFaint.Down;
+  Italics := bItalics.Down;
+  Underline := bUnderline.Down;
+  BlinkSlow := bBlinkSlow.Down;;
+  BlinkFast := bBlinkFast.Down;;
+  Reverse := bReverse.Down;;
+  Conceal := bConceal.Down;;
+  StriketHrough := bStrikethrough.Down;;
+  Doublestrike := bDoublestrike.Down;;
+  Shadow := bShadow.Down;;
+  TopHalf := bTopHalf.Down;;
+  BottomHalf := bBottomHalf.Down;;
+end;
+
+end.
+
+
+
+
+
+

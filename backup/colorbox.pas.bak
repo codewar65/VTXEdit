@@ -1,0 +1,135 @@
+unit ColorBox;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Classes, SysUtils, FileUtil, Forms, Controls, Dialogs, ComCtrls, Math,
+  VTXConst, VTXSupport, BGRABitmap, BGRABitmapTypes, Windows, Graphics,
+  ExtCtrls, Messages;
+
+type
+
+  { TfColor }
+
+  TfColor = class(TForm)
+    iFG: TImage;
+    iBG: TImage;
+    pbColors: TPaintBox;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure pbColorsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure pbColorsPaint(Sender: TObject);
+  private
+    { private declarations }
+  public
+    { public declarations }
+    procedure WndProc(var Msg: TMessage); override;
+    var FG, BG : integer;
+  end;
+
+var
+  fColor: TfColor;
+	MaxFG, MaxBG : integer;
+
+implementation
+
+{$R *.lfm}
+
+procedure TfColor.WndProc(var Msg:TMessage);
+begin
+  if Msg.msg = WM_VTXEDIT then
+    begin
+      case Msg.wParam of
+        WA_COLOR_RESIZE:
+          begin
+            // resize window (0=16/8, 1=16/16, 2=256/256)
+            case Msg.lParam of
+              0: begin MaxFG := 16; MaxBG := 8; end;
+              1: begin MaxFG := 16; MaxBG := 16; end;
+              2: begin MaxFG := 256; MaxBG := 256; end;
+            end;
+            case MaxFG of
+              8:		self.Height := (1 * 24) + 4;
+              16:		self.Height := (1 * 24) + 4;
+              256:	self.Height := (16 * 24) + 4;
+						end;
+            if FG >= MaxFG then FG := 0;
+            if BG >= MaxBG then BG := 0;
+            pbColors.Invalidate;
+					end;
+
+        WA_COLOR_SETVALS:
+          begin
+            FG := GetBits(Msg.lParam, A_CELL_FG_MASK);
+            BG := GetBits(Msg.lParam, A_CELL_BG_MASK, 8);
+            if FG >= MaxFG then FG := 0;
+            if BG >= MaxBG then BG := 0;
+            pbColors.Invalidate;
+          end;
+      end;
+    end
+  else
+    inherited WndProc(Msg);
+end;
+
+{ TfColor }
+procedure TfColor.FormCreate(Sender: TObject);
+begin
+end;
+
+procedure TfColor.FormDestroy(Sender: TObject);
+begin
+end;
+
+procedure TfColor.pbColorsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  c : integer;
+begin
+  c := math.floor(x / 24) + (math.floor(y / 24) << 4);
+  if Button = mbLeft then
+  begin
+    if c < MaxFG then
+			FG := c
+  end
+  else
+  begin
+    if c < MaxBG then
+	    BG := c;
+  end;
+  pbColors.Invalidate;
+end;
+
+procedure TfColor.pbColorsPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  x, y, i : integer;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+  for i := 0 to 255 do
+	begin
+    x := (i and $F) * 24;
+    y := (i >> 4) * 24;
+		if i < MaxFG then
+      begin
+        cnv.Pen.Color := clBlack;
+        cnv.Rectangle(x+1,y+1,x+21,y+21);
+        cnv.Brush.Color := AnsiColor[i];
+        cnv.FillRect(x+2,y+2,x+20, y+20);
+
+        if i = FG then
+          cnv.Draw(x + 2, y + 2, iFG.Picture.Bitmap);
+        if i = BG then
+          cnv.Draw(x + 10, y + 10, iBG.Picture.Bitmap);
+      end;
+  end;
+end;
+
+
+end.
+

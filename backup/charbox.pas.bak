@@ -1,0 +1,257 @@
+unit CharBox;
+
+{$mode objfpc}{$H+}
+
+interface
+
+uses
+  Windows, Messages, Classes, SysUtils, FileUtil, Forms, Controls, Graphics,
+  Dialogs, StdCtrls, Spin, ExtCtrls, VTXConst, VTXSupport, Math,
+  BGRABitmap, BGRABitmapTypes;
+
+type
+
+  { TfChar }
+
+  TfChar = class(TForm)
+    Label3: TLabel;
+    tbCodePage: TEdit;
+    Label1: TLabel;
+    Label2: TLabel;
+    pbChars: TPaintBox;
+    ScrollBox1: TScrollBox;
+    seCharacter: TSpinEdit;
+    tbUnicode: TEdit;
+    procedure FormCreate(Sender: TObject);
+    procedure BuildPalette;
+    procedure FormDestroy(Sender: TObject);
+    procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure pbCharsPaint(Sender: TObject);
+    procedure seCharacterChange(Sender: TObject);
+  private
+    { private declarations }
+  public
+    { public declarations }
+    SelectedChar : integer;
+    procedure WndProc(var Msg:TMessage); override;
+  end;
+
+var
+  Unicode : boolean;
+  CodePage : TEncoding;
+  fChar: TfChar;
+  NumChars : integer;
+  bmp : TBGRABitmap = nil;
+
+implementation
+
+{$R *.lfm}
+
+{ TfChar }
+
+const
+  PALCOLS = 16;
+  CELL_WIDTH = 21;
+  CELL_HEIGHT = 40;
+
+procedure TfChar.BuildPalette;
+var
+  rows : integer;
+  i : integer;
+  x, y : integer;
+  x1, y1 : integer;
+  off : integer;
+  b : byte;
+  cell : TBGRABitmap;
+  rect : TRect;
+begin
+  // build palette
+  //cell := TBGRABitmap.Create(8,16);
+
+  if (CodePage = encUTF8) or (CodePage = encUTF16) then
+  begin
+    NumChars := math.floor(length(UVGA16) / 18) - 1;
+    seCharacter.MinValue := $0020;
+    seCharacter.MaxValue := $FFFF;
+    Unicode := true;
+  end
+  else
+  begin
+    NumChars := 256;
+    seCharacter.MinValue := $0000;
+    seCharacter.MaxValue := $00FF;
+    Unicode := false;
+  end;
+
+  if bmp <> nil then
+    bmp.Free;
+  rows := (NumChars - 1) div PALCOLS + 1;
+  bmp := TBGRABitmap.Create(PALCOLS * CELL_WIDTH + 4, rows * CELL_HEIGHT + 4);
+  bmp.FillRect(0,0,bmp.Width,bmp.Height,clWhite);
+
+  for i := 0 to NumChars - 1 do
+  begin
+
+    if Unicode then
+    	off := (i + 1) * 18 + 2
+    else
+      off := CPages[CodePage].QuickGlyph[i];
+      //GetGlyphOff(CP437[i]);
+
+    y := i div PALCOLS;
+    x := i - (y * PALCOLS);
+
+    x := x * CELL_WIDTH + 2;
+    y := y * CELL_HEIGHT + 2;
+
+    // draw simple glyph in cell (8x16)
+    cell := GetGlyphBmp(CPages[CodePage].GlyphTable, off, clWhite, clBlack);
+
+//    for y1 := 0 to 15 do
+//    begin
+//      b := UVGA16[off];
+//      inc(off);
+//    	for x1 := 0 to 7 do
+//      begin
+//				if (b and $80) <> 0 then
+//        	cell.SetPixel(x1, y1, clWhite)
+//        else
+//        	cell.SetPixel(x1, y1, clBlack);
+//        b := (b and $7F) << 1;
+//      end;
+//    end;
+
+    rect.Left := 4 + x;
+    rect.Top := 2 + y;
+    rect.Width := 16;
+    rect.Height := 32;
+
+    bmp.FillRect(4 + x - 1, 2 + y - 1, 4 + x + 18, 2 + y + 34, clBlack);
+    cell.Draw(bmp.Canvas, rect);
+    cell.Free;
+  end;
+  //cell.Free;
+  pbChars.Invalidate;
+end;
+
+procedure TfChar.FormDestroy(Sender: TObject);
+begin
+  if bmp <> nil then
+	  bmp.Free;
+end;
+
+procedure TfChar.pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  off, i : integer;
+begin
+  // click to select
+  y := (y - 4) div CELL_HEIGHT;
+  x := (x - 4) div CELL_WIDTH;
+  if between(x, 0, 15) and (y >= 0) then
+  begin
+    i := y * PALCOLS + x;
+    if Unicode then
+    begin
+      off := (i + 1) * 18;
+      i := (UVGA16[off] << 8) or UVGA16[off+1];
+      SelectedChar := i;
+      seCharacter.value := i;
+      tbUnicode.Text := IntToStr(i);
+    end
+    else
+    begin
+      SelectedChar := i;
+      seCharacter.value := i;
+      tbUnicode.Text := IntToStr(CP437[i]);
+    end;
+  end;
+  pbChars.Invalidate;
+end;
+
+procedure TfChar.pbCharsPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  i, x, y : integer;
+
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+  pb.Width := bmp.Width;
+  pb.Height := bmp.Height;
+  bmp.Draw(cnv, 0, 0);
+
+  // hilight the selected char
+	if Unicode then
+    // convert unicode to offset
+  	i := (GetGlyphOff(SelectedChar, CPages[CodePage].GlyphTable, CPages[CodePage].GlyphTableSize) - 2) div 18 - 1
+  else
+    i := SelectedChar;
+
+  y := i div PALCOLS;
+  x := i - (y * PALCOLS);
+  x := x * CELL_WIDTH + 4;
+  y := y * CELL_HEIGHT + 2;
+
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clRed;
+  cnv.Pen.Width := 2;
+  cnv.Rectangle(x, y, x + 22, y + 38);
+end;
+
+procedure TfChar.seCharacterChange(Sender: TObject);
+begin
+	if Unicode then
+  else
+  begin
+    SelectedChar := seCharacter.Value;
+    if Unicode then
+    	tbUnicode.Text := IntToStr(SelectedChar)
+		else
+			tbUnicode.Text := IntToStr(CP437[SelectedChar]);
+  end;
+end;
+
+const
+  CodePageStrs : array [ encCP437 .. encUTF16 ] of string = (
+  	'CP 437', 'UTF-8', 'UTF-16'
+  );
+
+procedure TfChar.WndProc(var Msg:TMessage);
+begin
+  if Msg.msg = WM_VTXEDIT then
+    begin
+      case Msg.wParam of
+        WA_CHAR_CODEPAGE:
+          begin
+            // rebuild from codepage change.
+            CodePage := TEncoding(Msg.lParam);
+            tbCodePage.Text := CodePageStrs[CodePage];
+            BuildPalette;
+          end;
+
+        WA_CHAR_SETVALS:
+          begin
+            // select a character
+            SelectedChar := Msg.lParam;
+            seCharacter.Value := SelectedChar;
+						if Unicode then
+              tbUnicode.Text := IntToStr(SelectedChar)
+						else
+              tbUnicode.Text := IntToStr(CP437[SelectedChar]);
+            pbChars.Invalidate;
+          end;
+      end;
+    end
+  else
+    inherited WndProc(Msg);
+end;
+
+procedure TfChar.FormCreate(Sender: TObject);
+begin
+end;
+
+end.
+
