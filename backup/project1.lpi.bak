@@ -14,10 +14,10 @@
       <UseXPManifest Value="True"/>
       <Icon Value="0"/>
       <Resources Count="4">
-        <Resource_0 FileName="buttons.png" Type="RCDATA" ResourceName="BUTTONS"/>
-        <Resource_1 FileName="ruler.png" Type="RCDATA" ResourceName="RULER"/>
-        <Resource_2 FileName="captionbuttons.png" Type="RCDATA" ResourceName="BUTTONS2"/>
-        <Resource_3 FileName="icons.png" Type="RCDATA" ResourceName="ICONS"/>
+        <Resource_0 FileName="work\icons.png" Type="RCDATA" ResourceName="ICONS"/>
+        <Resource_1 FileName="work\captionbuttons.png" Type="RCDATA" ResourceName="CAPTIONBUTTONS"/>
+        <Resource_2 FileName="work\ruler.png" Type="RCDATA" ResourceName="RULER"/>
+        <Resource_3 FileName="work\buttons.png" Type="RCDATA" ResourceName="BUTTONS"/>
       </Resources>
     </General>
     <i18n>

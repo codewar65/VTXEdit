@@ -549,7 +549,7 @@ begin
 	bmp.free;
 
   // get toolbar caption buttons
-  rs := TResourceStream.Create(HInstance, 'BUTTONS2', Windows.RT_RCDATA);
+  rs := TResourceStream.Create(HInstance, 'CAPTIONBUTTONS', Windows.RT_RCDATA);
   bmp := TBGRABitmap.Create(rs);
   rs.Free;
   rect.top := 0; rect.left := 0; rect.Width := 12; rect.Height := 12;
@@ -2290,6 +2290,7 @@ begin
   fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
+  fFontsBox.Invalidate;
 end;
 
 procedure TfMain.miPrefCaptionTextClick(Sender: TObject);
@@ -2304,6 +2305,7 @@ begin
   fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
+  fFontsBox.Invalidate;
 end;
 
 procedure TfMain.miPrefTextClick(Sender: TObject);
@@ -2318,6 +2320,7 @@ begin
   fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
+  fFontsBox.Invalidate;
 end;
 
 procedure TfMain.miToolsAttrClick(Sender: TObject);

@@ -1,7 +1,7 @@
 object fPreview: TfPreview
-  Left = 72
+  Left = 280
   Height = 363
-  Top = 432
+  Top = 503
   Width = 300
   BorderIcons = []
   BorderStyle = bsNone

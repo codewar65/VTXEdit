@@ -7,6 +7,7 @@ object fFonts: TfFonts
   Caption = 'fFonts'
   ClientHeight = 145
   ClientWidth = 368
+  FormStyle = fsStayOnTop
   LCLVersion = '1.6.4.0'
   object pbTitleBar: TPaintBox
     Left = 0

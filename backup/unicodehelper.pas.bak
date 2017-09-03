@@ -140,7 +140,7 @@ begin
   if (index < 0) or (index >= self.length) then
     result := 0
   else
-	  result := self[index + 1].toCharCode;
+    result := self[index + 1].toCharCode;
 end;
 
 function TUnicodeStringHelper.charAt(index : integer) : WideChar; inline;
@@ -148,7 +148,7 @@ begin
   if (index < 0) or (index >= self.length) then
     result := WideChar(0)
   else
-	  result := self[index + 1];
+    result := self[index + 1];
 end;
 
 
@@ -169,14 +169,14 @@ begin
     begin
       if ch = Separators[j] then
       begin
-				setlength(result, system.length(result) + 1);
+        setlength(result, system.length(result) + 1);
         result[system.length(result) - 1] := self.substring(lastpos, i - lastpos);
         lastpos := i + 1;
         break;
       end;
     end;
   end;
-	setlength(result, system.length(result) + 1);
+  setlength(result, system.length(result) + 1);
   result[system.length(result) - 1] := self.substring(lastpos);
 end;
 

@@ -347,7 +347,7 @@ begin
             tbUnicode.Text := IntToStr(SelectedChar)
 					else
 // CODEPAGE
-          	tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[SelectedChar]);
+          	tbUnicode.Text := IntToStr(CPages[UseCodePage].EncodingLUT[SelectedChar]);
 //            tbUnicode.Text := IntToStr(CP437[SelectedChar]);
           seCharacter.Enabled := true;
           pbChars.Invalidate;

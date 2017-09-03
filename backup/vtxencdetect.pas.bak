@@ -243,9 +243,9 @@ begin
   if encoding <> deNone then
    	begin result := encoding; exit; end;
 
-  encoding := CheckUtf16NewlineChars(buffer);
-  if encoding <> deNone then
-   	begin result := encoding; exit; end;
+//  encoding := CheckUtf16NewlineChars(buffer);
+//  if encoding <> deNone then
+//   	begin result := encoding; exit; end;
 
   encoding := CheckUtf16Ascii(buffer);
   if encoding <> deNone then

@@ -50,10 +50,6 @@ procedure movetools(h : hwnd; x, y : integer);
 var
   Version : string;
 
-  // tool moving
-  movetool : boolean = false;
-  movetooldx, movetooldy : integer;
-
   textureUp, textureDown,			// 24x24 button images (up / down)
   textureBlotch,								// overlay for color palette entry
 	iconsNormal, iconsGrayed, iconsHilite, iconsDown,	// button icons

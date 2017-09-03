@@ -8,7 +8,7 @@ uses
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
   Forms, VTXEdit, VTXConst, VTXColorBox, VTXAttrBox, VTXCharBox, VTXPreviewBox,
-  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper, unit1
+  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper, VTXFonts
   { you can add units after this };
 
 {$R *.res}

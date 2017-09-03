@@ -268,7 +268,7 @@ procedure TfColor.pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   ReleaseCapture;
-  SendMessage(Handle, WM_NCLBUTTONDOWN, HTBOTTOM, 0);
+  SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 end;
 
 // end toobar move routines
