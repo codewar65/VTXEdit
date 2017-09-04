@@ -89,11 +89,6 @@ var
   textureRuler : TBGRABitmap;
   Ctrl3D : array [0..4] of TBGRAPixel;  // 0=dark/2=mid/4=light
 
-  UIBackground : integer = 4;
-  UIText : integer = 15;
-  UICaption : integer = 5;
-  UICaptionText : integer = 15;
-
   // various settings
   PageType :                integer;  // from cbPageType  PAGETYPE_
   ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_

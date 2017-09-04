@@ -1,7 +1,7 @@
 object fFonts: TfFonts
-  Left = 745
+  Left = 95
   Height = 145
-  Top = 406
+  Top = 397
   Width = 368
   BorderStyle = bsNone
   Caption = 'fFonts'

@@ -1,10 +1,11 @@
 object fColor: TfColor
-  Left = 197
+  Left = 1101
   Height = 351
-  Top = 419
+  Top = 273
   Width = 300
   BorderIcons = []
-  BorderStyle = bsNone
+  BorderStyle = bsToolWindow
+  Caption = 'Colors'
   ClientHeight = 351
   ClientWidth = 300
   FormStyle = fsStayOnTop
@@ -12,8 +13,8 @@ object fColor: TfColor
   LCLVersion = '1.6.4.0'
   object pbColors: TPaintBox
     Left = 0
-    Height = 335
-    Top = 16
+    Height = 351
+    Top = 0
     Width = 300
     Anchors = [akTop, akLeft, akRight, akBottom]
     ParentShowHint = False
@@ -314,23 +315,5 @@ object fColor: TfColor
       426082
     }
     Visible = False
-  end
-  object pbTitleBar: TPaintBox
-    Left = 0
-    Height = 16
-    Top = 0
-    Width = 300
-    Anchors = [akTop, akLeft, akRight]
-    OnMouseDown = pbTitleBarMouseDown
-    OnPaint = pbTitleBarPaint
-  end
-  object pbClose: TPaintBox
-    Left = 286
-    Height = 12
-    Top = 2
-    Width = 12
-    Anchors = [akTop, akRight]
-    OnClick = pbCloseClick
-    OnPaint = pbClosePaint
   end
 end

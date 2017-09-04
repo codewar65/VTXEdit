@@ -46,37 +46,21 @@ type
     Label1: TLabel;
     Label2: TLabel;
     Label3: TLabel;
-    pbBottomResizer: TPaintBox;
     pbChars: TPaintBox;
-    pbClose: TPaintBox;
-    pbTopResizer: TPaintBox;
-    pbTitleBar: TPaintBox;
-    pCharPal: TPanel;
     ScrollBox1: TScrollBox;
     seCharacter: TSpinEdit;
     tbCodePage: TEdit;
     tbUnicode: TEdit;
     procedure FormResize(Sender: TObject);
     procedure ScrollToChar;
-    procedure FormCreate(Sender: TObject);
     procedure BuildPalette;
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure iCloseClick(Sender: TObject);
-    procedure pbBottomResizerMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure pbCloseClick(Sender: TObject);
-    procedure pbClosePaint(Sender: TObject);
-    procedure pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure pbTitleBarPaint(Sender: TObject);
     procedure pCharPalPaint(Sender: TObject);
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbCharsPaint(Sender: TObject);
     procedure seCharacterChange(Sender: TObject);
-    procedure pbTopResizerMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
   private
     { private declarations }
   public
@@ -253,8 +237,8 @@ begin
   p := TPanel(Sender);
   cnv := p.Canvas;
   r := p.ClientRect;
-  p.Font.Color := ANSIColor[UIText];
-  cnv.Brush.Color := ANSIColor[UIBackground];
+  p.Font.Color := ANSIColor[15];
+  cnv.Brush.Color := ANSIColor[1];
   cnv.FillRect(r);
 //  DrawBitmapTiled(textureStone.Bitmap, cnv, r);
   DrawRectangle3D(cnv, r, true);
@@ -386,82 +370,6 @@ begin
   else
     inherited WndProc(Msg);
 end;
-
-procedure TfChar.FormCreate(Sender: TObject);
-begin
-end;
-
-
-// Caption Bar
-
-procedure TfChar.iCloseClick(Sender: TObject);
-begin
-  Hide;
-end;
-
-procedure TfChar.pbCloseClick(Sender: TObject);
-begin
-  Hide;
-end;
-
-procedure TfChar.pbClosePaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r : TRect;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  r := pb.ClientRect;
-  captionCloseUp.Draw(cnv, r);
-end;
-
-// resize grabber
-procedure TfChar.pbTopResizerMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  ReleaseCapture;
-  SendMessage(Handle, WM_NCLBUTTONDOWN, HTTOP, 0);
-end;
-
-// resize grabber
-procedure TfChar.pbBottomResizerMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  ReleaseCapture;
-  SendMessage(Handle, WM_NCLBUTTONDOWN, HTBOTTOM, 0);
-end;
-
-procedure TfChar.pbTitleBarPaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r : TRect;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  r := pb.ClientRect;
-
-  cnv.Brush.Color := ANSIColor[UICaption];
-  cnv.FillRect(r);
-//  DrawBitmapTiled(textureStone.Bitmap, cnv, r);
-  DrawRectangle3D(cnv, r, true);
-  cnv.Brush.Style:=bsClear;
-  cnv.Font.Color := ANSIColor[UICaptionText];
-  cnv.Font.Size := -11;
-  cnv.Font.Style := [ fsBold ];
-  cnv.TextOut(3,1,'Character Palette');
-end;
-
-
-procedure TfChar.pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  ReleaseCapture;
-  SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-end;
-
-// end toobar move routines
 
 end.
 

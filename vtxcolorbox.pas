@@ -46,19 +46,12 @@ type
     iFG: TImage;
     iBG: TImage;
     iBlotch: TImage;
-    pbClose: TPaintBox;
-    pbTitleBar: TPaintBox;
     pbColors: TPaintBox;
-    procedure pbCloseClick(Sender: TObject);
-    procedure pbClosePaint(Sender: TObject);
     procedure pbColorsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbColorsMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
     procedure pbColorsPaint(Sender: TObject);
-    procedure pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure pbTitleBarPaint(Sender: TObject);
   private
     { private declarations }
   public
@@ -78,11 +71,6 @@ implementation
 {$R *.lfm}
 
 procedure TfColor.WndProc(var Msg:TMessage);
-var
-  i, thisi : integer;
-  twi : TWINDOWINFO;
-  pwp : PWINDOWPOS;
-  bx, by : integer;
 begin
   if Msg.msg = WM_VTXEDIT then
   begin
@@ -96,28 +84,28 @@ begin
                 MaxFG := 8;
                 MaxBG := 8;
                 self.Width := (8 * 23) + 1;
-                self.Height := (1 * 23) + 17;
+                self.Height := (1 * 23) + 1;
               end;
             1: // 16/8
               begin
                 MaxFG := 16;
                 MaxBG := 8;
                 self.Width := (16 * 23) + 1;
-                self.Height := (1 * 23) + 17;
+                self.Height := (1 * 23) + 1;
               end;
             2: // 16/16
               begin
                 MaxFG := 16;
                 MaxBG := 16;
                 self.Width := (16 * 23) + 1;
-                self.Height := (1 * 23) + 17;
+                self.Height := (1 * 23) + 1;
               end;
             3: // 256/256
               begin
                 MaxFG := 256;
                 MaxBG := 256;
                 self.Width := (16 * 23) + 1;
-                self.Height := (16 * 23) + 17;
+                self.Height := (16 * 23) + 1;
               end;
           end;
           if FG >= MaxFG then FG := 7;
@@ -241,66 +229,6 @@ begin
       end;
   end;
 end;
-
-
-// CAPTION BAR
-
-procedure TfColor.pbTitleBarPaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r : TRect;
-const
-  titletxt = 'Color Palette';
-  helptxt = 'left=FG, right=BG';
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  r := pb.ClientRect;
-
-  cnv.Brush.Color := ANSIColor[UICaption];
-  cnv.FillRect(r);
-//  DrawBitmapTiled(textureStone.Bitmap, cnv, r);
-  DrawRectangle3D(cnv, r, true);
-  cnv.Brush.Style:=bsClear;
-  cnv.Font.Color := ANSIColor[UICaptionText];
-  cnv.Font.Size := -11;
-  cnv.Font.Style := [ fsBold ];
-  cnv.TextOut(3,1,titletxt);
-  if Paltype = 0 then
-    cnv.TextOut(pbClose.Left - cnv.TextWidth(helptxt) - 6, 1, helptxt);
-end;
-
-
-
-// CAPTION BAR
-
-procedure TfColor.pbCloseClick(Sender: TObject);
-begin
-  Hide;
-end;
-
-procedure TfColor.pbClosePaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r : TRect;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  r := pb.ClientRect;
-  captionCloseUp.Draw(cnv, r);
-end;
-
-// toolbar move routines
-procedure TfColor.pbTitleBarMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  ReleaseCapture;
-  SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-end;
-
-// end toobar move routines
 
 end.
 

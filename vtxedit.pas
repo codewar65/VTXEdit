@@ -99,12 +99,10 @@ uses
   BGRABitmapTypes,
   Types,
   VTXColorBox,
-  VTXCharBox,
   VTXPreviewBox,
   VTXConst,
   VTXSupport,
   VTXEncDetect,
-  VTXFonts,
   UnicodeHelper,
   LazUTF8,
   Inifiles;
@@ -126,15 +124,11 @@ type
     CoolBar1: TCoolBar;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
-    Label11: TLabel;
-    Label12: TLabel;
-    pbCurrCell: TPaintBox;
-    tbSauceTitle: TEdit;
-    tbSauceAuthor: TEdit;
-    tbSauceGroup: TEdit;
-    tbSauceDate: TEdit;
     Label1: TLabel;
     Label10: TLabel;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label14: TLabel;
     Label2: TLabel;
     Label3: TLabel;
     Label4: TLabel;
@@ -143,45 +137,62 @@ type
     Label7: TLabel;
     Label8: TLabel;
     Label9: TLabel;
+    PageControl1: TPageControl;
+    Panel1: TPanel;
     miFileOpen: TMenuItem;
     miFileSave: TMenuItem;
-    miPrefBackground: TMenuItem;
-    miPrefText: TMenuItem;
-    miPrefCaption: TMenuItem;
-    miPrefCaptionText: TMenuItem;
-    miPreferences: TMenuItem;
     miToolsPreview: TMenuItem;
     miToolsCharacters: TMenuItem;
     miToolsColors: TMenuItem;
     miToolsAttr: TMenuItem;
     miTools: TMenuItem;
     odAnsi: TOpenDialog;
-    pbStatusBar: TPaintBox;
-    pbRulerTop: TPaintBox;
-    pbRulerLeft: TPaintBox;
+    pbChars: TPaintBox;
+    pRightBar: TPanel;
     pbPage: TPaintBox;
+    pbRulerLeft: TPaintBox;
+    pbRulerTop: TPaintBox;
+    pPagePanel: TPanel;
+    pbCurrCell: TPaintBox;
     miFileExit: TMenuItem;
     miFileNew: TMenuItem;
     mMenu: TMainMenu;
     miFile: TMenuItem;
     miEdit: TMenuItem;
     miHelp: TMenuItem;
+    pbStatusBar: TPaintBox;
     pSettings: TPanel;
-    sdAnsi: TSaveDialog;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
+    ScrollBox1: TScrollBox;
+    sbChars: TScrollBox;
+    sdAnsi: TSaveDialog;
+    seCharacter: TSpinEdit;
     seCols: TSpinEdit;
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
-    SpeedButton1: TSpeedButton;
     irqBlink: TTimer;
-    ToolBar1: TToolBar;
+    SpeedButton1: TSpeedButton;
+    TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
+    tbCodePage: TEdit;
+    tbSauceAuthor: TEdit;
+    tbSauceDate: TEdit;
+    tbSauceGroup: TEdit;
+    tbSauceTitle: TEdit;
+    tbTools: TToolBar;
     tbAttributes: TToolBar;
     tbToolFill: TToolButton;
     tbToolEyedropper: TToolButton;
     tbToolLine: TToolButton;
     tbToolRect: TToolButton;
     tbToolEllipse: TToolButton;
+    tbFontSelect: TToolBar;
+    tbFont0: TToolButton;
+    tbFont8: TToolButton;
+    tbFont9: TToolButton;
+    tbFont10: TToolButton;
+    tbUnicode: TEdit;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
     tbModeLeftRights: TToolButton;
@@ -198,7 +209,6 @@ type
     tbAttrReverse: TToolButton;
     tbAttrConceal: TToolButton;
     tbAttrStrikethrough: TToolButton;
-    tbCharacters: TToolButton;
     tbAttrDoublestrike: TToolButton;
     tbAttrShadow: TToolButton;
     tbAttrTop: TToolButton;
@@ -206,16 +216,28 @@ type
     tbAttrCharacter: TToolButton;
     tbAttrFG: TToolButton;
     tbAttrBG: TToolButton;
-    tbFonts: TToolButton;
     tbPreview: TToolButton;
     tbToolSelect: TToolButton;
+    tbFont1: TToolButton;
+    tbFont2: TToolButton;
+    tbFont3: TToolButton;
+    tbFont4: TToolButton;
+    tbFont5: TToolButton;
+    tbFont6: TToolButton;
+    tbFont11: TToolButton;
+    tbFont12: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
-    procedure CoolBar1Resize(Sender: TObject);
-    procedure pbFontsClick(Sender: TObject);
+    tbFont7: TToolButton;
+    procedure BuildCharacterPalette;
+    procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure pbCharsPaint(Sender: TObject);
+    procedure seCharacterChange(Sender: TObject);
     procedure tbAttrClick(Sender: TObject);
     procedure tbAttrMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
+    procedure tbFontClick(Sender: TObject);
     procedure tbModeClick(Sender: TObject);
     procedure tbToolClick(Sender: TObject);
     procedure tbAttributesPaintButton(Sender: TToolButton; State: integer);
@@ -240,11 +262,6 @@ type
     procedure miFileOpenClick(Sender: TObject);
     procedure miFileNewClick(Sender: TObject);
     procedure miFileSaveClick(Sender: TObject);
-    procedure miPrefBackgroundClick(Sender: TObject);
-    procedure miPrefCaptionClick(Sender: TObject);
-    procedure miPrefCaptionTextClick(Sender: TObject);
-    procedure miPrefTextClick(Sender: TObject);
-    procedure miToolsCharactersClick(Sender: TObject);
     procedure miToolsColorsClick(Sender: TObject);
     procedure pbPageMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
@@ -259,7 +276,6 @@ type
     procedure pbPreviewClick(Sender: TObject);
     procedure pbRulerLeftPaint(Sender: TObject);
     procedure pbRulerTopPaint(Sender: TObject);
-    procedure pSettingsPaint(Sender: TObject);
     procedure pbStatusBarPaint(Sender: TObject);
     procedure pToolsPaint(Sender: TObject);
     procedure ResizeScrolls;
@@ -355,9 +371,7 @@ var
   // tool windows
   fColorBox : TfColor;
   fColorPickerBox : TfColor;
-  fCharBox :TfChar;
   fPreviewBox : TfPreview;
-  fFontsBox : TfFonts;
 
   CurrFileName :            unicodestring;
   CurrFileChanged :         boolean;
@@ -395,6 +409,8 @@ var
 
   SkipScroll :              boolean;      // disable scroll to cursor
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
+
+  bmpCharPalette : TBGRABitmap = nil;
 
 {*****************************************************************************}
 
@@ -608,9 +624,7 @@ begin
   // create tool windows
   fColorBox := TfColor.Create(self);
   fColorPickerBox := TfColor.Create(self);
-  fCharBox := TfChar.Create(self);
   fPreviewBox := TfPreview.Create(self);
-  fFontsBox := TfFonts.Create(self);
 
   // initialize new document
   NumRows := 24;
@@ -703,6 +717,9 @@ begin
   CurrCodePage := Fonts[CurrFont];
   cbCodePage.ItemIndex := ord(CurrCodePage);
   CodePageChange;
+  tbFont0.Down := true;
+  BuildCharacterPalette;
+  seCharacter.Value := CurrChar;
 
   PageType := PAGETYPE_BBS;
   cbPageType.ItemIndex := PageType;
@@ -714,8 +731,6 @@ begin
 
   fColorBox.PalType := 0;
   fColorPickerBox.PalType := 1;
-  SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
-  SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_SETVALS, CurrChar);
   SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
   SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
   SendMessage(fColorPickerBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 3);
@@ -742,10 +757,6 @@ begin
     SetBits(CurrAttr, A_CELL_FG_MASK, fColorBox.FG);
     SetBits(CurrAttr, A_CELL_BG_MASK, fColorBox.BG, 8);
   end;
-
-  if fCharBox <> nil then
-    CurrChar := fCharBox.SelectedChar;
-
   pbCurrCell.Invalidate;
 end;
 
@@ -754,18 +765,14 @@ begin
 
   SaveSettings;
   fColorBox.Hide;
-  fCharBox.Hide;
   fPreviewBox.Hide;
   fColorPickerBox.Hide;
-  fFontsBox.Hide;
 
   bmpPage.Free;
 
   fColorBox.Free;
-  fCharBox.Free;
   fPreviewBox.Free;
   fColorPickerBox.Free;
-  fFontsBox.Free;
 
   textureRuler.free;
   iconsNormal.Free;
@@ -779,6 +786,9 @@ begin
   captionCloseDown.free;
   captionAutoRollupUp.free;
   captionAutoRollupDown.free;
+
+  if bmpCharPalette <> nil then bmpCharPalette.Free;
+
 end;
 
 
@@ -1312,7 +1322,11 @@ var
 begin
 
   // let system handle these controls
-  if seRows.Focused or seCols.Focused or seXScale.Focused then exit;
+  if seRows.Focused
+    or seCols.Focused
+    or seXScale.Focused
+    or seCharacter.Focused then
+    exit;
 
   if (Key = VK_SHIFT) or (Key = VK_CONTROL) or (Key = VK_MENU) then exit;
 
@@ -1443,10 +1457,9 @@ begin
           if KeyValue.IndexOf(tmp) <> -1 then
           begin
             ch := FKeys[CurrFKeySet][i];
-            if Unicode then
-// CODEPAGE x
+            if CurrCodePage in [encUTF8, encUTF16 ] then
               ch := CPages[CurrCodePage].EncodingLUT[ch];
-//              ch := CP437[ch];
+
             KeyValue := KeyValue.Replace(tmp, char(ch));
           end;
         end;
@@ -1466,6 +1479,7 @@ begin
         end;
         for i := 0 to KeyValue.Length - 1 do
           PutChar(ord(KeyValue.Chars[i]));
+        ScrollToCursor;
       end;
 
     KA_MODECHARS:
@@ -1541,12 +1555,6 @@ begin
 
     KA_SHOWCHARACTERS:
       begin
-        case KeyValue of
-          '0':  fCharBox.Hide;
-          '1':  fCharBox.Show;
-          else
-            fCharBox.Visible:=not fCharBox.Visible;
-        end;
       end;
 
     KA_SHOWPREVIEW:
@@ -1570,11 +1578,16 @@ end;
 procedure TfMain.FormKeyPress(Sender: TObject; var Key: char);
 begin
 
-  if seRows.Focused or seCols.Focused or seXScale.Focused then exit;
+  if seRows.Focused
+    or seCols.Focused
+    or seXScale.Focused
+    or seCharacter.Focused then
+    exit;
 
   if Between(Key, ' ', '~') then
   begin
     PutChar(ord(Key));
+    ScrollToCursor;
     Key := #0;
   end;
 end;
@@ -1605,7 +1618,7 @@ procedure TfMain.PutCharEx(ch, cattr, row, col : integer);
 var
   attr, mask : UInt32;
 begin
-  ScrollToCursor; // keep cursor on screen if typing
+//  ScrollToCursor; // keep cursor on screen if typing
 
   if tbAttrCharacter.Tag = 0 then     Page.Rows[row].Cells[col].Chr := ch;
 
@@ -1641,7 +1654,7 @@ procedure TfMain.PutChar(ch : integer);
 var
   attr, mask : UInt32;
 begin
-  ScrollToCursor; // keep cursor on screen if typing
+//  ScrollToCursor; // keep cursor on screen if typing
 
   if tbAttrCharacter.Tag = 0 then     Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
 
@@ -1678,11 +1691,6 @@ end;
 
 {-----------------------------------------------------------------------------}
 
-{ Timers }
-
-
-{-----------------------------------------------------------------------------}
-
 { Control events }
 
 procedure TfMain.CodePageChange;
@@ -1692,11 +1700,12 @@ begin
   begin
     Fonts[0] := TEncoding(cbCodePage.ItemIndex);
     CurrCodePage := Fonts[CurrFont];
+    tbCodePage.Text := CPages[Fonts[CurrFont]].Name;
 
     // rebuild page
     GenerateBmpPage;
     pbPage.Invalidate;
-    SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
+    BuildCharacterPalette;
 
     // enable / disable Modes
     tbModeLeftRights.Enabled := CPages[CurrCodePage].CanDrawMode[dmLeftRights];
@@ -1865,20 +1874,10 @@ begin
   cnv:=pb.Canvas;
   r := pb.ClientRect;
 
-  cnv.Brush.Color := ANSIColor[UIBackground];
-  cnv.FillRect(r);
-
   style.Layout := tlCenter;
   style.Alignment:= taLeftJustify;
 
-  DrawLine(cnv, Ctrl3D[3], 0, 0, 0, pb.Height - 1);
-  DrawLine(cnv, Ctrl3D[1], 0, pb.Height - 1, pb.Width - 1, pb.Height - 1);
-  DrawLine(cnv, Ctrl3D[1], pb.Width - 1, pb.Height - 1, pb.Width-1, 0);
-  DrawLine(cnv, Ctrl3D[3], pb.Width-1, 0, pSettings.Width - 1, 0);
-
-  cnv.Brush.Style := bsClear;
   cnv.Font.Size := -11;
-  cnv.Font.Color := ANSIColor[UIText];
   r.left += 6;
   cnv.TextRect(r, r.left, 0, Format('Cursor: R:%0.3d C:%0.3d', [ CursorRow + 1, CursorCol + 1 ]), style);
   r.left += 128;
@@ -1888,8 +1887,6 @@ begin
   r.left += 128;
 
   // draw fkeys
-  cnv.Brush.Style := bsClear;
-  cnv.Font.Color := ANSIColor[UIText];
   str := '[' + IntToStr(CurrFKeySet+1) + ']';
   cnv.TextRect(r, r.left, 0, str, style);
   r.left += cnv.TextWidth(str) + 4;
@@ -1903,7 +1900,7 @@ begin
     ch := FKeys[CurrFKeySet][i];  // 437 char
     u := CP437[ch];               // unicode char
     off := GetGlyphOff(u, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize);
-    GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, (UIText << 8) or UIBackground, false);
+    GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, $0007, false);
     bmp.Draw(cnv, r.left, 4);
     r.left += 12;
   end;
@@ -1919,7 +1916,7 @@ begin
   p := TPanel(Sender);
   cnv := p.Canvas;
 
-  cnv.Brush.Color := ANSIColor[UIBackground];
+  cnv.Brush.Color := ANSIColor[1];
   cnv.FillRect(p.ClientRect);
 
   DrawLine(cnv, Ctrl3D[1], 0, 0, p.Width, 0);
@@ -2107,104 +2104,230 @@ begin
   end;
 end;
 
-procedure TfMain.miPrefBackgroundClick(Sender: TObject);
-begin
-  // pick background color
-  fColorPickerBox.FG := UIBackground;
-  fColorPickerBox.PalType := 1;
-  fColorPickerBox.ShowModal;
-  UIBackground:=fColorPickerBox.FG;
-  Invalidate;
-  fColorBox.Invalidate;
-  fCharBox.Invalidate;
-  fColorPickerBox.Invalidate;
-  fPreviewBox.Invalidate;
-  fFontsBox.Invalidate;
-end;
-
-procedure TfMain.miPrefCaptionClick(Sender: TObject);
-begin
-  fColorPickerBox.FG := UIBackground;
-  fColorPickerBox.PalType := 1;
-  fColorPickerBox.ShowModal;
-  UICaption:=fColorPickerBox.FG;
-  Invalidate;
-  fColorBox.Invalidate;
-  fCharBox.Invalidate;
-  fColorPickerBox.Invalidate;
-  fPreviewBox.Invalidate;
-  fFontsBox.Invalidate;
-end;
-
-procedure TfMain.miPrefCaptionTextClick(Sender: TObject);
-begin
-  fColorPickerBox.FG := UIBackground;
-  fColorPickerBox.PalType := 1;
-  fColorPickerBox.ShowModal;
-  UICaptionText:=fColorPickerBox.FG;
-  Invalidate;
-  fColorBox.Invalidate;
-  fCharBox.Invalidate;
-  fColorPickerBox.Invalidate;
-  fPreviewBox.Invalidate;
-  fFontsBox.Invalidate;
-end;
-
-procedure TfMain.miPrefTextClick(Sender: TObject);
-begin
-  fColorPickerBox.FG := UIBackground;
-  fColorPickerBox.PalType := 1;
-  fColorPickerBox.ShowModal;
-  UIText:=fColorPickerBox.FG;
-  Invalidate;
-  fColorBox.Invalidate;
-  fCharBox.Invalidate;
-  fColorPickerBox.Invalidate;
-  fPreviewBox.Invalidate;
-  fFontsBox.Invalidate;
-end;
-
-procedure TfMain.miToolsCharactersClick(Sender: TObject);
-begin
-  fCharBox.Visible := not fCharBox.Visible;
-end;
-
 procedure TfMain.miToolsColorsClick(Sender: TObject);
 begin
   fColorBox.Visible := not fColorBox.Visible;
 end;
 
-procedure TfMain.pbFontsClick(Sender: TObject);
+procedure TfMain.BuildCharacterPalette;
+var
+  rows : integer;
+  i : integer;
+  x, y : integer;
+  off : integer;
+  cell : TBGRABitmap;
+  rect : TRect;
+  NumChars : integer;
+
+const
+  PALCOLS = 16;
+  CELL_WIDTH = 21;
+  CELL_HEIGHT = 40;
+
 begin
-  fFontsBox.Visible := not fFontsBox.Visible;
+  // build palette
+  seCharacter.Enabled := false;
+  cell := TBGRABitmap.Create(8,16);
+  if (CurrCodePage = encUTF8) or (CurrCodePage = encUTF16) then
+  begin
+    NumChars := math.floor(length(UVGA16) / 18) - 1;
+    seCharacter.MinValue := $0020;
+    seCharacter.MaxValue := $FFFF;
+  end
+  else
+  begin
+    NumChars := 256;
+    seCharacter.MinValue := $0000;
+    seCharacter.MaxValue := $00FF;
+  end;
+  if not between(CurrChar, seCharacter.MinValue, seCharacter.MaxValue) then
+  begin
+    // todo : check invalid if UTF8/16
+    CurrChar := 32;
+    seCharacter.Value := CurrChar;
+    tbUnicode.Text := '32';
+  end;
+  seCharacter.Enabled := true;
+
+  rows := (NumChars - 1) div PALCOLS + 1;
+  if bmpCharPalette <> nil then
+    bmpCharPalette.Free;
+  bmpCharPalette := TBGRABitmap.Create(PALCOLS * CELL_WIDTH + 4, rows * CELL_HEIGHT + 4);
+  bmpCharPalette.FillRect(0,0,bmpCharPalette.Width,bmpCharPalette.Height,clBlack);
+
+  for i := 0 to NumChars - 1 do
+  begin
+
+    if CurrCodePage in [ encUTF8, encUTF16 ]then
+      off := (i + 1) * 18 + 2
+    else
+      off := CPages[CurrCodePage].QuickGlyph[i];
+
+    y := i div PALCOLS;
+    x := i - (y * PALCOLS);
+
+    x := x * CELL_WIDTH + 2;
+    y := y * CELL_HEIGHT + 2;
+
+    // draw simple glyph in cell (8x16)
+    GetGlyphBmp(cell, CPages[CurrCodePage].GlyphTable, off, 15, false);
+
+    rect.Left := 2 + x;
+    rect.Top := 2 + y;
+    rect.Width := 16;
+    rect.Height := 32;
+
+    bmpCharPalette.FillRect(2 + x - 1, 2 + y - 1, 4 + x + 17, 2 + y + 33, clDkGray);
+    cell.Draw(bmpCharPalette.Canvas, rect);
+  end;
+  cell.Free;
+  pbChars.Invalidate;
 end;
 
-procedure TfMain.CoolBar1Resize(Sender: TObject);
+procedure TfMain.pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
 var
-  h, oldh, newh, delta : integer;
+  off, i : integer;
+
+const
+  PALCOLS = 16;
+  CELL_WIDTH = 21;
+  CELL_HEIGHT = 40;
+
 begin
-  oldh := pSettings.Top;
-  newh := CoolBar1.Height;
-  delta := oldh - newh;
+  // click to select
+  y := (y - 4) div CELL_HEIGHT;
+  x := (x - 4) div CELL_WIDTH;
+  seCharacter.Enabled := false;
+  if between(x, 0, 15) and (y >= 0) then
+  begin
+    i := y * PALCOLS + x;
+    if CurrCodePage in [ encUTF8, encUTF16 ] then
+    begin
+      off := (i + 1) * 18;
+      i := (UVGA16[off] << 8) or UVGA16[off+1];
+      CurrChar := i;
+      seCharacter.value := i;
+      tbUnicode.Text := IntToStr(i);
+    end
+    else
+    begin
+      CurrChar := i;
+      seCharacter.value := i;
+      tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[i]);
+    end;
+  end;
+  seCharacter.Enabled := true;
+  pbChars.Invalidate;
+end;
 
+procedure TfMain.pbCharsPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  i, x, y : integer;
 
-  pSettings.Top := newh;
-  h := pSettings.Height + delta;
-  pSettings.Height := h;
+const
+  PALCOLS = 16;
+  CELL_WIDTH = 21;
+  CELL_HEIGHT = 40;
 
-  pbRulerTop.Top := newh;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
 
-  pbRulerLeft.Top := pbRulerTop.Height + newh;
-  h := pbRulerLeft.Height + delta;
-  pbRulerLeft.Height := h;
+  pb.Width := bmpCharPalette.Width;
+  pb.Height := bmpCharPalette.Height;
+  bmpCharPalette.Draw(cnv, 0, 0);
 
-  sbVert.Top := pbRulerTop.Height + newh;
-  h := sbVert.Height + delta;
-  sbVert.Height := h;
+  // hilight the selected char
+  if CurrCodePage in [ encUTF8, encUTF16 ] then
+    // convert unicode to offset
+    i := (GetGlyphOff(
+      CurrChar,
+      CPages[CurrCodePage].GlyphTable,
+      CPages[CurrCodePage].GlyphTableSize) - 2) div 18 - 1
+  else
+    i := CurrChar;
 
-  pbPage.Top := pbRulerTop.Height + newh;
-  h := pbPage.Height + delta;
-  pbPage.Height := h;
+  y := i div PALCOLS;
+  x := i - (y * PALCOLS);
+  x := x * CELL_WIDTH + 4;
+  y := y * CELL_HEIGHT + 2;
+
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clRed;
+  cnv.Pen.Width := 1;
+  cnv.Rectangle(x, y, x + 20, y + 36);
+
+  pbCurrCell.Invalidate;
+end;
+
+// get next available glyph in uvga
+function GetNextUnicodeChar(chr : integer) : integer;
+var
+  i : integer;
+begin
+  for i := chr to $FFFF do
+    if GetGlyphOff(i, @UVGA16, sizeof(UVGA16)) <> 2 then
+      exit (i);
+  result := 0;
+end;
+
+function GetPrevUnicodeChar(chr : integer) : integer;
+var
+  i : integer;
+begin
+  for i := chr downto $0000 do
+    if GetGlyphOff(i, @UVGA16, sizeof(UVGA16)) <> 2 then
+      exit (i);
+  result := 0;
+end;
+
+var
+  LastCharNum : integer = 0;
+
+procedure TfMain.seCharacterChange(Sender: TObject);
+var
+  chr : integer;
+begin
+  if TSpinEdit(sender).enabled then
+  begin
+    chr := seCharacter.Value;
+    if CurrCodePage in [ encUTF8, encUTF16 ] then
+    begin
+      // code to skip to char
+      if GetGlyphOff(chr, @UVGA16, sizeof(UVGA16)) <> 2 then
+        CurrChar := chr
+      else
+      begin
+        if LastCharNum > chr then
+        begin
+          CurrChar := GetPrevUnicodeChar(chr);
+          if CurrChar = 0 then
+            CurrChar := GetPrevUnicodeChar($FFFF);
+        end
+        else
+        begin
+          CurrChar := GetNextUnicodeChar(chr);
+          if CurrChar = 0 then
+            CurrChar := GetNextUnicodeChar(1);
+        end;
+
+        seCharacter.Enabled := false;
+        seCharacter.Value := CurrChar;
+        seCharacter.Enabled := true;
+      end;
+      tbUnicode.Text := IntToStr(CurrChar);
+    end
+    else
+    begin
+      CurrChar := seCharacter.Value;
+      tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[CurrChar]);
+    end;
+    LastCharNum := CurrChar;
+    pbChars.Invalidate;
+  end;
 end;
 
 procedure TfMain.tbAttrClick(Sender: TObject);
@@ -2291,6 +2414,84 @@ begin
     tb.Tag := iif(tb.Tag = 0, 1, 0);
     tb.invalidate;
   end;
+end;
+
+procedure TfMain.tbFontClick(Sender: TObject);
+var
+  tb : TToolButton;
+begin
+  tb := TToolButton(Sender);
+  case tb.Name of
+    'tbFont0':
+      begin
+        CurrFont := 0;
+      end;
+    'tbFont1':
+      begin
+        CurrFont := 1;
+      end;
+    'tbFont2':
+      begin
+        CurrFont := 2;
+      end;
+    'tbFont3':
+      begin
+        CurrFont := 3;
+      end;
+    'tbFont4':
+      begin
+        CurrFont := 4;
+      end;
+    'tbFont5':
+      begin
+        CurrFont := 5;
+      end;
+    'tbFont6':
+      begin
+        CurrFont := 6;
+      end;
+    'tbFont7':
+      begin
+        CurrFont := 7;
+      end;
+    'tbFont8':
+      begin
+        CurrFont := 8;
+      end;
+    'tbFont9':
+      begin
+        CurrFont := 9;
+      end;
+    'tbFont10':
+      begin
+        CurrFont := 10;
+      end;
+    'tbFont11':
+      begin
+        CurrFont := 11;
+      end;
+    'tbFont12':
+      begin
+        CurrFont := 12;
+      end;
+  end;
+
+  tbFont0.Down := (tb.Name = 'tbFont0');
+  tbFont1.Down := (tb.Name = 'tbFont1');
+  tbFont2.Down := (tb.Name = 'tbFont2');
+  tbFont3.Down := (tb.Name = 'tbFont3');
+  tbFont4.Down := (tb.Name = 'tbFont4');
+  tbFont5.Down := (tb.Name = 'tbFont5');
+  tbFont6.Down := (tb.Name = 'tbFont6');
+  tbFont7.Down := (tb.Name = 'tbFont7');
+  tbFont8.Down := (tb.Name = 'tbFont8');
+  tbFont9.Down := (tb.Name = 'tbFont9');
+  tbFont10.Down := (tb.Name = 'tbFont10');
+  tbFont11.Down := (tb.Name = 'tbFont11');
+  tbFont12.Down := (tb.Name = 'tbFont12');
+
+  // update character palette here.
+
 end;
 
 procedure TfMain.tbModeClick(Sender: TObject);
@@ -2595,6 +2796,7 @@ var
         CurrCodePage := encUTF8;
         cbCodePage.ItemIndex := ord(CurrCodePage);
         cbCodePageChange(cbCodePage);
+        BuildCharacterPalette;
       end;
       ansi := ansi.fromUTF8Bytes(buff);
     end
@@ -2607,6 +2809,7 @@ var
         CurrCodePage := encUTF16;
         cbCodePage.ItemIndex := ord(CurrCodePage);
         cbCodePageChange(cbCodePage);
+        BuildCharacterPalette;
       end;
       ansi := ansi.fromUTF16Bytes(buff);
     end
@@ -2620,6 +2823,7 @@ var
         CurrCodePage := encCP437;
         cbCodePage.ItemIndex := ord(CurrCodePage);
         cbCodePageChange(cbCodePage);
+        BuildCharacterPalette;
       end;
 
       // only use sause in 8bit CodePaged files.
@@ -3233,8 +3437,6 @@ begin
     CursorCol := 0;
     SkipScroll := false;
     SetAttrButtons(CurrAttr);
-    SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
-    SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_SETVALS, CurrChar);
     SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
     SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
 
@@ -3445,9 +3647,7 @@ var
 begin
   hw := GetActiveWindow;
   if (hw = fColorBox.Handle)
-  or (hw = fCharBox.Handle)
-  or (hw = fPreviewBox.Handle)
-  or (hw = fFontsBox.handle) then
+  or (hw = fPreviewBox.Handle) then
   begin
     BringToFront;
     Activate;
@@ -3986,20 +4186,6 @@ begin
   end;
 end;
 
-procedure TfMain.pSettingsPaint(Sender: TObject);
-var
-  p:TPanel;
-  cnv:TCanvas;
-begin
-  p:=TPanel(Sender);
-  cnv:=p.Canvas;
-  p.Font.Color := ANSIColor[UIText];
-  cnv.Brush.Color := ANSIColor[UIBackground];
-  cnv.FillRect(p.ClientRect);
-  DrawLine(cnv, Ctrl3D[3], 0, 0, 0, p.Height-1);
-  DrawLine(cnv, Ctrl3D[1], p.Width-1,p.Height-1, p.Width-1, 0);
-end;
-
 // draw cell at row, col at x, y of cnv (also copy to bmpPage)
 procedure TfMain.DrawCellEx(cnv : TCanvas; x, y, row, col : integer; skipUpdate : boolean = true);
 var
@@ -4230,10 +4416,6 @@ const
 
 begin
   iin := TIniFile.Create('vtxedit.ini');
-  UIBackground :=   iin.ReadInteger(sect, 'Background', 7);
-  UIText :=         iin.ReadInteger(sect, 'Text', 0);
-  UICaption :=      iin.ReadInteger(sect, 'Caption', 4);
-  UICaptionText :=  iin.ReadInteger(sect, 'CaptionText', 15);
 
   q := StrToQuad(iin.ReadString(sect, 'Window','64,64 640,480'));
   SetFormQuad(fMain, q);
@@ -4242,16 +4424,11 @@ begin
   q.v2 := 0;
   SetFormQuad(fColorBox, q);
 
-  q := StrToQuad(iin.ReadString(sect, 'CharBox', '64,64 640,480'));
-  q.v2 := 0;
-  SetFormQuad(fCharBox, q);
-
   q := StrToQuad(iin.ReadString(sect, 'PreviewBox', '64,64 640,480'));
   q.v2 := 0;
   SetFormQuad(fPreviewBox, q);
 
   if iin.ReadBool(sect, 'ColorBoxOpen', false) then fColorBox.Show;
-  if iin.ReadBool(sect, 'CharBoxOpen', false) then fCharBox.Show;
   if iin.ReadBool(sect, 'PreviewBoxOpen', false) then fPreviewBox.Show;
   if iin.ReadBool(sect, 'WindowMax', false) then fMain.WindowState := wsMaximized;
 
@@ -4883,19 +5060,13 @@ const
   sect : unicodestring = 'VTXEdit';
 begin
   iin := TIniFile.Create('vtxedit.ini');
-  iin.WriteInteger(sect, 'Background', UIBackground);
-  iin.WriteInteger(sect, 'Text', UIText);
-  iin.WriteInteger(sect, 'Caption', UICaption);
-  iin.WriteInteger(sect, 'CaptionText', UICaptionText);
 
   // window positions
   iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
   iin.WriteString(sect, 'ColorBox', QuadToStr(GetFormQuad(fColorBox)));
-  iin.WriteString(sect, 'CharBox', QuadToStr(GetFormQuad(fCharBox)));
   iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
 
   iin.WriteBool(sect, 'ColorBoxOpen', fColorBox.Showing);
-  iin.WriteBool(sect, 'CharBoxOpen', fCharBox.Showing);
   iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
 
   iin.WriteBool(sect, 'WindowMax', fMain.WindowState = wsMaximized);

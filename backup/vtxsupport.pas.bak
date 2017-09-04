@@ -351,7 +351,6 @@ function Brighten(color : TColor; factor: real): TColor;
 var
   r, g, b : double;
 begin
-
   r := Norm(Red(color));
   g := Norm(Green(color));
   b := Norm(Blue(color));

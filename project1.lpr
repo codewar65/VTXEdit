@@ -36,9 +36,8 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, VTXEdit, VTXConst, VTXColorBox, VTXCharBox, VTXPreviewBox,
-  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper, VTXFonts
-  { you can add units after this };
+  Forms, VTXEdit, VTXConst, VTXColorBox, VTXPreviewBox,
+  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper;
 
 {$R *.res}
 
@@ -47,7 +46,6 @@ begin
   RequireDerivedFormResource:=True;
   Application.Initialize;
   Application.CreateForm(TfMain, fMain);
-  Application.CreateForm(TfFonts, fFonts);
   Application.Run;
 end.
 
