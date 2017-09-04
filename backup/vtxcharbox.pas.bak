@@ -87,7 +87,7 @@ type
 
 var
   Unicode : boolean;
-  UseCodePage : TEncoding;		// codepage to use.
+  UseCodePage : TEncoding;    // codepage to use.
   fChar: TfChar;
   NumChars : integer;
 
@@ -143,7 +143,7 @@ begin
   begin
 
     if Unicode then
-    	off := (i + 1) * 18 + 2
+      off := (i + 1) * 18 + 2
     else
       off := CPages[UseCodePage].QuickGlyph[i];
 
@@ -171,7 +171,7 @@ end;
 procedure TfChar.FormDestroy(Sender: TObject);
 begin
   if bmp <> nil then
-	  bmp.Free;
+    bmp.Free;
 end;
 
 procedure TfChar.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -179,33 +179,33 @@ var
   off, i : integer;
 begin
   // get index of selected char
-	if Unicode then
+  if Unicode then
     // convert unicode to offset
-  	i := (GetGlyphOff(
-    	SelectedChar,
+    i := (GetGlyphOff(
+      SelectedChar,
       CPages[UseCodePage].GlyphTable,
       CPages[UseCodePage].GlyphTableSize) - 2) div 18 - 1
   else
     i := SelectedChar;
 
   case Key of
-		VK_UP:		i -= 16;
-    VK_DOWN:	i += 16;
-    VK_LEFT:	i -= 1;
-    VK_RIGHT:	i += 1;
+    VK_UP:    i -= 16;
+    VK_DOWN:  i += 16;
+    VK_LEFT:  i -= 1;
+    VK_RIGHT: i += 1;
   end;
 
-	if i < 0 then
-  	i := 0;
+  if i < 0 then
+    i := 0;
   if unicode then
   begin
-	  if i >= (UVGA16_COUNT - 1) then
-  		i := (UVGA16_COUNT - 2);
+    if i >= (UVGA16_COUNT - 1) then
+      i := (UVGA16_COUNT - 2);
   end
   else
   begin
-  	if i >= 256 then
-    	i := 255;
+    if i >= 256 then
+      i := 255;
   end;
 
   seCharacter.Enabled := false;
@@ -227,16 +227,16 @@ begin
   end;
   seCharacter.Enabled := true;
   pbChars.Invalidate;
-	SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
+  SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
 end;
 
 procedure TfChar.ScrollToChar;
 begin
   // scroll to selected char if off screen.
 //  if (ScrollBox1.VertScrollBar.Position + 36) < y then
-//		ScrollBox1.VertScrollBar.Position := y;
+//    ScrollBox1.VertScrollBar.Position := y;
 //  if ScrollBox1.VertScrollBar.Position > (y) then
-//		ScrollBox1.VertScrollBar.Position := y;
+//    ScrollBox1.VertScrollBar.Position := y;
 end;
 
 procedure TfChar.FormResize(Sender: TObject);
@@ -291,7 +291,7 @@ begin
   end;
   seCharacter.Enabled := true;
   pbChars.Invalidate;
-	SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
+  SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
 end;
 
 procedure TfChar.pbCharsPaint(Sender: TObject);
@@ -308,10 +308,10 @@ begin
   bmp.Draw(cnv, 0, 0);
 
   // hilight the selected char
-	if Unicode then
+  if Unicode then
     // convert unicode to offset
-  	i := (GetGlyphOff(
-    	SelectedChar,
+    i := (GetGlyphOff(
+      SelectedChar,
       CPages[UseCodePage].GlyphTable,
       CPages[UseCodePage].GlyphTableSize) - 2) div 18 - 1
   else
@@ -330,21 +330,21 @@ end;
 
 procedure TfChar.seCharacterChange(Sender: TObject);
 begin
-	if TSpinEdit(sender).enabled then
+  if TSpinEdit(sender).enabled then
   begin
     if Unicode then
     else
     begin
       SelectedChar := seCharacter.Value;
       if Unicode then
-      	tbUnicode.Text := IntToStr(SelectedChar)
-  		else
+        tbUnicode.Text := IntToStr(SelectedChar)
+      else
 // CODEPAGE
-//  			tbUnicode.Text := IntToStr(CP437[SelectedChar]);
-				tbUnicode.Text := IntToStr(CPages[UseCodePage].EncodingLUT[SelectedChar]);
+//        tbUnicode.Text := IntToStr(CP437[SelectedChar]);
+        tbUnicode.Text := IntToStr(CPages[UseCodePage].EncodingLUT[SelectedChar]);
     end;
     pbChars.Invalidate;
-  	SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
+    SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
   end;
 end;
 
@@ -355,7 +355,7 @@ var
   pwp : PWINDOWPOS;
   bx, by : integer;
 begin
-	if Msg.msg = WM_VTXEDIT then
+  if Msg.msg = WM_VTXEDIT then
   begin
     case Msg.wParam of
       WA_CHAR_CODEPAGE:
@@ -372,11 +372,11 @@ begin
           SelectedChar := Msg.lParam;
           seCharacter.Enabled := false;
           seCharacter.Value := SelectedChar;
-					if Unicode then
+          if Unicode then
             tbUnicode.Text := IntToStr(SelectedChar)
-					else
+          else
 // CODEPAGE
-          	tbUnicode.Text := IntToStr(CPages[UseCodePage].EncodingLUT[SelectedChar]);
+            tbUnicode.Text := IntToStr(CPages[UseCodePage].EncodingLUT[SelectedChar]);
 //            tbUnicode.Text := IntToStr(CP437[SelectedChar]);
           seCharacter.Enabled := true;
           pbChars.Invalidate;
@@ -396,7 +396,7 @@ end;
 
 procedure TfChar.iCloseClick(Sender: TObject);
 begin
-	Hide;
+  Hide;
 end;
 
 procedure TfChar.pbCloseClick(Sender: TObject);
@@ -413,7 +413,7 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   r := pb.ClientRect;
-	captionCloseUp.Draw(cnv, r);
+  captionCloseUp.Draw(cnv, r);
 end;
 
 // resize grabber

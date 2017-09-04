@@ -93,12 +93,11 @@ uses
   StdCtrls,
   Buttons,
   Graphics,
-  Spin,
+  Spin, ComCtrls,
   Math,
   BGRABitmap,
   BGRABitmapTypes,
   Types,
-  VTXAttrBox,
   VTXColorBox,
   VTXCharBox,
   VTXPreviewBox,
@@ -124,10 +123,12 @@ type
     cbCodePage: TComboBox;
     cbColorScheme: TComboBox;
     cbPageType: TComboBox;
+    CoolBar1: TCoolBar;
+    ilButtons: TImageList;
+    ilDisabledButtons: TImageList;
     Label11: TLabel;
     Label12: TLabel;
     pbCurrCell: TPaintBox;
-    pbFonts: TPaintBox;
     tbSauceTitle: TEdit;
     tbSauceAuthor: TEdit;
     tbSauceGroup: TEdit;
@@ -155,24 +156,6 @@ type
     miToolsAttr: TMenuItem;
     miTools: TMenuItem;
     odAnsi: TOpenDialog;
-    pbAttribPalette: TPaintBox;
-    pbToolEyedropper: TPaintBox;
-    pbToolRect: TPaintBox;
-    pbToolEllipse: TPaintBox;
-    pbModeChars: TPaintBox;
-    pbModeLeftRights: TPaintBox;
-    pbModeTopBottoms: TPaintBox;
-    pbModeQuarters: TPaintBox;
-    pbModeSixels: TPaintBox;
-    pbColorPalette: TPaintBox;
-    pbCharPalette: TPaintBox;
-    pbPreview: TPaintBox;
-    pbRowAttribPalette: TPaintBox;
-    pbToolNormal: TPaintBox;
-    pbToolDraw: TPaintBox;
-    pbToolFill: TPaintBox;
-    pbToolLine: TPaintBox;
-    pTools: TPanel;
     pbStatusBar: TPaintBox;
     pbRulerTop: TPaintBox;
     pbRulerLeft: TPaintBox;
@@ -192,7 +175,50 @@ type
     seXScale: TFloatSpinEdit;
     SpeedButton1: TSpeedButton;
     irqBlink: TTimer;
+    ToolBar1: TToolBar;
+    tbAttributes: TToolBar;
+    tbToolFill: TToolButton;
+    tbToolEyedropper: TToolButton;
+    tbToolLine: TToolButton;
+    tbToolRect: TToolButton;
+    tbToolEllipse: TToolButton;
+    ToolButton15: TToolButton;
+    tbModeCharacter: TToolButton;
+    tbModeLeftRights: TToolButton;
+    tbModeTopBottoms: TToolButton;
+    tbModeQuarters: TToolButton;
+    tbColors: TToolButton;
+    tbModeSixels: TToolButton;
+    tbAttrBold: TToolButton;
+    tbAttrFaint: TToolButton;
+    tbAttrItalics: TToolButton;
+    tbAttrUnderline: TToolButton;
+    tbAttrBlinkSlow: TToolButton;
+    tbAttrBlinkFast: TToolButton;
+    tbAttrReverse: TToolButton;
+    tbAttrConceal: TToolButton;
+    tbAttrStrikethrough: TToolButton;
+    tbCharacters: TToolButton;
+    tbAttrDoublestrike: TToolButton;
+    tbAttrShadow: TToolButton;
+    tbAttrTop: TToolButton;
+    tbAttrBottom: TToolButton;
+    tbAttrCharacter: TToolButton;
+    tbAttrFG: TToolButton;
+    tbAttrBG: TToolButton;
+    tbFonts: TToolButton;
+    tbPreview: TToolButton;
+    tbToolSelect: TToolButton;
+    ToolButton8: TToolButton;
+    tbToolDraw: TToolButton;
+    procedure CoolBar1Resize(Sender: TObject);
     procedure pbFontsClick(Sender: TObject);
+    procedure tbAttrClick(Sender: TObject);
+    procedure tbAttrMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure tbModeClick(Sender: TObject);
+    procedure tbToolClick(Sender: TObject);
+    procedure tbAttributesPaintButton(Sender: TToolButton; State: integer);
     procedure UpdateTitles;
     procedure SaveVTXFile(fname : string);
     procedure LoadVTXFile(fname : string);
@@ -200,17 +226,7 @@ type
     procedure UpdateFromTools;
     procedure UpdatePreview;
     procedure DrawCellEx(cnv : TCanvas; x, y, row, col : integer; skipUpdate : boolean = true);
-    procedure bModeCharsClick(Sender: TObject);
-    procedure bModeLeftRightsClick(Sender: TObject);
-    procedure bModeQuartersClick(Sender: TObject);
-    procedure bModeSixelsClick(Sender: TObject);
-    procedure bToolDrawClick(Sender: TObject);
-    procedure bToolEllipseClick(Sender: TObject);
-    procedure bToolFillClick(Sender: TObject);
-    procedure bToolLineClick(Sender: TObject);
-    procedure bToolNormalClick(Sender: TObject);
-    procedure bToolRectClick(Sender: TObject);
-    procedure bModeTopBottomsClick(Sender: TObject);
+    procedure SetAttrButtons(attr : Uint32);
     procedure cbCodePageChange(Sender: TObject);
     procedure cbColorSchemeChange(Sender: TObject);
     procedure cbPageTypeChange(Sender: TObject);
@@ -228,7 +244,6 @@ type
     procedure miPrefCaptionClick(Sender: TObject);
     procedure miPrefCaptionTextClick(Sender: TObject);
     procedure miPrefTextClick(Sender: TObject);
-    procedure miToolsAttrClick(Sender: TObject);
     procedure miToolsCharactersClick(Sender: TObject);
     procedure miToolsColorsClick(Sender: TObject);
     procedure pbPageMouseDown(Sender: TObject; Button: TMouseButton;
@@ -338,7 +353,6 @@ implementation
 
 var
   // tool windows
-  fAttrBox : TfAttr;
   fColorBox : TfColor;
   fColorPickerBox : TfColor;
   fCharBox :TfChar;
@@ -592,7 +606,6 @@ begin
   bmp.free;
 
   // create tool windows
-  fAttrBox := TfAttr.Create(self);
   fColorBox := TfColor.Create(self);
   fColorPickerBox := TfColor.Create(self);
   fCharBox := TfChar.Create(self);
@@ -632,8 +645,8 @@ begin
 
   ToolMode := tmNormal;
   DrawMode := dmChars;
-  SetDown(pbToolNormal, true);
-  SetDown(pbModeChars, true);
+  tbToolSelect.Down := true;
+  tbModeCharacter.Down := true;
   SubXSize := 1;
   SubYSize := 1;
 
@@ -703,7 +716,6 @@ begin
   fColorPickerBox.PalType := 1;
   SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
   SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_SETVALS, CurrChar);
-  SendMessage(fAttrBox.Handle, WM_VTXEDIT, WA_ATTR_SETVALS, CurrAttr);
   SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
   SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
   SendMessage(fColorPickerBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 3);
@@ -725,28 +737,6 @@ procedure TfMain.UpdateFromTools;
 begin
   // fetch values from tool windows.
   // build CurrAttr based on controls
-  if fAttrBox <> nil then
-  begin
-    SetBit(CurrAttr, A_CELL_BOLD, fAttrBox.Bold);
-    SetBit(CurrAttr, A_CELL_FAINT, fAttrBox.Faint);
-    SetBit(CurrAttr, A_CELL_ITALICS, fAttrBox.Italics);
-    SetBit(CurrAttr, A_CELL_UNDERLINE, fAttrBox.Underline);
-    SetBit(CurrAttr, A_CELL_BLINKSLOW, fAttrBox.BlinkSlow);
-    SetBit(CurrAttr, A_CELL_BLINKFAST, fAttrBox.BlinkFast);
-    SetBit(CurrAttr, A_CELL_REVERSE, fAttrBox.Reverse);
-    SetBit(CurrAttr, A_CELL_STRIKETHROUGH, fAttrBox.Strikethrough);
-    SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, fAttrBox.Doublestrike);
-    SetBit(CurrAttr, A_CELL_SHADOW, fAttrBox.Shadow);
-    if fAttrBox.Conceal then
-      SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL)
-    else if fAttrBox.TopHalf then
-      SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP)
-    else if fAttrBox.BottomHalf then
-      SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM)
-    else
-      SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
-  end;
-
   if fColorBox <> nil then
   begin
     SetBits(CurrAttr, A_CELL_FG_MASK, fColorBox.FG);
@@ -763,7 +753,6 @@ procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
 
   SaveSettings;
-  fAttrBox.Hide;
   fColorBox.Hide;
   fCharBox.Hide;
   fPreviewBox.Hide;
@@ -772,7 +761,6 @@ begin
 
   bmpPage.Free;
 
-  fAttrBox.Free;
   fColorBox.Free;
   fCharBox.Free;
   fPreviewBox.Free;
@@ -1481,76 +1469,40 @@ begin
       end;
 
     KA_MODECHARS:
-      begin
-        pb := pbModeChars;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbModeCharacter.Enabled then tbModeCharacter.Click;
 
     KA_MODELEFTRIGHTBLOCKS:
-      begin
-        pb := pbModeLeftRights;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbModeLeftRights.Enabled then tbModeLeftRights.Click;
 
     KA_MODETOPBOTTOMBLOCKS:
-      begin
-        pb := pbModeTopBottoms;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbModeTopBottoms.Enabled then tbModeTopBottoms.Click;
 
     KA_MODEQUARTERBLOCKS:
-      begin
-        pb := pbModeQuarters;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbModeQuarters.Enabled then tbModeQuarters.Click;
 
     KA_MODESIXELS:
-      begin
-        pb := pbModeSixels;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbModeSixels.Enabled then tbModeSixels.Click;
 
     KA_TOOLSELECT:
-      begin
-        pb := pbToolNormal;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolSelect.Enabled then tbToolSelect.Click;
 
     KA_TOOLDRAW:
-      begin
-        pb := pbToolDraw;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolDraw.Enabled then tbToolDraw.Click;
 
     KA_TOOLFILL:
-      begin
-        pb := pbToolFill;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolFill.Enabled then tbToolFill.Click;
 
     KA_TOOLLINE:
-      begin
-        pb := pbToolLine;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolLine.Enabled then tbToolLine.Click;
 
     KA_TOOLRECTANGLE:
-      begin
-        pb := pbToolRect;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolRect.Enabled then tbToolRect.Click;
 
     KA_TOOLELLIPSE:
-      begin
-        pb := pbToolEllipse;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolEllipse.Enabled then tbToolEllipse.Click;
 
     KA_TOOLEYEDROPPER:
-      begin
-        pb := pbToolEyedropper;
-        if pb.Enabled then pb.OnClick(pb);
-      end;
+      if tbToolEyedropper.Enabled then tbToolEyedropper.Click;
 
     KA_FILENEW:
       begin
@@ -1574,12 +1526,6 @@ begin
 
     KA_SHOWATTRIBUTES:
       begin
-        case KeyValue of
-          '0':  fAttrBox.Hide;
-          '1':  fAttrBox.Show;
-          else
-            fAttrBox.Visible:=not fAttrBox.Visible;
-        end;
       end;
 
     KA_SHOWCOLORS:
@@ -1661,39 +1607,26 @@ var
 begin
   ScrollToCursor; // keep cursor on screen if typing
 
-  if not GetIgnore(fAttrBox.bCharacter) then
-    Page.Rows[row].Cells[col].Chr := ch;
+  if tbAttrCharacter.Tag = 0 then     Page.Rows[row].Cells[col].Chr := ch;
 
   // build attribute Mask
   mask := $00000000;
-  if not GetIgnore(fAttrBox.bForeground) then
-    mask := mask or A_CELL_FG_MASK;
-  if not GetIgnore(fAttrBox.bBackground) then
-    mask := mask or A_CELL_BG_MASK;
+  if tbAttrFG.Tag = 0 then            mask := mask or A_CELL_FG_MASK;
+  if tbAttrBG.Tag = 0 then            mask := mask or A_CELL_BG_MASK;
 
-  if not GetIgnore(fAttrBox.bBold) then
-    mask := mask or A_CELL_BOLD;
-  if not GetIgnore(fAttrBox.bFaint) then
-    mask := mask or A_CELL_FAINT;
-  if not GetIgnore(fAttrBox.bUnderline) then
-    mask := mask or A_CELL_UNDERLINE;
-  if not GetIgnore(fAttrBox.bBlinkSlow) then
-    mask := mask or A_CELL_BLINKSLOW;
-  if not GetIgnore(fAttrBox.bBlinkFast) then
-    mask := mask or A_CELL_BLINKFAST;
-  if not GetIgnore(fAttrBox.bReverse) then
-    mask := mask or A_CELL_REVERSE;
-  if not GetIgnore(fAttrBox.bStrikethrough) then
-    mask := mask or A_CELL_STRIKETHROUGH;
-  if not GetIgnore(fAttrBox.bDoublestrike) then
-    mask := mask or A_CELL_DOUBLESTRIKE;
-  if not GetIgnore(fAttrBox.bShadow) then
-    mask := mask or A_CELL_SHADOW;
+  if tbAttrBold.Tag = 0 then          mask := mask or A_CELL_BOLD;
+  if tbAttrFaint.Tag = 0 then         mask := mask or A_CELL_FAINT;
+  if tbAttrUnderline.Tag = 0 then     mask := mask or A_CELL_UNDERLINE;
+  if tbAttrBlinkSlow.Tag = 0 then     mask := mask or A_CELL_BLINKSLOW;
+  if tbAttrBlinkFast.Tag = 0 then     mask := mask or A_CELL_BLINKFAST;
+  if tbAttrReverse.Tag = 0 then       mask := mask or A_CELL_REVERSE;
+  if tbAttrStrikethrough.Tag = 0 then mask := mask or A_CELL_STRIKETHROUGH;
+  if tbAttrDoublestrike.Tag = 0 then  mask := mask or A_CELL_DOUBLESTRIKE;
+  if tbAttrShadow.Tag = 0 then        mask := mask or A_CELL_SHADOW;
 
-  if not GetIgnore(fAttrBox.bConceal)
-  or not GetIgnore(fAttrBox.bReverse)
-  or not GetIgnore(fAttrBox.bReverse) then
-    mask := mask or A_CELL_DISPLAY_MASK;
+  if (tbAttrConceal.Tag = 0)
+  or (tbAttrTop.Tag = 0)
+  or (tbAttrBottom.Tag = 0) then      mask := mask or A_CELL_DISPLAY_MASK;
 
   attr := Page.Rows[row].Cells[col].Attr;
   attr := attr and (not mask);
@@ -1710,39 +1643,26 @@ var
 begin
   ScrollToCursor; // keep cursor on screen if typing
 
-  if not GetIgnore(fAttrBox.bCharacter) then
-    Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
+  if tbAttrCharacter.Tag = 0 then     Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
 
   // build attribute Mask
   mask := $00000000;
-  if not GetIgnore(fAttrBox.bForeground) then
-    mask := mask or A_CELL_FG_MASK;
-  if not GetIgnore(fAttrBox.bBackground) then
-    mask := mask or A_CELL_BG_MASK;
+  if tbAttrFG.Tag = 0 then            mask := mask or A_CELL_FG_MASK;
+  if tbAttrBG.Tag = 0 then            mask := mask or A_CELL_BG_MASK;
 
-  if not GetIgnore(fAttrBox.bBold) then
-    mask := mask or A_CELL_BOLD;
-  if not GetIgnore(fAttrBox.bFaint) then
-    mask := mask or A_CELL_FAINT;
-  if not GetIgnore(fAttrBox.bUnderline) then
-    mask := mask or A_CELL_UNDERLINE;
-  if not GetIgnore(fAttrBox.bBlinkSlow) then
-    mask := mask or A_CELL_BLINKSLOW;
-  if not GetIgnore(fAttrBox.bBlinkFast) then
-    mask := mask or A_CELL_BLINKFAST;
-  if not GetIgnore(fAttrBox.bReverse) then
-    mask := mask or A_CELL_REVERSE;
-  if not GetIgnore(fAttrBox.bStrikethrough) then
-    mask := mask or A_CELL_STRIKETHROUGH;
-  if not GetIgnore(fAttrBox.bDoublestrike) then
-    mask := mask or A_CELL_DOUBLESTRIKE;
-  if not GetIgnore(fAttrBox.bShadow) then
-    mask := mask or A_CELL_SHADOW;
+  if tbAttrBold.Tag = 0 then          mask := mask or A_CELL_BOLD;
+  if tbAttrFaint.Tag = 0 then         mask := mask or A_CELL_FAINT;
+  if tbAttrUnderline.Tag = 0 then     mask := mask or A_CELL_UNDERLINE;
+  if tbAttrBlinkSlow.Tag = 0 then     mask := mask or A_CELL_BLINKSLOW;
+  if tbAttrBlinkFast.Tag = 0 then     mask := mask or A_CELL_BLINKFAST;
+  if tbAttrReverse.Tag = 0 then       mask := mask or A_CELL_REVERSE;
+  if tbAttrStrikethrough.Tag = 0 then mask := mask or A_CELL_STRIKETHROUGH;
+  if tbAttrDoublestrike.Tag = 0 then  mask := mask or A_CELL_DOUBLESTRIKE;
+  if tbAttrShadow.Tag = 0 then        mask := mask or A_CELL_SHADOW;
 
-  if not GetIgnore(fAttrBox.bConceal)
-  or not GetIgnore(fAttrBox.bReverse)
-  or not GetIgnore(fAttrBox.bReverse) then
-    mask := mask or A_CELL_DISPLAY_MASK;
+  if (tbAttrConceal.Tag = 0)
+  or (tbAttrTop.Tag = 0)
+  or (tbAttrBottom.Tag = 0) then      mask := mask or A_CELL_DISPLAY_MASK;
 
   attr := Page.Rows[CursorRow].Cells[CursorCol].Attr;
   attr := attr and (not mask);
@@ -1765,121 +1685,6 @@ end;
 
 { Control events }
 
-procedure TfMain.bToolNormalClick(Sender: TObject);
-begin
-  ToolMode := tmNormal;
-  SetDown(pbToolNormal, true);
-  SetDown(pbToolDraw, false);
-  SetDown(pbToolFill, false);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, false);
-  SetDown(pbToolEllipse, false);
-end;
-
-procedure TfMain.bToolDrawClick(Sender: TObject);
-begin
-  ToolMode := tmDraw;
-  SetDown(pbToolNormal, false);
-  SetDown(pbToolDraw, true);
-  SetDown(pbToolFill, false);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, false);
-  SetDown(pbToolEllipse, false);
-end;
-
-procedure TfMain.bModeCharsClick(Sender: TObject);
-begin
-  DrawMode := dmChars;
-  SetDown(pbModeChars, true);
-  SetDown(pbModeTopBottoms, false);
-  SetDown(pbModeLeftRights, false);
-  SetDown(pbModeQuarters, false);
-  SetDown(pbModeSixels, false);
-  SubXSIze := 1;
-  SubYSize := 1;
-end;
-
-procedure TfMain.bModeLeftRightsClick(Sender: TObject);
-begin
-  DrawMode := dmLeftRights;
-  SetDown(pbModeChars, false);
-  SetDown(pbModeTopBottoms, false);
-  SetDown(pbModeLeftRights, true);
-  SetDown(pbModeQuarters, false);
-  SetDown(pbModeSixels, false);
-  SubXSIze := 2;
-  SubYSize := 1;
-end;
-
-procedure TfMain.bModeTopBottomsClick(Sender: TObject);
-begin
-  DrawMode := dmTopBottoms;
-  SetDown(pbModeChars, false);
-  SetDown(pbModeTopBottoms, true);
-  SetDown(pbModeLeftRights, false);
-  SetDown(pbModeQuarters, false);
-  SetDown(pbModeSixels, false);
-  SubXSIze := 1;
-  SubYSize := 2;
-end;
-
-procedure TfMain.bModeQuartersClick(Sender: TObject);
-begin
-  DrawMode := dmQuarters;
-  SetDown(pbModeChars, false);
-  SetDown(pbModeTopBottoms, false);
-  SetDown(pbModeLeftRights, false);
-  SetDown(pbModeQuarters, true);
-  SetDown(pbModeSixels, false);
-  SubXSIze := 2;
-  SubYSize := 2;
-end;
-
-procedure TfMain.bModeSixelsClick(Sender: TObject);
-begin
-  DrawMode := dmSixels;
-  SetDown(pbModeChars, false);
-  SetDown(pbModeTopBottoms, false);
-  SetDown(pbModeLeftRights, false);
-  SetDown(pbModeQuarters, false);
-  SetDown(pbModeSixels, true);
-  SubXSIze := 2;
-  SubYSize := 3;
-end;
-
-procedure TfMain.bToolFillClick(Sender: TObject);
-begin
-  ToolMode := tmFill;
-  SetDown(pbToolNormal, false);
-  SetDown(pbToolDraw, false);
-  SetDown(pbToolFill, true);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, false);
-  SetDown(pbToolEllipse, false);
-end;
-
-procedure TfMain.bToolLineClick(Sender: TObject);
-begin
-  ToolMode := tmLine;
-  SetDown(pbToolNormal, false);
-  SetDown(pbToolDraw, false);
-  SetDown(pbToolFill, true);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, false);
-  SetDown(pbToolEllipse, false);
-end;
-
-procedure TfMain.bToolRectClick(Sender: TObject);
-begin
-  ToolMode := tmRect;
-  SetDown(pbToolNormal, false);
-  SetDown(pbToolDraw, false);
-  SetDown(pbToolFill, false);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, true);
-  SetDown(pbToolEllipse, false);
-end;
-
 procedure TfMain.CodePageChange;
 begin
 // CODEPAGE
@@ -1894,10 +1699,10 @@ begin
     SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
 
     // enable / disable Modes
-    pbModeLeftRights.Enabled := CPages[CurrCodePage].CanDrawMode[dmLeftRights];
-    pbModeTopBottoms.Enabled := CPages[CurrCodePage].CanDrawMode[dmTopBottoms];
-    pbModeQuarters.Enabled := CPages[CurrCodePage].CanDrawMode[dmQuarters];
-    pbModeSixels.Enabled := CPages[CurrCodePage].CanDrawMode[dmSixels];
+    tbModeLeftRights.Enabled := CPages[CurrCodePage].CanDrawMode[dmLeftRights];
+    tbModeTopBottoms.Enabled := CPages[CurrCodePage].CanDrawMode[dmTopBottoms];
+    tbModeQuarters.Enabled := CPages[CurrCodePage].CanDrawMode[dmQuarters];
+    tbModeSixels.Enabled := CPages[CurrCodePage].CanDrawMode[dmSixels];
   end;
 end;
 
@@ -1966,10 +1771,32 @@ begin
   PageType := cb.ItemIndex;
   case PageType of
     PAGETYPE_BBS, PAGETYPE_CTERM: // BBS / CTerm
-      SendMessage(fAttrBox.Handle, WM_VTXEDIT, WA_ATTR_DISABLENONVTX, 0);
+      begin
+        tbAttrBold.Enabled := false;
+        tbAttrFaint.Enabled := false;
+        tbAttrItalics.Enabled := false;
+        tbAttrUnderline.Enabled := false;
+        tbAttrBlinkSlow.Enabled := false;
+        tbAttrStrikethrough.Enabled := false;
+        tbAttrDoublestrike.Enabled := false;
+        tbAttrShadow.Enabled := false;
+        tbAttrTop.Enabled := false;
+        tbAttrBottom.Enabled := false;
+      end;
 
     PAGETYPE_VTX: // VTX
-      SendMessage(fAttrBox.Handle, WM_VTXEDIT, WA_ATTR_ENABLEALL, 0);
+      begin
+        tbAttrBold.Enabled := true;
+        tbAttrFaint.Enabled := true;
+        tbAttrItalics.Enabled := true;
+        tbAttrUnderline.Enabled := true;
+        tbAttrBlinkSlow.Enabled := true;
+        tbAttrStrikethrough.Enabled := true;
+        tbAttrDoublestrike.Enabled := true;
+        tbAttrShadow.Enabled := true;
+        tbAttrTop.Enabled := true;
+        tbAttrBottom.Enabled := true;
+      end;
   end;
 
   SetBits(CurrAttr, A_CELL_BOLD or A_CELL_FAINT or A_CELL_ITALICS
@@ -1977,17 +1804,6 @@ begin
       or A_CELL_DOUBLESTRIKE or A_CELL_SHADOW or A_CELL_DISPLAY_TOP
       or A_CELL_DISPLAY_BOTTOM, 0);
   pbCurrCell.Invalidate;
-end;
-
-procedure TfMain.bToolEllipseClick(Sender: TObject);
-begin
-  ToolMode := tmEllipse;
-  SetDown(pbToolNormal, false);
-  SetDown(pbToolDraw, false);
-  SetDown(pbToolFill, false);
-  SetDown(pbToolLine, false);
-  SetDown(pbToolRect, false);
-  SetDown(pbToolEllipse, true);
 end;
 
 procedure TfMain.ResizeScrolls;
@@ -2301,7 +2117,6 @@ begin
   Invalidate;
   fColorBox.Invalidate;
   fCharBox.Invalidate;
-  fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
   fFontsBox.Invalidate;
@@ -2316,7 +2131,6 @@ begin
   Invalidate;
   fColorBox.Invalidate;
   fCharBox.Invalidate;
-  fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
   fFontsBox.Invalidate;
@@ -2331,7 +2145,6 @@ begin
   Invalidate;
   fColorBox.Invalidate;
   fCharBox.Invalidate;
-  fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
   fFontsBox.Invalidate;
@@ -2346,15 +2159,9 @@ begin
   Invalidate;
   fColorBox.Invalidate;
   fCharBox.Invalidate;
-  fAttrBox.Invalidate;
   fColorPickerBox.Invalidate;
   fPreviewBox.Invalidate;
   fFontsBox.Invalidate;
-end;
-
-procedure TfMain.miToolsAttrClick(Sender: TObject);
-begin
-  fAttrBox.Visible := not fAttrBox.Visible;
 end;
 
 procedure TfMain.miToolsCharactersClick(Sender: TObject);
@@ -2370,6 +2177,307 @@ end;
 procedure TfMain.pbFontsClick(Sender: TObject);
 begin
   fFontsBox.Visible := not fFontsBox.Visible;
+end;
+
+procedure TfMain.CoolBar1Resize(Sender: TObject);
+var
+  h, oldh, newh, delta : integer;
+begin
+  oldh := pSettings.Top;
+  newh := CoolBar1.Height;
+  delta := oldh - newh;
+
+
+  pSettings.Top := newh;
+  h := pSettings.Height + delta;
+  pSettings.Height := h;
+
+  pbRulerTop.Top := newh;
+
+  pbRulerLeft.Top := pbRulerTop.Height + newh;
+  h := pbRulerLeft.Height + delta;
+  pbRulerLeft.Height := h;
+
+  sbVert.Top := pbRulerTop.Height + newh;
+  h := sbVert.Height + delta;
+  sbVert.Height := h;
+
+  pbPage.Top := pbRulerTop.Height + newh;
+  h := pbPage.Height + delta;
+  pbPage.Height := h;
+end;
+
+procedure TfMain.tbAttrClick(Sender: TObject);
+var
+  tb : TToolButton;
+begin
+  // click down / up
+  tb := TToolButton(Sender);
+
+  case tb.Name of
+    'tbAttrCharacter',
+    'tbAttrFG',
+    'tbAttrBG':
+      tb.Down := false;
+
+    'tbBlinkSlow':
+      tbAttrBlinkFast.Down := false;
+
+    'tbBlinkFast':
+      tbAttrBlinkSlow.Down := false;
+
+    'tbAttrConceal':
+      begin
+        tbAttrTop.Down := false;
+        tbAttrBottom.Down := false;
+        if tb.Down then
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL)
+        else
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+      end;
+
+    'tbAttrTop':
+      begin
+        tbAttrConceal.Down := false;
+        tbAttrBottom.Down := false;
+        if tb.Down then
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP)
+        else
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+      end;
+
+    'tbAttrBottom':
+      begin
+        tbAttrConceal.Down := false;
+        tbAttrTop.Down := false;
+        if tb.Down then
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM)
+        else
+          SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+      end;
+  end;
+
+  SetBit(CurrAttr, A_CELL_BOLD, tbAttrBold.Down);
+  SetBit(CurrAttr, A_CELL_FAINT, tbAttrFaint.Down);
+  SetBit(CurrAttr, A_CELL_ITALICS, tbAttrItalics.Down);
+  SetBit(CurrAttr, A_CELL_UNDERLINE, tbAttrUnderline.Down);
+  SetBit(CurrAttr, A_CELL_BLINKSLOW, tbAttrBlinkSlow.Down);
+  SetBit(CurrAttr, A_CELL_BLINKFAST, tbAttrBlinkFast.Down);
+  SetBit(CurrAttr, A_CELL_REVERSE, tbAttrReverse.Down);
+  SetBit(CurrAttr, A_CELL_STRIKETHROUGH, tbAttrStrikethrough.Down);
+  SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, tbAttrDoublestrike.Down);
+  SetBit(CurrAttr, A_CELL_SHADOW, tbAttrShadow.Down);
+
+  pbCurrCell.Invalidate;
+end;
+
+function iif(cond : boolean; trueval : variant; falseval : variant) : variant;
+begin
+  if cond then
+    result := trueval
+  else
+    result := falseval;
+end;
+
+procedure TfMain.tbAttrMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  tb : TToolButton;
+begin
+  // right click enable/disable
+  if button = mbRight then
+  begin
+    tb := TToolButton(Sender);
+    tb.Tag := iif(tb.Tag = 0, 1, 0);
+    tb.invalidate;
+  end;
+end;
+
+procedure TfMain.tbModeClick(Sender: TObject);
+var
+  tb : TToolButton;
+  n : string;
+begin
+  tb := TToolButton(Sender);
+
+  n := tb.Name;
+  case n of
+    'tbModeCharacter':
+      begin
+        DrawMode := dmChars;
+        SubXSIze := 1;
+        SubYSize := 1;
+      end;
+
+    'tbModeLeftRights':
+      begin
+        DrawMode := dmLeftRights;
+        SubXSIze := 2;
+        SubYSize := 1;
+      end;
+
+    'tbModeTopBottoms':
+      begin
+        DrawMode := dmTopBottoms;
+        SubXSIze := 1;
+        SubYSize := 2;
+      end;
+
+    'tbModeQuarters':
+      begin
+        DrawMode := dmQuarters;
+        SubXSIze := 2;
+        SubYSize := 2;
+      end;
+
+    'tbModeSixels':
+      begin
+        DrawMode := dmSixels;
+        SubXSIze := 2;
+        SubYSize := 3;
+      end;
+  end;
+
+  tbModeCharacter.Down := (tb.Name = 'tbModeCharacter');
+  tbModeLeftRights.Down := (tb.Name = 'tbModeLeftRights');
+  tbModeTopBottoms.Down := (tb.Name = 'tbModeTopBottoms');
+  tbModeQuarters.Down := (tb.Name = 'tbModeQuarters');
+  tbModeSixels.Down := (tb.Name = 'tbModeSixels');
+end;
+
+procedure TfMain.tbToolClick(Sender: TObject);
+var
+  tb : TToolButton;
+begin
+  tb := TToolButton(Sender);
+
+  case tb.Name of
+    'tbToolSelect':     ToolMode := tmNormal;
+    'tbToolDraw':       ToolMode := tmDraw;
+//    'tbToolEyedropper': ToolMode := tmEy;
+    'tbToolFill':       ToolMode := tmFill;
+    'tbToolLine':       ToolMode := tmLine;
+    'tbToolRect':       ToolMode := tmRect;
+    'tbToolEllipse':    ToolMode := tmEllipse;
+  end;
+
+  tbToolSelect.Down := (tb.Name = 'tbToolSelect');
+  tbToolDraw.Down := (tb.Name = 'tbToolDraw');
+  tbToolEyedropper.Down := (tb.Name = 'tbToolEyedropper');
+  tbToolFill.Down := (tb.Name = 'tbToolFill');
+  tbToolLine.Down := (tb.Name = 'tbToolLine');
+  tbToolRect.Down := (tb.Name = 'tbToolRect');
+  tbToolEllipse.Down := (tb.Name = 'tbToolEllipse');
+end;
+
+procedure TfMain.tbAttributesPaintButton(Sender: TToolButton; State: integer);
+var
+  tb : TToolButton;
+  cnv : TCanvas;
+  bmp : TBitmap;
+  off : integer;
+  r : trect;
+  d : integer;
+  c, c0, c1, c2 : TColor;
+
+begin
+  // draw normal button if tag = 0.
+  // draw normal button with X if tab <> 0
+  tb := TToolButton(Sender);
+  cnv := tb.Canvas;
+  r := cnv.ClipRect;
+  d := (r.width - 16) >> 1;
+
+  {$ifdef WINDOWS}
+    c := GetSysColor(COLOR_HOTLIGHT);
+  {$else}
+    // get a color for button clicks.
+    c := clBlue;
+  {$ENDIF}
+  c0 := Brighten(c, 0.60);  // border color
+  c1 := Brighten(c, 0.85);  // hottrack color
+  c2 := Brighten(c, 0.75);  // pressed color
+
+  bmp := TBitmap.create;
+  bmp.PixelFormat:=pf32bit;
+
+  case State of
+
+      4, 0:  // disabled
+        begin
+          off := 0;
+          TToolBar(tb.parent).DisabledImages.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      1:  // normal
+        begin
+          off := 0;
+          TToolBar(tb.parent).Images.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      2:  // hot
+        begin
+          cnv.brush.color := c1;
+          cnv.FillRect(r);
+          cnv.Pen.color := c0;
+          cnv.Brush.style := bsClear;
+          cnv.Rectangle(r);
+          off := 0;
+          TToolBar(tb.parent).Images.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      3:  // clicked
+        begin
+          cnv.brush.color := c1;
+          cnv.FillRect(r);
+          cnv.Pen.color := c0;
+          cnv.Brush.style := bsClear;
+          cnv.Rectangle(r);
+          off := 1;
+          TToolBar(tb.parent).Images.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      5: // down
+        begin
+          cnv.brush.color := c2;
+          cnv.FillRect(r);
+          cnv.Pen.color := c0;
+          cnv.Brush.style := bsClear;
+          cnv.Rectangle(r);
+          off := 1;
+          TToolBar(tb.parent).Images.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      6:  // clicked
+        begin
+          cnv.brush.color := c1;
+          cnv.FillRect(r);
+          cnv.Pen.color := c0;
+          cnv.Brush.style := bsClear;
+          cnv.Rectangle(r);
+          off := 1;
+          TToolBar(tb.parent).Images.GetBitmap(tb.ImageIndex, bmp);
+        end;
+
+      7: //??
+        nop;
+
+      else
+        begin
+          nop;
+        end;
+  end;
+  cnv.Draw(d + off, d + off, bmp);
+  bmp.free;
+
+  if tb.Tag <> 0 then
+  begin
+    bmp := TBitmap.create;
+    bmp.PixelFormat:=pf32bit;
+    ilButtons.GetBitmap(31, bmp);
+    cnv.Draw(d, d, bmp);
+    bmp.free;
+  end;
 end;
 
 procedure TfMain.miFileExitClick(Sender: TObject);
@@ -3124,9 +3232,9 @@ begin
     CursorRow := 0;
     CursorCol := 0;
     SkipScroll := false;
+    SetAttrButtons(CurrAttr);
     SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_CODEPAGE, ord(CurrCodePage));
     SendMessage(fCharBox.Handle, WM_VTXEDIT, WA_CHAR_SETVALS, CurrChar);
-    SendMessage(fAttrBox.Handle, WM_VTXEDIT, WA_ATTR_SETVALS, CurrAttr);
     SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
     SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
 
@@ -3136,6 +3244,26 @@ begin
   end;
 end;
 
+procedure TfMain.SetAttrButtons(attr : Uint32);
+var
+  bits : integer;
+begin
+  tbAttrBold.Down := HasBits(attr, A_CELL_BOLD);
+  tbAttrFaint.Down := HasBits(attr, A_CELL_FAINT);
+  tbAttrItalics.Down := HasBits(attr, A_CELL_ITALICS);
+  tbAttrUnderline.Down := HasBits(attr, A_CELL_UNDERLINE);
+  tbAttrBlinkSlow.Down := HasBits(attr, A_CELL_BLINKSLOW);
+  tbAttrBlinkFast.Down := HasBits(attr, A_CELL_BLINKFAST);
+  tbAttrReverse.Down := HasBits(attr, A_CELL_REVERSE);
+  tbAttrStrikethrough.Down := HasBits(attr, A_CELL_STRIKETHROUGH);
+  tbAttrDoublestrike.Down := HasBits(attr, A_CELL_DOUBLESTRIKE);
+  tbAttrShadow.Down := HasBits(attr, A_CELL_SHADOW);
+
+  bits := GetBits(attr, A_CELL_DISPLAY_MASK);
+  tbAttrConceal.Down := (bits = A_CELL_DISPLAY_CONCEAL);
+  tbAttrTop.Down := (bits = A_CELL_DISPLAY_TOP);
+  tbAttrBottom.Down := (bits = A_CELL_DISPLAY_BOTTOM);
+end;
 
 {-----------------------------------------------------------------------------}
 
@@ -3316,8 +3444,7 @@ var
   hw : HWND;
 begin
   hw := GetActiveWindow;
-  if (hw = fAttrBox.handle)
-  or (hw = fColorBox.Handle)
+  if (hw = fColorBox.Handle)
   or (hw = fCharBox.Handle)
   or (hw = fPreviewBox.Handle)
   or (hw = fFontsBox.handle) then
@@ -4115,10 +4242,6 @@ begin
   q.v2 := 0;
   SetFormQuad(fColorBox, q);
 
-  q := StrToQuad(iin.ReadString(sect, 'AttrBox', '64,64 640,480'));
-  q.v2 := 0;
-  SetFormQuad(fAttrBox, q);
-
   q := StrToQuad(iin.ReadString(sect, 'CharBox', '64,64 640,480'));
   q.v2 := 0;
   SetFormQuad(fCharBox, q);
@@ -4128,7 +4251,6 @@ begin
   SetFormQuad(fPreviewBox, q);
 
   if iin.ReadBool(sect, 'ColorBoxOpen', false) then fColorBox.Show;
-  if iin.ReadBool(sect, 'AttrBoxOpen', false) then fAttrBox.Show;
   if iin.ReadBool(sect, 'CharBoxOpen', false) then fCharBox.Show;
   if iin.ReadBool(sect, 'PreviewBoxOpen', false) then fPreviewBox.Show;
   if iin.ReadBool(sect, 'WindowMax', false) then fMain.WindowState := wsMaximized;
@@ -4687,40 +4809,40 @@ begin
       if Keybinds[i].Alt then shortcut := (shortcut or $8000);
       case KeyBinds[i].Action of
         KA_MODECHARS:
-          pbModeChars.Hint := pbModeChars.Hint + ' ' + KeyBinds[i].KeyStr;
+          tbModeCharacter.Hint := tbModeCharacter.Hint + ' ' + KeyBinds[i].KeyStr;
 
         KA_MODELEFTRIGHTBLOCKS:
-          pbModeLeftRights.Hint := pbModeLeftRights.Hint+' ' + KeyBinds[i].KeyStr;
+          tbModeLeftRights.Hint := tbModeLeftRights.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_MODETOPBOTTOMBLOCKS:
-          pbModeTopBottoms.Hint := pbModeTopBottoms.Hint+' ' + KeyBinds[i].KeyStr;
+          tbModeTopBottoms.Hint := tbModeTopBottoms.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_MODEQUARTERBLOCKS:
-          pbModeQuarters.Hint := pbModeQuarters.Hint+' ' + KeyBinds[i].KeyStr;
+          tbModeQuarters.Hint := tbModeQuarters.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_MODESIXELS:
-          pbModeSixels.Hint := pbModeSixels.Hint+' ' + KeyBinds[i].KeyStr;
+          tbModeSixels.Hint := tbModeSixels.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLSELECT:
-          pbToolNormal.Hint := pbToolNormal.Hint+ ' ' + KeyBinds[i].KeyStr;
+          tbToolSelect.Hint := tbToolSelect.Hint+ ' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLDRAW:
-          pbToolDraw.Hint := pbToolDraw.Hint+' ' + KeyBinds[i].KeyStr;
+          tbToolDraw.Hint := tbToolDraw.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLFILL:
-          pbToolFill.Hint := pbToolFill.Hint+' ' + KeyBinds[i].KeyStr;
+          tbToolFill.Hint := tbToolFill.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLLINE:
-          pbToolLine.Hint := pbToolLine.Hint+' ' + KeyBinds[i].KeyStr;
+          tbToolLine.Hint := tbToolLine.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLRECTANGLE:
-          pbToolRect.Hint := pbToolRect.Hint+' ' + KeyBinds[i].KeyStr;
+          tbToolRect.Hint := tbToolRect.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLELLIPSE:
-          pbToolEllipse.Hint := pbToolEllipse.Hint + ' ' + KeyBinds[i].KeyStr;
+          tbToolEllipse.Hint := tbToolEllipse.Hint + ' ' + KeyBinds[i].KeyStr;
 
         KA_TOOLEYEDROPPER:
-          pbToolEyedropper.Hint := pbToolEyedropper.Hint+' ' + KeyBinds[i].KeyStr;
+          tbToolEyedropper.Hint := tbToolEyedropper.Hint+' ' + KeyBinds[i].KeyStr;
 
         KA_FILENEW:
             miFileNew.ShortCut := shortcut;
@@ -4769,12 +4891,10 @@ begin
   // window positions
   iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
   iin.WriteString(sect, 'ColorBox', QuadToStr(GetFormQuad(fColorBox)));
-  iin.WriteString(sect, 'AttrBox', QuadToStr(GetFormQuad(fAttrBox)));
   iin.WriteString(sect, 'CharBox', QuadToStr(GetFormQuad(fCharBox)));
   iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
 
   iin.WriteBool(sect, 'ColorBoxOpen', fColorBox.Showing);
-  iin.WriteBool(sect, 'AttrBoxOpen', fAttrBox.Showing);
   iin.WriteBool(sect, 'CharBoxOpen', fCharBox.Showing);
   iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
 

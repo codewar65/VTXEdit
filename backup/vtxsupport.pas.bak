@@ -79,9 +79,9 @@ procedure movetools(h : hwnd; x, y : integer);
 var
   Version : string;
 
-  textureUp, textureDown,			// 24x24 button images (up / down)
-  textureBlotch,								// overlay for color palette entry
-	iconsNormal, iconsGrayed, iconsHilite, iconsDown,	// button icons
+  textureUp, textureDown,     // 24x24 button images (up / down)
+  textureBlotch,                // overlay for color palette entry
+  iconsNormal, iconsGrayed, iconsHilite, iconsDown, // button icons
   captionCloseUp,
   captionCloseDown,
   captionAutoRollupUp,
@@ -95,14 +95,14 @@ var
   UICaptionText : integer = 15;
 
   // various settings
-  PageType : 								integer;	// from cbPageType  PAGETYPE_
-  ColorScheme :							integer;	// from cbColorScheme COLORSCHEME_
+  PageType :                integer;  // from cbPageType  PAGETYPE_
+  ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_
 
-  bmpPage : TBGRABitmap;	// copy of page.
-  PageZoom : 								double;			// 1.0 = 100%
-  XScale : 									double;			// horizontal stretch. 1.0 = 100%
-  CellWidth, CellHeight : 	integer;		// pixels
-  CellWidthZ, CellHeightZ : integer;		// adjusted by PageZoom
+  bmpPage : TBGRABitmap;  // copy of page.
+  PageZoom :                double;     // 1.0 = 100%
+  XScale :                  double;     // horizontal stretch. 1.0 = 100%
+  CellWidth, CellHeight :   integer;    // pixels
+  CellWidthZ, CellHeightZ : integer;    // adjusted by PageZoom
 
   KeyBinds : array of TKeyBinds;
 
@@ -125,7 +125,7 @@ begin
   // do binary search for codepoint in UVGA16
   min := 0;
   max := recs;
-	repeat
+  repeat
     if max < min then
     begin
       // not found! return 0 (the undef char)
@@ -135,10 +135,10 @@ begin
 
     rec := (max + min) >> 1;
     off := rec * 18;
-		key := (table[off] << 8) or table[off + 1];
+    key := (table[off] << 8) or table[off + 1];
 
     if key = codepoint then
-    	// got a match. exit with off
+      // got a match. exit with off
       break;
 
     if key < codepoint then
@@ -153,10 +153,10 @@ end;
 // return new rendered glyph - does not render blink or double height
 procedure GetGlyphBmp(
   var bmp : TBGRABitmap;
-	base : pbyte;					// base address of glyph table
-  off : integer;				// offset into glyph table points to 8x16
-  attr : Uint32;				// standard cell attributes
-  blink : boolean 			// if on, conceal text.
+  base : pbyte;         // base address of glyph table
+  off : integer;        // offset into glyph table points to 8x16
+  attr : Uint32;        // standard cell attributes
+  blink : boolean       // if on, conceal text.
   );
 var
   x, y : integer;
@@ -174,25 +174,25 @@ var
 begin
   ptr := @base[off];
 
-	italics := 		HasBits(attr, A_CELL_ITALICS);
-  bold :=  			HasBits(attr, A_CELL_BOLD);
-  shadow :=  		HasBits(attr, A_CELL_SHADOW);
-  underline :=	HasBits(attr, A_CELL_UNDERLINE);
-	strike :=			HasBits(attr, A_CELL_STRIKETHROUGH);
-	dstrike :=  	HasBits(attr, A_CELL_DOUBLESTRIKE);
-	disp := 			GetBits(attr, A_CELL_DISPLAY_MASK);
+  italics :=    HasBits(attr, A_CELL_ITALICS);
+  bold :=       HasBits(attr, A_CELL_BOLD);
+  shadow :=     HasBits(attr, A_CELL_SHADOW);
+  underline :=  HasBits(attr, A_CELL_UNDERLINE);
+  strike :=     HasBits(attr, A_CELL_STRIKETHROUGH);
+  dstrike :=    HasBits(attr, A_CELL_DOUBLESTRIKE);
+  disp :=       GetBits(attr, A_CELL_DISPLAY_MASK);
 
   // dont' swap bold bit if BBS or CTerm and colors between 8-15
   fi := GetBits(attr, A_CELL_FG_MASK);
   bi := GetBits(attr, A_CELL_BG_MASK, 8);
   if HasBits(attr, A_CELL_REVERSE) then
   begin
-	  if ColorScheme = COLORSCHEME_BBS then
+    if ColorScheme = COLORSCHEME_BBS then
     begin
       i := fi and $08;
       fi := fi and $07;
       bi := bi or i;
-	  end;
+    end;
     fg := ANSIColor[bi];
     bg := ANSIColor[fi];
   end
@@ -203,48 +203,48 @@ begin
   end;
 
   if HasBits(attr, A_CELL_FAINT) then
-		fg := Brighten(fg, -0.33);
+    fg := Brighten(fg, -0.33);
 
   if shadow then
-  	sc := Brighten(bg, -0.33);
+    sc := Brighten(bg, -0.33);
 
   // draw background.
   bmp.FillRect(0,0,8,16,bg);
   if not blink and (disp <> A_CELL_DISPLAY_CONCEAL) then
   begin
-		for y := 0 to 15 do
-  	begin
-     	bptr := bmp.ScanLine[y];
-	    b := ptr^;
-  	  inc(ptr);
+    for y := 0 to 15 do
+    begin
+      bptr := bmp.ScanLine[y];
+      b := ptr^;
+      inc(ptr);
 
-      if underline and (y = 15) then 							b := $ff;
-      if strike    and (y = 7) then 							b := $ff;
+      if underline and (y = 15) then              b := $ff;
+      if strike    and (y = 7) then               b := $ff;
       if dstrike   and ((y = 3) or (y = 11)) then b := $ff;
 
-	  	for x := 0 to 7 do
-	    begin
-  	    if (b and $80) > 0 then
-    	  begin
-      	  adj := 0;
-      		if italics and (y < 8) then
-        		inc(adj);
+      for x := 0 to 7 do
+      begin
+        if (b and $80) > 0 then
+        begin
+          adj := 0;
+          if italics and (y < 8) then
+            inc(adj);
 
-	        if x + adj < 8 then
-  	      begin
+          if x + adj < 8 then
+          begin
             if shadow and (y > 0) and (x + adj < 7) then
-  						bptr[adj - 7] := sc;
+              bptr[adj - 7] := sc;
 
-			      bptr[adj] := fg;
-  	  	    if bold and (x + adj < 7) then
-    	  	  	bptr[adj + 1] := fg;
+            bptr[adj] := fg;
+            if bold and (x + adj < 7) then
+              bptr[adj + 1] := fg;
 
           end;
-  	    end;
-				inc(bptr);
-      	b := (b and $7F) << 1;
-	    end;
-  	end;
+        end;
+        inc(bptr);
+        b := (b and $7F) << 1;
+      end;
+    end;
     // adjust for double height
     if disp = A_CELL_DISPLAY_TOP then
     begin
@@ -286,7 +286,7 @@ end;
 // any bits set?
 function HasBits(val, mask : UInt32) : boolean; inline;
 begin
-	result := ((val and mask) <> 0);
+  result := ((val and mask) <> 0);
 end;
 
 // return bits under bitmask
@@ -298,16 +298,16 @@ end;
 // set bits for bitmask
 procedure SetBits(var val : UInt32; mask, bits : UInt32; shift : integer = 0); inline;
 begin
-	val := ((val and not mask) or ((bits << shift) and mask));
+  val := ((val and not mask) or ((bits << shift) and mask));
 end;
 
 procedure SetBit(var val : UInt32; mask : UInt32; bit : boolean);
 var
   bitval : UInt32;
 begin
-	bitval := mask;
+  bitval := mask;
   if not bit then
-  	bitval := 0;
+    bitval := 0;
   val := ((val and not mask) or bitval);
 end;
 
@@ -315,9 +315,9 @@ procedure SetBit(var val : longint; mask : longint; bit : boolean);
 var
   bitval : longint;
 begin
-	bitval := mask;
+  bitval := mask;
   if not bit then
-  	bitval := 0;
+    bitval := 0;
   val := ((val and not mask) or bitval);
 end;
 
@@ -325,22 +325,22 @@ procedure Swap(var val1, val2 : integer); inline;
 var
   tmp : integer;
 begin
-	tmp := val1; val1 := val2; val2 := tmp;
+  tmp := val1; val1 := val2; val2 := tmp;
 end;
 
 procedure Swap(var val1, val2 : UInt32); inline;
 var
   tmp : UInt32;
 begin
-	tmp := val1; val1 := val2; val2 := tmp;
+  tmp := val1; val1 := val2; val2 := tmp;
 end;
 
 // brighten / darken color
 function Brighten(color : TColor; factor: real): TColor;
 
-	function Norm(val : byte) : double; inline;
+  function Norm(val : byte) : double; inline;
   begin
-		result := val / 255.0;
+    result := val / 255.0;
   end;
 
   function Unnorm(val : double) : byte; inline;
@@ -351,7 +351,8 @@ function Brighten(color : TColor; factor: real): TColor;
 var
   r, g, b : double;
 begin
-	r := Norm(Red(color));
+
+  r := Norm(Red(color));
   g := Norm(Green(color));
   b := Norm(Blue(color));
   if factor < 0 then
@@ -441,7 +442,7 @@ begin
   r.Right := 0;
   r.Width := cnv.Width;
   r.Height := cnv.Height;
-	tmp := TBGRABitmap.Create(cnv.Width, cnv.Height);
+  tmp := TBGRABitmap.Create(cnv.Width, cnv.Height);
   BitBlt(tmp.Canvas.Handle, 0, 0, cnv.Width, cnv.Height, cnv.Handle, 0, 0, SRCCOPY);
   tmp.DrawLine(x1,y1,x2,y2,clr,true);
   tmp.Draw(cnv, 0, 0, true);
@@ -450,7 +451,7 @@ end;
 
 procedure DrawRectangle3D(cnv: TCanvas; rect : TRect; raised:boolean);
 begin
-	DrawRectangle3D(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, raised);
+  DrawRectangle3D(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, raised);
 end;
 
 procedure DrawRectangle3D(cnv: TCanvas; x1, y1, x2, y2 : integer; raised:boolean);
@@ -474,7 +475,7 @@ end;
 
 procedure DrawRectangleButton(cnv: TCanvas; rect : TRect; down : boolean);
 begin
-	DrawRectangleButton(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, down);
+  DrawRectangleButton(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, down);
 end;
 
 procedure DrawRectangleButton(cnv: TCanvas; x1, y1, x2, y2 : integer; down : boolean);
@@ -495,7 +496,7 @@ begin
     DrawLine(cnv, Ctrl3D[0], x1, y2, x2, y2); //
     DrawLine(cnv, Ctrl3D[0], x2, y2, x2, y1); //     _|
   end
-	else
+  else
   begin
     DrawLine(cnv, Ctrl3D[4], x2 - 1, y1, x1, y1);
     DrawLine(cnv, Ctrl3D[4], x1, y1, x1, y2 -1);
@@ -514,7 +515,7 @@ end;
 
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
 begin
-	DrawRectangle(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, clr);
+  DrawRectangle(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, clr);
 end;
 
 procedure DrawRectangle(cnv: TCanvas; x1, y1, x2, y2 : integer; clr : TColor);
@@ -531,18 +532,18 @@ var v : longint;
 begin
   v := pb.Tag;
   SetBit(v, PBB_DOWN, val);
-	pb.Tag := v;
+  pb.Tag := v;
   pb.Invalidate;
 end;
 
 function GetDown(pb : TPaintBox) : boolean; inline;
 begin
- 	result := ((pb.Tag and PBB_DOWN) > 0);
+  result := ((pb.Tag and PBB_DOWN) > 0);
 end;
 
 function GetIgnore(pb : TPaintBox) : boolean; inline;
 begin
- 	result := ((pb.Tag and PBB_IGNORE) > 0);
+  result := ((pb.Tag and PBB_IGNORE) > 0);
 end;
 
 
@@ -550,22 +551,22 @@ end;
 
 // line plotting vars
 var
-	calcX0, calcY0, calcX1, calcY1 : integer;
-	calcDX, calcDY, calcSX, calcSY : integer;
-	calcErr : integer;
+  calcX0, calcY0, calcX1, calcY1 : integer;
+  calcDX, calcDY, calcSX, calcSY : integer;
+  calcErr : integer;
 
 // initialize line plotting calculator
 procedure LineCalcInit(x0, y0, x1, y1 : integer);
 begin
-	calcX0 := x0;						calcY0 := y0;
-  calcX1 := x1;						calcY1 := y1;
-  calcDX := abs(x1 - x0);	calcDY := abs(y1 - y0);
-	if x0 < x1 then calcSX := 1 else calcSX := -1;
-	if y0 < y1 then calcSY := 1 else calcSY := -1;
+  calcX0 := x0;           calcY0 := y0;
+  calcX1 := x1;           calcY1 := y1;
+  calcDX := abs(x1 - x0); calcDY := abs(y1 - y0);
+  if x0 < x1 then calcSX := 1 else calcSX := -1;
+  if y0 < y1 then calcSY := 1 else calcSY := -1;
   if calcDX > calcDY then
-  	calcErr := calcDX div 2
+    calcErr := calcDX div 2
   else
-	  calcErr := (-calcDY) div 2;
+    calcErr := (-calcDY) div 2;
 end;
 
 // get next point
@@ -574,13 +575,13 @@ var
   e2 : integer;
 begin
   result := ((calcX0 = calcX1) and (calcY0 = calcY1));
-	if not result then
+  if not result then
   begin
-		e2 := calcErr;
+    e2 := calcErr;
     if e2 > -calcDX then
     begin
       calcErr -= calcDY;
-			calcX0 += calcSX;
+      calcX0 += calcSX;
     end;
     if e2 < calcDY then
     begin
@@ -603,8 +604,8 @@ var
   i : integer;
 begin
   for i := 1 to str.length do
-  	if not between(str[i], '0', '9') then
-    	exit(false);
+    if not between(str[i], '0', '9') then
+      exit(false);
   result := true;
 end;
 
@@ -617,7 +618,7 @@ begin
   result.v1 := 64;
   result.v2 := 64;
   result.v3 := 64;
-	vals := str.Split([',',' ']);
+  vals := str.Split([',',' ']);
   l := length(vals);
   if (l >= 1) and isInteger(vals[0]) then result.v0 := strtoint(vals[0]);
   if (l >= 2) and isInteger(vals[1]) then result.v1 := strtoint(vals[1]);
@@ -633,12 +634,12 @@ begin
   if q.v0 > Screen.Width then q.v0 := 0;
   if q.v1 > Screen.Height then q.v1 := 0;
 
-	f.Left := q.v0;
+  f.Left := q.v0;
   f.Top := q.v1;
   if q.v2 > 0 then
   begin
-	  f.Width := q.v2;
-  	f.Height := q.v3;
+    f.Width := q.v2;
+    f.Height := q.v3;
   end;
 end;
 
@@ -657,14 +658,14 @@ begin
   result := '';
   len := length(src);
   for i := 0 to len - 1 do
-	  result += src[i];
+    result += src[i];
 end;
 
 
 // move this window + all snapped
 procedure movetools(h : hwnd; x, y : integer);
 begin
- 	SetWindowPos(h, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE or SWP_NOACTIVATE);
+  SetWindowPos(h, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE or SWP_NOACTIVATE);
 end;
 
 end.

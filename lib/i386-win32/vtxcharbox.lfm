@@ -1,7 +1,7 @@
 object fChar: TfChar
-  Left = 301
+  Left = 1188
   Height = 472
-  Top = 440
+  Top = 497
   Width = 368
   BorderIcons = []
   BorderStyle = bsNone

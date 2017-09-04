@@ -1,7 +1,7 @@
 object fAttr: TfAttr
-  Left = 274
+  Left = 100
   Height = 40
-  Top = 372
+  Top = 319
   Width = 368
   BorderIcons = []
   BorderStyle = bsNone

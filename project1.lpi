@@ -45,7 +45,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="13">
+    <Units Count="11">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -59,73 +59,61 @@
         <UnitName Value="VTXEdit"/>
       </Unit1>
       <Unit2>
-        <Filename Value="vtxedit.inc"/>
-        <IsPartOfProject Value="True"/>
-      </Unit2>
-      <Unit3>
-        <Filename Value="vtxattrbox.pas"/>
-        <IsPartOfProject Value="True"/>
-        <ComponentName Value="fAttr"/>
-        <HasResources Value="True"/>
-        <ResourceBaseClass Value="Form"/>
-        <UnitName Value="VTXAttrBox"/>
-      </Unit3>
-      <Unit4>
         <Filename Value="vtxcolorbox.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="fColor"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXColorBox"/>
-      </Unit4>
-      <Unit5>
+      </Unit2>
+      <Unit3>
         <Filename Value="vtxconst.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXConst"/>
-      </Unit5>
-      <Unit6>
+      </Unit3>
+      <Unit4>
         <Filename Value="vtxcharbox.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="fChar"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXCharBox"/>
-      </Unit6>
-      <Unit7>
+      </Unit4>
+      <Unit5>
         <Filename Value="vtxpreviewbox.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="fPreview"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXPreviewBox"/>
-      </Unit7>
-      <Unit8>
+      </Unit5>
+      <Unit6>
         <Filename Value="vtxsupport.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXSupport"/>
-      </Unit8>
-      <Unit9>
+      </Unit6>
+      <Unit7>
         <Filename Value="vtxedit.ini"/>
         <IsPartOfProject Value="True"/>
-      </Unit9>
-      <Unit10>
+      </Unit7>
+      <Unit8>
         <Filename Value="vtxencdetect.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXEncDetect"/>
-      </Unit10>
-      <Unit11>
+      </Unit8>
+      <Unit9>
         <Filename Value="unicodehelper.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="UnicodeHelper"/>
-      </Unit11>
-      <Unit12>
+      </Unit9>
+      <Unit10>
         <Filename Value="vtxfonts.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="fFonts"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXFonts"/>
-      </Unit12>
+      </Unit10>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

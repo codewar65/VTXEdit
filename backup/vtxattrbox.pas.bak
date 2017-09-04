@@ -79,8 +79,8 @@ type
     { public declarations }
     procedure WndProc(var Msg: TMessage); override;
     var
-	    Bold, Faint, Italics, Underline, BlinkSlow, BlinkFast, Reverse, Conceal,
-  	  StriketHrough, Doublestrike, Shadow, TopHalf, BottomHalf : boolean;
+      Bold, Faint, Italics, Underline, BlinkSlow, BlinkFast, Reverse, Conceal,
+      StriketHrough, Doublestrike, Shadow, TopHalf, BottomHalf : boolean;
   end;
 
 
@@ -123,24 +123,24 @@ begin
 
         WA_ATTR_DISABLENONVTX:
           begin
-            bBold.Enabled := false;						SetDown(bBold, false);
-            bFaint.Enabled := false; 					SetDown(bFaint, false);
-            bItalics.Enabled := false; 				SetDown(bItalics,false);
-            bUnderline.Enabled := false;     	SetDown(bUnderline,false);
-            bBlinkSlow.Enabled := false;			SetDown(bBlinkSlow,false);
+            bBold.Enabled := false;           SetDown(bBold, false);
+            bFaint.Enabled := false;          SetDown(bFaint, false);
+            bItalics.Enabled := false;        SetDown(bItalics,false);
+            bUnderline.Enabled := false;      SetDown(bUnderline,false);
+            bBlinkSlow.Enabled := false;      SetDown(bBlinkSlow,false);
             bBlinkFast.Enabled := true;
             bReverse.Enabled := true;
             bConceal.Enabled := true;
             bStrikethrough.Enabled := false;  SetDown(bStrikethrough, false);
-            bDoublestrike.Enabled := false;		SetDown(bDoublestrike, false);
-            bShadow.Enabled := false;    			SetDown(bShadow, false);
-            bTopHalf.Enabled := false;     		SetDown(bTopHalf, false);
-            bBottomHalf.Enabled := false;    	SetDown(bBottomHalf, false);
+            bDoublestrike.Enabled := false;   SetDown(bDoublestrike, false);
+            bShadow.Enabled := false;         SetDown(bShadow, false);
+            bTopHalf.Enabled := false;        SetDown(bTopHalf, false);
+            bBottomHalf.Enabled := false;     SetDown(bBottomHalf, false);
           end;
 
         WA_ATTR_SETVALS:
           begin
-						attr := Msg.lParam;
+            attr := Msg.lParam;
             if HasBits(attr, A_CELL_BOLD) and bBold.Enabled then
               SetDown(bBold, true);
 
@@ -183,8 +183,8 @@ begin
             if (GetBits(attr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_BOTTOM)
             and bBottomHalf.Enabled then
               SetDown(bBottomHalf, true);
-        	end;
-		end;
+          end;
+    end;
   end
   else
     inherited WndProc(Msg);
@@ -195,11 +195,11 @@ procedure TfAttr.bToolBarButtonClick(Sender: TObject);
 var
   pb : TPaintBox;
 begin
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
 
   if GetDown(pb) then
-  	case pb.Name of
-    	'bConceal':
+    case pb.Name of
+      'bConceal':
         begin
           SetDown(bTopHalf, false);
           SetDown(bBottomHalf, false);
@@ -218,14 +218,14 @@ begin
         end;
 
       'bBlinkSlow':
-        	SetDown(bBlinkFast, false);
+          SetDown(bBlinkFast, false);
 
       'bBlinkFast':
-        	SetDown(bBlinkSlow, false);
+          SetDown(bBlinkSlow, false);
     end;
 
-	// build CurrAttr based on controls
-	Bold := GetDown(bBold);
+  // build CurrAttr based on controls
+  Bold := GetDown(bBold);
   Faint := GetDown(bFaint);
   Italics := GetDown(bItalics);
   Underline := GetDown(bUnderline);
@@ -239,7 +239,7 @@ begin
   TopHalf := GetDown(bTopHalf);
   BottomHalf := GetDown(bBottomHalf);
 
-	SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
+  SendMessage(TForm(Owner).Handle, WM_VTXEDIT, WA_MAIN_UPDATE, 0);
 end;
 
 // paintboxbutton
@@ -252,7 +252,7 @@ var
   down : boolean;
   btype : integer;
 begin
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
   v := pb.tag;
   btype := GetBits(v, PBB_TYPE_MASK);
   if Button = mbLeft then
@@ -261,11 +261,11 @@ begin
     if btype <> PBB_TYPE_STATIC then
     begin
       // not on statics
-			down := HasBits(v, PBB_DOWN);
-		  if btype = PBB_TYPE_TOGGLE then
-				SetBit(v, PBB_DOWN, not down)
-	  	else
-  			SetBit(v, PBB_DOWN, true);
+      down := HasBits(v, PBB_DOWN);
+      if btype = PBB_TYPE_TOGGLE then
+        SetBit(v, PBB_DOWN, not down)
+      else
+        SetBit(v, PBB_DOWN, true);
     end;
   end
   else if (Button = mbRight) and HasBits(v, PBB_FLAG_IGNORABLE) then
@@ -283,10 +283,10 @@ var
   v : Uint32;
   pb : TPaintBox;
 begin
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
   v := pb.tag;
   if HasBits(v, PBB_TYPE_BUTTON) then
-  	SetBit(v, PBB_DOWN, false);
+    SetBit(v, PBB_DOWN, false);
   pb.tag := v;
   pb.Invalidate;
 end;
@@ -298,7 +298,7 @@ var
   v : Uint32;
   pb : TPaintBox;
 begin
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
   v := pb.tag;
   SetBit(v, PBB_HOVER, true);
   pb.tag := v;
@@ -310,7 +310,7 @@ var
   v : Uint32;
   pb : TPaintBox;
 begin
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
   v := pb.tag;
   SetBit(v, PBB_HOVER, false);
   pb.tag := v;
@@ -331,7 +331,7 @@ var
   x, y : integer;
 begin
   // use tag for states
-	pb := TPaintBox(Sender);
+  pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   down := HasBits(pb.Tag, PBB_DOWN);
 
@@ -345,11 +345,11 @@ begin
   if not pb.Enabled then
     bmp := iconsGrayed.GetPart(r) as TBGRABitmap
   else if HasBits(pb.tag, PBB_HOVER) then
-	  bmp := iconsHilite.GetPart(r) as TBGRABitmap
+    bmp := iconsHilite.GetPart(r) as TBGRABitmap
   else if HasBits(pb.tag, PBB_DOWN) then
-		bmp := iconsDown.GetPart(r) as TBGRABitmap
+    bmp := iconsDown.GetPart(r) as TBGRABitmap
   else
-		bmp := iconsNormal.GetPart(r) as TBGRABitmap;
+    bmp := iconsNormal.GetPart(r) as TBGRABitmap;
 
   // draw button
   if down and pb.Enabled then
@@ -359,7 +359,7 @@ begin
 
   adj := 0;
   if down then
-  	adj := 1;
+    adj := 1;
   x := ((pb.Width - bmp.Width) >> 1);
   y := ((pb.Height - bmp.Height) >> 1) - 2 + adj;
   cnv.Draw(x, y, bmp.Bitmap);
@@ -370,19 +370,19 @@ begin
     r.Left := 31 * size;
     r.Width := size;
     r.Height := size;
-  	bmp.free;
+    bmp.free;
     bmp := iconsNormal.GetPart(r) as TBGRABitmap;
-  	cnv.Draw(x, y, bmp.Bitmap);
+    cnv.Draw(x, y, bmp.Bitmap);
   end;
 
-	bmp.free;
+  bmp.free;
 end;
 
 // CAPTION BAR
 
 procedure TfAttr.pbCloseClick(Sender: TObject);
 begin
-	Hide;
+  Hide;
 end;
 
 procedure TfAttr.pbClosePaint(Sender: TObject);
@@ -394,7 +394,7 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   r := pb.ClientRect;
-	captionCloseUp.Draw(cnv, r);
+  captionCloseUp.Draw(cnv, r);
 end;
 
 procedure TfAttr.pbTitleBarPaint(Sender: TObject);
