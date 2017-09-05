@@ -532,6 +532,7 @@ begin
   DoubleBuffered := true;
 
   bmpPage := nil;
+  bmpPreview := nil;
   SkipScroll := false;
 
   // create tool windows
@@ -651,6 +652,7 @@ begin
   SaveSettings;
   fPreviewBox.Hide;
   bmpPage.Free;
+  bmpPreview.Free;
   fPreviewBox.Free;
   if bmpCharPalette <> nil then bmpCharPalette.Free;
 end;
@@ -677,13 +679,18 @@ begin
     if (bmpPage.Width <> w) or (bmpPage.Height <> h) then
     begin
       bmpPage.Free;
+      bmpPreview.Free;
       bmpPage := TBGRABitmap.Create(w, h);
     end
     else
+    begin
       bmpPage.FillRect(0,0,w,h,clBlack);
+    end;
   end
   else
+  begin
     bmpPage := TBGRABitmap.Create(w, h);
+  end;
 
   bmp := TBGRABitmap.Create(CellWidth, CellHeight);
   y := 0;
@@ -715,6 +722,9 @@ begin
     y += CellHeight;
   end;
   bmp.free;
+
+  bmpPage.ResampleFilter := rfMitchell;
+  bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2) as TBGRABitmap;
 
   UpdatePreview;
 
@@ -4078,7 +4088,7 @@ end;
 // draw cell at row, col at x, y of cnv (also copy to bmpPage)
 procedure TfMain.DrawCellEx(cnv : TCanvas; x, y, row, col : integer; skipUpdate : boolean = true);
 var
-  bmp :           TBGRABitmap;
+  bmp, bmp2 :           TBGRABitmap;
   ch :            Uint16;
   off :           integer;
   fgc :           integer;
@@ -4115,6 +4125,10 @@ begin
     begin
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
       bmp.Draw(bmpPage.Canvas, col * CellWidth, row * CellHeight);
+
+      bmp.ResampleFilter := rfMitchell;
+      bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
+      bmp2.Draw(bmpPreview.Canvas, col * (CellWidth >> 2), row * (CellHeight >> 2));
 
       UpdatePreview;
 

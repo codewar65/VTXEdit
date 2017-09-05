@@ -76,7 +76,8 @@ var
   PageType :                integer;  // from cbPageType  PAGETYPE_
   ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_
 
-  bmpPage : TBGRABitmap;  // copy of page.
+  bmpPage     : TBGRABitmap;  // copy of page.
+  bmpPreview  : TBGRABitmap;  // copy of page.
   PageZoom :                double;     // 1.0 = 100%
   XScale :                  double;     // horizontal stretch. 1.0 = 100%
   CellWidth, CellHeight :   integer;    // pixels

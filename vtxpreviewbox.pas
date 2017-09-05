@@ -67,9 +67,6 @@ implementation
 
 {$R *.lfm}
 
-const
-  Zoom = 1/4;
-
 { TfPreview }
 procedure TfPreview.FormCreate(Sender: TObject);
 {$ifdef WINDOWS}
@@ -92,8 +89,8 @@ var
   fw, w, h : integer;
 begin
   // set size of pbPreview to max zoom out for bmpPage
-  w := floor(bmpPage.Width * Zoom * XScale);
-  h := floor(bmpPage.Height * Zoom);
+  w := floor(bmpPreview.Width * XScale);
+  h := bmpPreview.Height;
   fw := w + 8;
 
   if h > ScrollBox1.ClientHeight then
@@ -125,11 +122,11 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
 
-  bmpPage.Draw(cnv, pb.ClientRect, false);
-  bmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
-  bmp.Draw(cnv, pb.ClientRect);
-  bmp.Free;
+  bmpPreview.Draw(cnv, pb.ClientRect, false);
 
+//  bmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
+//  bmp.Draw(cnv, pb.ClientRect);
+//  bmp.Free;
 //  cnv.StretchDraw(pb.ClientRect, bmpPage.Bitmap);
 end;
 
@@ -139,8 +136,8 @@ var
 begin
   if bmpPage = nil then exit;
 
-  w := floor(bmpPage.Width * Zoom * XScale);
-  h := floor(bmpPage.Height * Zoom);
+  w := floor(bmpPreview.Width * XScale);
+  h := bmpPreview.Height;
   fw := w + 8;
 
   if h > ScrollBox1.ClientHeight then
