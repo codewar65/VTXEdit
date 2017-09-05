@@ -50,7 +50,6 @@ type
     pbPreview: TPaintBox;
     ScrollBox1: TScrollBox;
     procedure FormCreate(Sender: TObject);
-    procedure FormResize(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure pbPreviewPaint(Sender: TObject);
     procedure ScrollBox1Paint(Sender: TObject);
@@ -78,6 +77,7 @@ var
   loc_SBInfo :    TNonCLientMetrics;
 {$endif}
 begin
+  DoubleBuffered:=true;
 {$ifdef WINDOWS}
   loc_SBInfo.cbSize := SizeOf(loc_SBInfo);
   SystemParametersInfo(SPI_GetNonClientMetrics,0,@loc_SBInfo,0);
@@ -99,36 +99,43 @@ begin
   if h > ScrollBox1.ClientHeight then
     fw += ScrollWidth + 2;
 
-  self.Constraints.MaxWidth:=fw;
-  self.Constraints.MinWidth:=fw;
-  self.Width := fw;
+  if width <> fw then
+  begin
+    self.Constraints.MaxWidth:=fw;
+    self.Constraints.MinWidth:=fw;
+    self.Width := fw;
+  end;
+  if pbPreview.Width <> w then
+    pbPreview.Width := w;
 
-  pbPreview.Width := w;
-  pbPreview.Height := h;
+  if pbPreview.Height <> h then
+    pbPreview.Height := h;
 end;
 
-
+// this routine needs better looking / faster update
+// maybe drop the tscrollbox, move to panel/image, add scrollbars,
+// and only draw displayable chunk?
 procedure TfPreview.pbPreviewPaint(Sender: TObject);
 var
   pb : TPaintBox;
   cnv : TCanvas;
-  tmp : TBGRABitmap;
+  bmp : TBGRABitmap;
+
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
-  tmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
-  tmp.Draw(cnv, 0, 0);
-  tmp.free;
-end;
 
-procedure TfPreview.FormResize(Sender: TObject);
-begin
-  Invalidate;
+  bmpPage.Draw(cnv, pb.ClientRect, false);
+  bmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
+  bmp.Draw(cnv, pb.ClientRect);
+  bmp.Free;
+
+//  cnv.StretchDraw(pb.ClientRect, bmpPage.Bitmap);
 end;
 
 procedure TfPreview.FormShow(Sender: TObject);
 var
-  h, w,  fw : integer;
+  h, w, fw : integer;
 begin
   if bmpPage = nil then exit;
 
@@ -139,12 +146,18 @@ begin
   if h > ScrollBox1.ClientHeight then
     fw += ScrollWidth + 2;
 
-  self.Constraints.MaxWidth:=fw;
-  self.Constraints.MinWidth:=fw;
-  self.Width := fw;
+  if Width <> fw then
+  begin
+    self.Constraints.MaxWidth:=fw;
+    self.Constraints.MinWidth:=fw;
+    self.Width := fw;
+  end;
 
-  pbPreview.Width := w;
-  pbPreview.Height := h;
+  if pbPreview.Width <> w then
+    pbPreview.Width := w;
+
+  if pbPreview.Height <> h then
+    pbPreview.Height := h;
 end;
 
 end.

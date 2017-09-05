@@ -1,7 +1,7 @@
 object fPreview: TfPreview
-  Left = 1162
+  Left = 1206
   Height = 363
-  Top = 248
+  Top = 458
   Width = 300
   BorderIcons = []
   BorderStyle = bsSizeToolWin
@@ -10,7 +10,6 @@ object fPreview: TfPreview
   ClientWidth = 300
   FormStyle = fsStayOnTop
   OnCreate = FormCreate
-  OnResize = FormResize
   OnShow = FormShow
   ShowInTaskBar = stNever
   LCLVersion = '1.6.4.0'
@@ -24,10 +23,10 @@ object fPreview: TfPreview
     HorzScrollBar.Smooth = True
     HorzScrollBar.Tracking = True
     VertScrollBar.Increment = 10
-    VertScrollBar.Page = 105
+    VertScrollBar.Page = 106
     VertScrollBar.Smooth = True
     VertScrollBar.Tracking = True
-    Align = alClient
+    Anchors = [akTop, akLeft, akRight, akBottom]
     ClientHeight = 359
     ClientWidth = 296
     Color = clBlack
@@ -37,7 +36,7 @@ object fPreview: TfPreview
     object pbPreview: TPaintBox
       Left = 0
       Height = 105
-      Top = 0
+      Top = 1
       Width = 105
       Align = alCustom
       Color = clBlack

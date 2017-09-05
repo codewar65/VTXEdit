@@ -49,16 +49,15 @@ procedure SetBit(var val : longint; mask : longint; bit : boolean);
 procedure Swap(var val1, val2 : integer); inline;
 procedure Swap(var val1, val2 : UInt32); inline;
 function Brighten(color : TColor; factor: real): TColor;
-procedure DrawBitmapTiled(const bmp:TBitmap; cnv: TCanvas; dest:TRect);
 function DrawTextCentered(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
 function DrawTextRight(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
-procedure DrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
-procedure DrawRectangle3D(cnv: TCanvas; x1, y1, x2, y2 : integer; raised:boolean);
-procedure DrawRectangle3D(cnv: TCanvas; rect : TRect; raised:boolean);
+//procedure DrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
+//procedure DrawRectangle3D(cnv: TCanvas; x1, y1, x2, y2 : integer; raised:boolean);
+//procedure DrawRectangle3D(cnv: TCanvas; rect : TRect; raised:boolean);
 procedure DrawRectangle(cnv: TCanvas; x1, y1, x2, y2 : integer; clr : TColor);
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
-procedure DrawRectangleButton(cnv: TCanvas; x1, y1, x2, y2 : integer; down : boolean);
-procedure DrawRectangleButton(cnv: TCanvas; rect : TRect; down : boolean);
+//procedure DrawRectangleButton(cnv: TCanvas; x1, y1, x2, y2 : integer; down : boolean);
+//procedure DrawRectangleButton(cnv: TCanvas; rect : TRect; down : boolean);
 procedure LineCalcInit(x0, y0, x1, y1 : integer);
 function LineCalcNext(var xo, yo : integer) : boolean;
 function QuadToStr(q : TQuad) : unicodestring;
@@ -365,26 +364,6 @@ begin
   result := RGB(Unnorm(r), Unnorm(g), Unnorm(b));
 end;
 
-procedure DrawBitmapTiled(const bmp:TBitmap; cnv: TCanvas; dest:TRect);
-var
-  X, Y: Integer;
-  dX, dY: Integer;
-begin
-  dX := bmp.Width;
-  dY := bmp.Height;
-  Y := dest.Top;
-  while Y < dest.Bottom do
-    begin
-      X := dest.Left;
-      while X < dest.Right do
-        begin
-          cnv.Draw(X, Y, bmp);
-          Inc(X, dX);
-        end;
-      Inc(Y, dY);
-    end;
-end;
-
 function DrawTextCentered(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
 var
   DrawRect: TRect;
@@ -427,7 +406,7 @@ begin
   Result := DrawParams.uiLengthDrawn;
 end;
 
-procedure DrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
+procedure XDrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
 var
   tmp : TBGRABitmap;
   r : TRect;
@@ -441,70 +420,7 @@ begin
   tmp.DrawLine(x1,y1,x2,y2,clr,true);
   tmp.Draw(cnv, 0, 0, true);
   tmp.free;
-end;
 
-procedure DrawRectangle3D(cnv: TCanvas; rect : TRect; raised:boolean);
-begin
-  DrawRectangle3D(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, raised);
-end;
-
-procedure DrawRectangle3D(cnv: TCanvas; x1, y1, x2, y2 : integer; raised:boolean);
-var i1, i2 : integer;
-begin
-  if raised then
-  begin
-    i1 := 3;
-    i2 := 1;
-  end
-  else
-  begin
-    i1 := 1;
-    i2 := 3;
-  end;
-  DrawLine(cnv, Ctrl3D[i1], x2 - 1, y1, x1, y1);
-  DrawLine(cnv, Ctrl3D[i1], x1, y1, x1, y2 -1);
-  DrawLine(cnv, Ctrl3D[i2], x1 + 1, y2, x2, y2);
-  DrawLine(cnv, Ctrl3D[i2], x2, y2, x2, y1 + 1);
-end;
-
-procedure DrawRectangleButton(cnv: TCanvas; rect : TRect; down : boolean);
-begin
-  DrawRectangleButton(cnv, rect.Left, rect.Top, rect.Right - 1, rect.Bottom - 1, down);
-end;
-
-procedure DrawRectangleButton(cnv: TCanvas; x1, y1, x2, y2 : integer; down : boolean);
-begin
-  if down then
-  begin
-    cnv.Pen.Color := clBlack;
-    cnv.Line(x2, y1, x1, y1);
-    cnv.Line(x1, y1, x1, y2);
-    cnv.Line(x1, y2, x2, y2);
-    cnv.Line(x2, y2, x2, y1);
-
-    inc(x1); inc(y1);
-    dec(x2); dec(y2);
-
-    DrawLine(cnv, Ctrl3D[1], x2, y1, x1, y1); //  _
-    DrawLine(cnv, Ctrl3D[1], x1, y1, x1, y2);  // |
-    DrawLine(cnv, Ctrl3D[0], x1, y2, x2, y2); //
-    DrawLine(cnv, Ctrl3D[0], x2, y2, x2, y1); //     _|
-  end
-  else
-  begin
-    DrawLine(cnv, Ctrl3D[4], x2 - 1, y1, x1, y1);
-    DrawLine(cnv, Ctrl3D[4], x1, y1, x1, y2 -1);
-    DrawLine(cnv, Ctrl3D[0], x1 + 1, y2, x2, y2);
-    DrawLine(cnv, Ctrl3D[0], x2, y2, x2, y1 + 1);
-
-    inc(x1); inc(y1);
-    dec(x2); dec(y2);
-
-    DrawLine(cnv, Ctrl3D[4], x2 - 1, y1, x1, y1);
-    DrawLine(cnv, Ctrl3D[4], x1, y1, x1, y2 -1);
-    DrawLine(cnv, Ctrl3D[0], x1 + 1, y2, x2, y2);
-    DrawLine(cnv, Ctrl3D[0], x2, y2, x2, y1 + 1);
-  end;
 end;
 
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);

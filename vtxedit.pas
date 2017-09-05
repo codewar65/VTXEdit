@@ -128,7 +128,10 @@ type
     Label10: TLabel;
     Label11: TLabel;
     Label12: TLabel;
+    Label13: TLabel;
     Label14: TLabel;
+    Label15: TLabel;
+    Label16: TLabel;
     Label2: TLabel;
     Label3: TLabel;
     Label4: TLabel;
@@ -148,6 +151,7 @@ type
     miTools: TMenuItem;
     odAnsi: TOpenDialog;
     pbChars: TPaintBox;
+    pbColors: TPaintBox;
     pRightBar: TPanel;
     pbPage: TPaintBox;
     pbRulerLeft: TPaintBox;
@@ -164,7 +168,6 @@ type
     pSettings: TPanel;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
-    ScrollBox1: TScrollBox;
     sbChars: TScrollBox;
     sdAnsi: TSaveDialog;
     seCharacter: TSpinEdit;
@@ -180,14 +183,14 @@ type
     tbSauceDate: TEdit;
     tbSauceGroup: TEdit;
     tbSauceTitle: TEdit;
-    tbTools: TToolBar;
-    tbAttributes: TToolBar;
+    tbToolPalette: TToolBar;
+    tbAttributesPalette: TToolBar;
     tbToolFill: TToolButton;
     tbToolEyedropper: TToolButton;
     tbToolLine: TToolButton;
     tbToolRect: TToolButton;
     tbToolEllipse: TToolButton;
-    tbFontSelect: TToolBar;
+    tbFontPalette: TToolBar;
     tbFont0: TToolButton;
     tbFont8: TToolButton;
     tbFont9: TToolButton;
@@ -233,6 +236,7 @@ type
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbCharsPaint(Sender: TObject);
+    procedure pbColorsPaint(Sender: TObject);
     procedure seCharacterChange(Sender: TObject);
     procedure tbAttrClick(Sender: TObject);
     procedure tbAttrMouseDown(Sender: TObject; Button: TMouseButton;
@@ -240,7 +244,7 @@ type
     procedure tbFontClick(Sender: TObject);
     procedure tbModeClick(Sender: TObject);
     procedure tbToolClick(Sender: TObject);
-    procedure tbAttributesPaintButton(Sender: TToolButton; State: integer);
+    procedure tbAttributesPalettePaintButton(Sender: TToolButton; State: integer);
     procedure UpdateTitles;
     procedure SaveVTXFile(fname : string);
     procedure LoadVTXFile(fname : string);
@@ -277,7 +281,7 @@ type
     procedure pbRulerLeftPaint(Sender: TObject);
     procedure pbRulerTopPaint(Sender: TObject);
     procedure pbStatusBarPaint(Sender: TObject);
-    procedure pToolsPaint(Sender: TObject);
+//    procedure pToolsPaint(Sender: TObject);
     procedure ResizeScrolls;
     procedure ResizePage;
     procedure sbHorzChange(Sender: TObject);
@@ -1769,6 +1773,7 @@ begin
       SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 3);
   end;
 
+  pbColors.Invalidate;
 end;
 
 procedure TfMain.cbPageTypeChange(Sender: TObject);
@@ -1907,7 +1912,7 @@ begin
   bmp.Free();
 
 end;
-
+{
 procedure TfMain.pToolsPaint(Sender: TObject);
 var
   p : TPanel;
@@ -1924,6 +1929,7 @@ begin
   DrawLine(cnv, Ctrl3D[1], pSettings.Width - 1, p.Height - 1, p.Width - 1, p.Height - 1);
   DrawLine(cnv, Ctrl3D[1], p.Width - 1, p.Height - 1, p.Width - 1, 0);
 end;
+}
 
 procedure TfMain.sbVertChange(Sender: TObject);
 begin
@@ -2263,6 +2269,77 @@ begin
   pbCurrCell.Invalidate;
 end;
 
+procedure TfMain.pbColorsPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  cls, fgs, bgs : integer;
+  maxr : integer;
+  x, y, r, c : integer;
+  rect : TRect;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+
+  // max colors
+  case ColorScheme of
+    COLORSCHEME_BASIC:
+      begin
+        fgs := 8;
+        bgs := 8;
+        cls := 8;
+      end;
+
+    COLORSCHEME_BBS:
+      begin
+        fgs := 16;
+        bgs := 8;
+        cls := 16;
+      end;
+
+    COLORSCHEME_ICE:
+      begin
+        fgs := 16;
+        bgs := 16;
+        cls := 16;
+      end;
+
+    COLORSCHEME_256:
+      begin
+        fgs := 256;
+        bgs := 256;
+        cls := 256;
+      end;
+  end;
+
+  maxr := cls div 16;  // 16 colors per row
+  y := 0;
+  for r := 0 to maxr - 1 do
+  begin
+    x := 0;
+    for c := 0 to 15 do
+    begin
+      rect.left :=   x;
+      rect.top :=    y;
+      rect.width :=  20;
+      rect.height := 20;
+      cnv.Brush.Color := ANSIColor[(r << 4) + c];
+      cnv.FillRect(rect);
+
+      cnv.pen.color := clblack;
+      cnv.Rectangle(rect);
+
+      //rect.inflate(-1,-1);
+      //DrawRectangle3D(cnv, rect, true);
+      //rect.inflate(-1,-1);
+      //DrawRectangle3D(cnv, rect, true);
+      x += 22;
+    end;
+    y += 22;
+  end;
+
+end;
+
 // get next available glyph in uvga
 function GetNextUnicodeChar(chr : integer) : integer;
 var
@@ -2571,7 +2648,7 @@ begin
   tbToolEllipse.Down := (tb.Name = 'tbToolEllipse');
 end;
 
-procedure TfMain.tbAttributesPaintButton(Sender: TToolButton; State: integer);
+procedure TfMain.tbAttributesPalettePaintButton(Sender: TToolButton; State: integer);
 var
   tb : TToolButton;
   cnv : TCanvas;
@@ -3976,10 +4053,10 @@ begin
   rarea.width := rarea.height;
 
   r := rarea;
-  DrawRectangle3D(cnv, r, false);
-  r.Inflate(-1, -1);
-  DrawRectangle3D(cnv, r, false);
-  r.Inflate(-1, -1);
+//  DrawRectangle3D(cnv, r, false);
+//  r.Inflate(-1, -1);
+//  DrawRectangle3D(cnv, r, false);
+//  r.Inflate(-1, -1);
 
   // change this to background color in VTX mode
   cnv.Brush.Color := ANSIColor[16];
@@ -4008,10 +4085,6 @@ begin
   r.Top += h - crsize + 2;
   r.width := crsize;
   r.height := crsize;
-  DrawRectangle3D(cnv, r, false);
-  r.inflate(-1,-1);
-  DrawRectangle3D(cnv, r, false);
-  r.inflate(-1,-1);
   DrawRectangle(cnv, r, clBlack);
   r.inflate(-1,-1);
   cnv.brush.color := AnsiColor[bg];
@@ -4025,10 +4098,6 @@ begin
   cnv.brush.color := AnsiColor[fg];
   cnv.FillRect(r);
   DrawRectangle(cnv, r, clBlack);
-  r.inflate(-1,-1);
-  DrawRectangle3D(cnv, r, true);
-  r.inflate(-1,-1);
-  DrawRectangle3D(cnv, r, true);
 
   // draw plain character
   rarea := pb.ClientRect;
@@ -4070,10 +4139,6 @@ begin
   cnv := pb.Canvas;
   with cnv do
   begin
-    DrawBitmapTiled(textureRuler.Bitmap, cnv, pb.ClientRect);
-    DrawLine(cnv, Ctrl3D[4], 0, 0, 0, pb.Height - 1);
-    DrawLine(cnv, Ctrl3D[0], 15, 0, 15, pb.Height - 1);
-
     Pen.Color := clBlack;
     Brush.Style := bsClear;
     Font.Color := clBlack;
@@ -4133,11 +4198,10 @@ begin
   cnv := pb.Canvas;
   with cnv do
   begin
-    DrawBitmapTiled(textureRuler.Bitmap, cnv, pb.ClientRect);
-    DrawLine(cnv, Ctrl3D[4], 0, 0, 0, pb.Height - 1);
-    DrawLine(cnv, Ctrl3D[4], 0, 0, pb.Width - 1, 0);
-    DrawLine(cnv, Ctrl3D[0], pbRulerLeft.Width - 1, pb.Height - 1, pb.Width - 1, pb.Height - 1);
-    DrawLine(cnv, Ctrl3D[0], pb.Width - 1, pb.Height - 1, pb.Width - 1, 0);
+//    DrawLine(cnv, Ctrl3D[4], 0, 0, 0, pb.Height - 1);
+//    DrawLine(cnv, Ctrl3D[4], 0, 0, pb.Width - 1, 0);
+//    DrawLine(cnv, Ctrl3D[0], pbRulerLeft.Width - 1, pb.Height - 1, pb.Width - 1, pb.Height - 1);
+//    DrawLine(cnv, Ctrl3D[0], pb.Width - 1, pb.Height - 1, pb.Width - 1, 0);
 
     Pen.Color := clBlack;
     Brush.Style := bsClear;

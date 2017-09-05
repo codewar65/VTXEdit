@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 48
+  Left = 136
   Height = 647
-  Top = 228
+  Top = 244
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627
@@ -16,7 +16,7 @@ object fMain: TfMain
   LCLVersion = '1.6.4.0'
   object CoolBar1: TCoolBar
     Left = 0
-    Height = 50
+    Height = 76
     Top = 0
     Width = 1062
     AutoSize = True
@@ -24,15 +24,15 @@ object fMain: TfMain
     Bands = <    
       item
         Break = False
-        Control = tbTools
+        Control = tbToolPalette
         FixedSize = True
         HorizontalOnly = True
         MinHeight = 24
-        MinWidth = 373
-        Width = 373
+        MinWidth = 331
+        Width = 331
       end    
       item
-        Control = tbAttributes
+        Control = tbAttributesPalette
         FixedSize = True
         HorizontalOnly = True
         MinHeight = 24
@@ -40,8 +40,7 @@ object fMain: TfMain
         Width = 357
       end    
       item
-        Break = False
-        Control = tbFontSelect
+        Control = tbFontPalette
         FixedSize = True
         HorizontalOnly = True
         MinHeight = 24
@@ -54,7 +53,7 @@ object fMain: TfMain
     GrabWidth = 8
     HorizontalSpacing = 2
     VerticalSpacing = 1
-    object tbTools: TToolBar
+    object tbToolPalette: TToolBar
       AnchorSideLeft.Control = CoolBar1
       AnchorSideTop.Control = CoolBar1
       Left = 14
@@ -67,7 +66,7 @@ object fMain: TfMain
       BorderSpacing.Top = 1
       ButtonHeight = 21
       ButtonWidth = 21
-      Caption = 'tbTools'
+      Caption = 'tbToolPalette'
       DisabledImages = ilDisabledButtons
       EdgeBorders = []
       EdgeInner = esNone
@@ -243,7 +242,7 @@ object fMain: TfMain
         ShowHint = True
       end
     end
-    object tbAttributes: TToolBar
+    object tbAttributesPalette: TToolBar
       AnchorSideLeft.Control = CoolBar1
       AnchorSideTop.Control = CoolBar1
       Left = 14
@@ -256,14 +255,14 @@ object fMain: TfMain
       BorderSpacing.Top = 27
       ButtonHeight = 21
       ButtonWidth = 21
-      Caption = 'tbAttributes'
+      Caption = 'tbAttributesPalette'
       DisabledImages = ilDisabledButtons
       EdgeBorders = []
       EdgeInner = esNone
       EdgeOuter = esNone
       Images = ilButtons
       TabOrder = 1
-      OnPaintButton = tbAttributesPaintButton
+      OnPaintButton = tbAttributesPalettePaintButton
       object tbAttrBold: TToolButton
         Left = 64
         Hint = 'Use Bold'
@@ -457,20 +456,20 @@ object fMain: TfMain
         Style = tbsCheck
       end
     end
-    object tbFontSelect: TToolBar
+    object tbFontPalette: TToolBar
       AnchorSideLeft.Control = CoolBar1
       AnchorSideTop.Control = CoolBar1
-      Left = 371
+      Left = 14
       Height = 21
-      Top = 27
+      Top = 53
       Width = 274
       Align = alNone
       AutoSize = True
-      BorderSpacing.Left = 371
-      BorderSpacing.Top = 27
+      BorderSpacing.Left = 14
+      BorderSpacing.Top = 53
       ButtonHeight = 21
       ButtonWidth = 21
-      Caption = 'tbFontSelect'
+      Caption = 'tbFontPalette'
       EdgeBorders = []
       EdgeInner = esNone
       EdgeOuter = esNone
@@ -610,22 +609,22 @@ object fMain: TfMain
   end
   object Panel1: TPanel
     Left = 0
-    Height = 577
-    Top = 50
+    Height = 551
+    Top = 76
     Width = 1062
     Align = alClient
     Caption = 'Panel1'
-    ClientHeight = 577
+    ClientHeight = 551
     ClientWidth = 1062
     TabOrder = 1
     object pSettings: TPanel
       Left = 0
-      Height = 554
+      Height = 528
       Top = 0
       Width = 170
       Anchors = [akTop, akLeft, akBottom]
       BevelOuter = bvNone
-      ClientHeight = 554
+      ClientHeight = 528
       ClientWidth = 170
       ParentColor = False
       TabOrder = 0
@@ -874,25 +873,25 @@ object fMain: TfMain
     object pbStatusBar: TPaintBox
       Left = 0
       Height = 23
-      Top = 554
+      Top = 528
       Width = 1062
       Anchors = [akLeft, akRight, akBottom]
       OnPaint = pbStatusBarPaint
     end
     object pPagePanel: TPanel
       Left = 170
-      Height = 554
+      Height = 528
       Top = 0
       Width = 516
       Anchors = [akTop, akLeft, akRight, akBottom]
       Caption = 'pPagePanel'
-      ClientHeight = 554
+      ClientHeight = 528
       ClientWidth = 516
       TabOrder = 1
       object sbHorz: TScrollBar
         Left = 16
         Height = 16
-        Top = 538
+        Top = 512
         Width = 484
         Anchors = [akLeft, akRight, akBottom]
         Max = 80
@@ -902,7 +901,7 @@ object fMain: TfMain
       end
       object pbPage: TPaintBox
         Left = 16
-        Height = 523
+        Height = 497
         Top = 16
         Width = 484
         Anchors = [akTop, akLeft, akRight, akBottom]
@@ -917,7 +916,7 @@ object fMain: TfMain
       end
       object pbRulerLeft: TPaintBox
         Left = 0
-        Height = 538
+        Height = 512
         Top = 16
         Width = 16
         Anchors = [akTop, akLeft, akBottom]
@@ -938,13 +937,13 @@ object fMain: TfMain
       object SpeedButton1: TSpeedButton
         Left = 500
         Height = 16
-        Top = 538
+        Top = 512
         Width = 16
         Anchors = [akRight, akBottom]
       end
       object sbVert: TScrollBar
         Left = 500
-        Height = 522
+        Height = 496
         Top = 16
         Width = 16
         Anchors = [akTop, akRight, akBottom]
@@ -956,54 +955,71 @@ object fMain: TfMain
     end
     object pRightBar: TPanel
       Left = 684
-      Height = 554
+      Height = 528
       Top = 0
       Width = 378
       Anchors = [akTop, akRight, akBottom]
-      ClientHeight = 554
+      ClientHeight = 528
       ClientWidth = 378
       ParentColor = False
       TabOrder = 2
       object PageControl1: TPageControl
         Left = 1
-        Height = 552
+        Height = 526
         Top = 1
         Width = 376
-        ActivePage = TabSheet2
+        ActivePage = TabSheet1
         Align = alClient
-        TabIndex = 1
+        TabIndex = 0
         TabOrder = 0
         object TabSheet1: TTabSheet
           Caption = 'Colors'
-          ClientHeight = 524
-          ClientWidth = 270
-          object ScrollBox1: TScrollBox
+          ClientHeight = 498
+          ClientWidth = 368
+          object pbColors: TPaintBox
             Left = 2
-            Height = 518
-            Top = 4
-            Width = 266
-            HorzScrollBar.Page = 1
-            VertScrollBar.Page = 1
+            Height = 325
+            Top = 50
+            Width = 360
             Anchors = [akTop, akLeft, akRight, akBottom]
-            TabOrder = 0
+            ParentShowHint = False
+            ShowHint = True
+            OnPaint = pbColorsPaint
+          end
+          object Label13: TLabel
+            Left = 4
+            Height = 15
+            Top = 4
+            Width = 97
+            Caption = 'Foreground Color:'
+            ParentColor = False
+          end
+          object Label16: TLabel
+            Left = 186
+            Height = 15
+            Top = 4
+            Width = 96
+            Caption = 'Background Color'
+            ParentColor = False
           end
         end
         object TabSheet2: TTabSheet
           Caption = 'Characters'
-          ClientHeight = 524
+          ClientHeight = 498
           ClientWidth = 368
           object sbChars: TScrollBox
             Left = 0
-            Height = 488
+            Height = 462
             Top = 34
             Width = 368
             HorzScrollBar.Page = 170
+            VertScrollBar.Increment = 17
             VertScrollBar.Page = 170
             VertScrollBar.Smooth = True
             VertScrollBar.Tracking = True
             Anchors = [akTop, akLeft, akRight, akBottom]
             AutoSize = True
-            ClientHeight = 484
+            ClientHeight = 458
             ClientWidth = 364
             Color = clBlack
             ParentColor = False
@@ -1034,7 +1050,7 @@ object fMain: TfMain
             Text = 'tbCodePage'
           end
           object Label14: TLabel
-            Left = 84
+            Left = 94
             Height = 15
             Top = 6
             Width = 54
@@ -1042,7 +1058,7 @@ object fMain: TfMain
             ParentColor = False
           end
           object seCharacter: TSpinEdit
-            Left = 140
+            Left = 156
             Height = 21
             Top = 4
             Width = 64
@@ -1054,7 +1070,7 @@ object fMain: TfMain
             TabOrder = 2
           end
           object tbUnicode: TEdit
-            Left = 210
+            Left = 288
             Height = 21
             Top = 4
             Width = 56
@@ -1065,6 +1081,14 @@ object fMain: TfMain
             TabStop = False
             TabOrder = 3
             Text = 'tbUnicode'
+          end
+          object Label15: TLabel
+            Left = 232
+            Height = 15
+            Top = 6
+            Width = 47
+            Caption = 'Unicode:'
+            ParentColor = False
           end
         end
       end

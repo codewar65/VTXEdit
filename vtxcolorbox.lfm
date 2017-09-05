@@ -1,7 +1,7 @@
 object fColor: TfColor
-  Left = 1268
+  Left = 1230
   Height = 351
-  Top = 314
+  Top = 377
   Width = 300
   BorderIcons = []
   BorderStyle = bsToolWindow
