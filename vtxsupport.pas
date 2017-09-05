@@ -35,7 +35,8 @@ interface
 
 uses
   UnicodeHelper,
-  Classes, Forms, SysUtils, ExtCtrls, VTXConst, BGRABitmap, BGRABitmapTypes, Windows, Graphics;
+  Classes, Forms, SysUtils, ExtCtrls, VTXConst, BGRABitmap, BGRABitmapTypes,
+  Windows, Graphics;
 
 function GetGlyphOff(codepoint : integer; table : PByte; size : integer) : integer;
 procedure GetGlyphBmp(var bmp : TBGRABitmap; base : pbyte; off : integer; attr : Uint32; blink : boolean);
@@ -88,6 +89,11 @@ implementation
 {*****************************************************************************}
 
 { Support Functions }
+
+function VTXRGB(r, g, b : byte) : dword; inline;
+begin
+  result := ((b << 16) or (g << 8) or r);
+end;
 
 function iif(cond : boolean; trueval : variant; falseval : variant) : variant; inline;
 begin
@@ -352,7 +358,7 @@ begin
     g := (1.0 - g) * factor + g;
     b := (1.0 - b) * factor + b;
   end;
-  result := RGB(Unnorm(r), Unnorm(g), Unnorm(b));
+  result := VTXRGB(Unnorm(r), Unnorm(g), Unnorm(b));
 end;
 
 function DrawTextCentered(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
