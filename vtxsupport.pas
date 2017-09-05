@@ -78,16 +78,6 @@ procedure movetools(h : hwnd; x, y : integer);
 var
   Version : string;
 
-  textureUp, textureDown,     // 24x24 button images (up / down)
-  textureBlotch,                // overlay for color palette entry
-  iconsNormal, iconsGrayed, iconsHilite, iconsDown, // button icons
-  captionCloseUp,
-  captionCloseDown,
-  captionAutoRollupUp,
-  captionAutoRollupDown,
-  textureRuler : TBGRABitmap;
-  Ctrl3D : array [0..4] of TBGRAPixel;  // 0=dark/2=mid/4=light
-
   // various settings
   PageType :                integer;  // from cbPageType  PAGETYPE_
   ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_

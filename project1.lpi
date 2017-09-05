@@ -13,13 +13,6 @@
       <ResourceType Value="res"/>
       <UseXPManifest Value="True"/>
       <Icon Value="0"/>
-      <Resources Count="5">
-        <Resource_0 FileName="work\ruler.png" Type="RCDATA" ResourceName="RULER"/>
-        <Resource_1 FileName="work\buttons.png" Type="RCDATA" ResourceName="BUTTONS"/>
-        <Resource_2 FileName="work\grayicons.png" Type="RCDATA" ResourceName="GRAYICONS"/>
-        <Resource_3 FileName="work\icons.png" Type="RCDATA" ResourceName="ICONS"/>
-        <Resource_4 FileName="work\captionbuttons.png" Type="RCDATA" ResourceName="CAPTIONBUTTONS"/>
-      </Resources>
     </General>
     <i18n>
       <EnableI18N LFM="False"/>
@@ -46,7 +39,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="9">
+    <Units Count="8">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -60,45 +53,37 @@
         <UnitName Value="VTXEdit"/>
       </Unit1>
       <Unit2>
-        <Filename Value="vtxcolorbox.pas"/>
-        <IsPartOfProject Value="True"/>
-        <ComponentName Value="fColor"/>
-        <HasResources Value="True"/>
-        <ResourceBaseClass Value="Form"/>
-        <UnitName Value="VTXColorBox"/>
-      </Unit2>
-      <Unit3>
         <Filename Value="vtxconst.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXConst"/>
-      </Unit3>
-      <Unit4>
+      </Unit2>
+      <Unit3>
         <Filename Value="vtxpreviewbox.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="fPreview"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXPreviewBox"/>
-      </Unit4>
-      <Unit5>
+      </Unit3>
+      <Unit4>
         <Filename Value="vtxsupport.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXSupport"/>
-      </Unit5>
-      <Unit6>
+      </Unit4>
+      <Unit5>
         <Filename Value="vtxedit.ini"/>
         <IsPartOfProject Value="True"/>
-      </Unit6>
-      <Unit7>
+      </Unit5>
+      <Unit6>
         <Filename Value="vtxencdetect.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXEncDetect"/>
-      </Unit7>
-      <Unit8>
+      </Unit6>
+      <Unit7>
         <Filename Value="unicodehelper.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="UnicodeHelper"/>
-      </Unit8>
+      </Unit7>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

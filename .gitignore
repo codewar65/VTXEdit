@@ -61,4 +61,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# CorelDraw backups
+Backup_of_*
+
 # End of https://www.gitignore.io/api/windows,lazarus,freepascal

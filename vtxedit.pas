@@ -98,7 +98,6 @@ uses
   BGRABitmap,
   BGRABitmapTypes,
   Types,
-  VTXColorBox,
   VTXPreviewBox,
   VTXConst,
   VTXSupport,
@@ -201,7 +200,6 @@ type
     tbModeLeftRights: TToolButton;
     tbModeTopBottoms: TToolButton;
     tbModeQuarters: TToolButton;
-    tbColors: TToolButton;
     tbModeSixels: TToolButton;
     tbAttrBold: TToolButton;
     tbAttrFaint: TToolButton;
@@ -236,6 +234,8 @@ type
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbCharsPaint(Sender: TObject);
+    procedure pbColorsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure pbColorsPaint(Sender: TObject);
     procedure seCharacterChange(Sender: TObject);
     procedure tbAttrClick(Sender: TObject);
@@ -249,7 +249,6 @@ type
     procedure SaveVTXFile(fname : string);
     procedure LoadVTXFile(fname : string);
     procedure pbCurrCellPaint(Sender: TObject);
-    procedure UpdateFromTools;
     procedure UpdatePreview;
     procedure DrawCellEx(cnv : TCanvas; x, y, row, col : integer; skipUpdate : boolean = true);
     procedure SetAttrButtons(attr : Uint32);
@@ -266,7 +265,6 @@ type
     procedure miFileOpenClick(Sender: TObject);
     procedure miFileNewClick(Sender: TObject);
     procedure miFileSaveClick(Sender: TObject);
-    procedure miToolsColorsClick(Sender: TObject);
     procedure pbPageMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbPageMouseLeave(Sender: TObject);
@@ -311,11 +309,6 @@ type
     function GetBlockColor(cell : TCell; xsize, ysize, x, y : integer) : integer;
     function SetBlockColor(clr: integer; cell : TCell; xsize, ysize, x, y : integer) : TCell;
     procedure GenerateBmpPage;
-    procedure bPBBMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-    procedure bPBBMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-    procedure bPBBMouseEnter(Sender: TObject);
-    procedure bPBBMouseLeave(Sender: TObject);
-    procedure bPBBPaint(Sender: TObject);
     procedure CodePageChange;
     function GetNextCell(r, c : integer) : TRowCol;
     Procedure LoadSettings;
@@ -330,7 +323,6 @@ type
 
   public
     { public declarations }
-    procedure WndProc(var Msg: TMessage); override;
 
   end;
 
@@ -373,8 +365,6 @@ implementation
 
 var
   // tool windows
-  fColorBox : TfColor;
-  fColorPickerBox : TfColor;
   fPreviewBox : TfPreview;
 
   CurrFileName :            unicodestring;
@@ -417,22 +407,6 @@ var
   bmpCharPalette : TBGRABitmap = nil;
 
 {*****************************************************************************}
-
-procedure TfMain.WndProc(var Msg:TMessage);
-begin
-  if Msg.msg = WM_VTXEDIT then
-    begin
-      case Msg.wParam of
-        WA_MAIN_UPDATE:
-          begin
-            // get vals from tools
-            UpdateFromTools;
-          end;
-      end;
-    end
-  else
-    inherited WndProc(Msg);
-end;
 
 procedure TfMain.DoBlink;
 var
@@ -560,74 +534,7 @@ begin
   bmpPage := nil;
   SkipScroll := false;
 
-  // load GUI images
-  rs := TResourceStream.Create(HInstance, 'RULER', Windows.RT_RCDATA);
-  textureRuler := TBGRABitmap.Create(rs);
-  rs.Free;
-
-  // tint icons for inactive / hover / down
-  rs := TResourceStream.Create(HInstance, 'ICONS', Windows.RT_RCDATA);
-  iconsNormal := TBGRABitmap.Create(rs);
-  rs.Free;
-  iconsGrayed := iconsNormal.Duplicate() as TBGRABitmap;
-  iconsHilite := iconsNormal.Duplicate() as TBGRABitmap;
-  iconsDown :=   iconsNormal.Duplicate() as TBGRABitmap;
-  for y := 0 to iconsNormal.Height - 1 do
-    for x := 0 to iconsNormal.Width - 1 do
-    begin
-      px1 := iconsNormal.GetPixel(x, y);
-
-      px2 := px1;
-      px2.red := (px2.green +   128) and $FF;
-      px2.green := (px2.green + 128) and $FF;
-      px2.blue := (px2.blue +   128) and $FF;
-      iconsGrayed.SetPixel(x, y, px2);
-
-      px2 := px1;
-      px2.green := (px2.green + 128) and $FF;
-      px2.blue := (px2.blue +   192) and $FF;
-      iconsHilite.SetPixel(x, y, px2);
-
-      px2 := px1;
-      px2.green := (px2.green + 64) and $FF;
-      px2.red := (px2.blue +   192) and $FF;
-      iconsDown.SetPixel(x, y, px2);
-    end;
-
-  // spit buttons for up / down
-  rs := TResourceStream.Create(HInstance, 'BUTTONS', Windows.RT_RCDATA);
-  bmp := TBGRABitmap.Create(rs);
-  rs.Free;
-  rect.top := 0;
-  rect.left := 0;
-  rect.Width := 24;
-  rect.Height := 24;
-  textureUp := bmp.GetPart(rect) as TBGRABitmap;
-  rect.left += 24;
-  rect.width := 24;
-  textureDown := bmp.GetPart(rect) as TBGRABitmap;
-  rect.left += 24;
-  rect.width := 24;
-  textureBlotch := bmp.GetPart(rect) as TBGRABitmap;
-  bmp.free;
-
-  // get toolbar caption buttons
-  rs := TResourceStream.Create(HInstance, 'CAPTIONBUTTONS', Windows.RT_RCDATA);
-  bmp := TBGRABitmap.Create(rs);
-  rs.Free;
-  rect.top := 0; rect.left := 0; rect.Width := 12; rect.Height := 12;
-  captionCloseUp := bmp.GetPart(rect) as TBGRABitmap;
-  rect.left += 12; rect.width := 12;
-  captionCloseDown := bmp.GetPart(rect) as TBGRABitmap;
-  rect.left += 12; rect.width := 12;
-  captionAutoRollupUp := bmp.GetPart(rect) as TBGRABitmap;
-  rect.left += 12; rect.width := 12;
-  captionAutoRollupDown := bmp.GetPart(rect) as TBGRABitmap;
-  bmp.free;
-
   // create tool windows
-  fColorBox := TfColor.Create(self);
-  fColorPickerBox := TfColor.Create(self);
   fPreviewBox := TfPreview.Create(self);
 
   // initialize new document
@@ -732,67 +639,20 @@ begin
   ColorScheme := COLORSCHEME_BBS;
   cbColorScheme.ItemIndex := ColorScheme;
   cbColorSchemeChange(cbColorScheme);
-
-  fColorBox.PalType := 0;
-  fColorPickerBox.PalType := 1;
-  SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
-  SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
-  SendMessage(fColorPickerBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 3);
-
-  // generate our 3d ui shades
-  Ctrl3D[2] := BGRA(0,0,0,0);
-  for i := 1 to 2 do
-  begin
-    Ctrl3D[2 - i] := BGRA(0,0,0,i * 48);
-    Ctrl3D[2 + i] := BGRA(255,255,255,i * 48);
-  end;
+  pbColors.Invalidate;
 
   CurrAttr := $0007;
   pbCurrCell.Invalidate;
 
 end;
 
-procedure TfMain.UpdateFromTools;
-begin
-  // fetch values from tool windows.
-  // build CurrAttr based on controls
-  if fColorBox <> nil then
-  begin
-    SetBits(CurrAttr, A_CELL_FG_MASK, fColorBox.FG);
-    SetBits(CurrAttr, A_CELL_BG_MASK, fColorBox.BG, 8);
-  end;
-  pbCurrCell.Invalidate;
-end;
-
 procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
-
   SaveSettings;
-  fColorBox.Hide;
   fPreviewBox.Hide;
-  fColorPickerBox.Hide;
-
   bmpPage.Free;
-
-  fColorBox.Free;
   fPreviewBox.Free;
-  fColorPickerBox.Free;
-
-  textureRuler.free;
-  iconsNormal.Free;
-  iconsGrayed.Free;
-  iconsHilite.Free;
-  iconsDown.Free;
-  textureUp.Free;
-  TextureDown.Free;
-  TextureBlotch.Free;
-  captionCloseUp.free;
-  captionCloseDown.free;
-  captionAutoRollupUp.free;
-  captionAutoRollupDown.free;
-
   if bmpCharPalette <> nil then bmpCharPalette.Free;
-
 end;
 
 
@@ -1374,8 +1234,7 @@ begin
           COLORSCHEME_256:    i := i and 255;
         end;
         SetBits(CurrAttr, A_CELL_FG_MASK, i);
-        fColorBox.FG := i;
-        fColorBox.Invalidate;
+        pbColors.Invalidate;
         pbCurrCell.Invalidate;
       end;
 
@@ -1390,8 +1249,7 @@ begin
           COLORSCHEME_256:      i := i and 255;
         end;
         SetBits(CurrAttr, A_CELL_FG_MASK, i);
-        fColorBox.FG := i;
-        fColorBox.Invalidate;
+        pbColors.Invalidate;
         pbCurrCell.Invalidate;
       end;
 
@@ -1406,8 +1264,7 @@ begin
           COLORSCHEME_256:      i := i and 255;
         end;
         SetBits(CurrAttr, A_CELL_BG_MASK, i, 8);
-        fColorBox.BG := i;
-        fColorBox.Invalidate;
+        pbColors.Invalidate;
         pbCurrCell.Invalidate;
       end;
 
@@ -1422,8 +1279,7 @@ begin
           COLORSCHEME_256:      i := i and 255;
         end;
         SetBits(CurrAttr, A_CELL_BG_MASK, i, 8);
-        fColorBox.BG := i;
-        fColorBox.Invalidate;
+        pbColors.Invalidate;
         pbCurrCell.Invalidate;
       end;
 
@@ -1548,14 +1404,7 @@ begin
 
     KA_SHOWCOLORS:
       begin
-        case KeyValue of
-          '0':  fColorBox.Hide;
-          '1':  fColorBox.Show;
-          else
-            fColorBox.Visible:=not fColorBox.Visible;
-        end;
       end;
-
 
     KA_SHOWCHARACTERS:
       begin
@@ -1761,17 +1610,6 @@ begin
       DrawCell(r, c, false);
     end;
   pbPage.Invalidate;
-
-  case sc of
-    0: // BASIC : only colors 0-7 FB/BG
-      SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 0);
-    1: // BBS : only colors 0-15;FG, 0-7 BG
-      SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 1);
-    2: // iCE : only color 0-15: FG/BG
-      SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 2);
-    3: // 256 Color
-      SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, 3);
-  end;
 
   pbColors.Invalidate;
 end;
@@ -2110,11 +1948,6 @@ begin
   end;
 end;
 
-procedure TfMain.miToolsColorsClick(Sender: TObject);
-begin
-  fColorBox.Visible := not fColorBox.Visible;
-end;
-
 procedure TfMain.BuildCharacterPalette;
 var
   rows : integer;
@@ -2269,47 +2102,61 @@ begin
   pbCurrCell.Invalidate;
 end;
 
+procedure TfMain.pbColorsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  fgs, bgs, cls : integer;
+  cl, maxr, r, c : integer;
+begin
+  // max colors
+  case ColorScheme of
+    COLORSCHEME_BASIC: begin fgs := 8; bgs := 8; cls := 8; end;
+    COLORSCHEME_BBS: begin fgs := 16; bgs := 8; cls := 16; end;
+    COLORSCHEME_ICE: begin fgs := 16; bgs := 16; cls := 16; end;
+    COLORSCHEME_256: begin fgs := 256; bgs := 256; cls := 256; end;
+  end;
+
+  r := Y div 22;
+  c := X div 22;
+  maxr := cls div 16;  // 16 colors per row
+
+  if not between(r, 0, maxr) or not between(c, 0, 15) then
+    exit;
+
+  cl := (r << 4) + c;
+
+  case button of
+    mbLeft:
+      if between(cl, 0, fgs - 1) then
+        SetBits(CurrAttr, A_CELL_FG_MASK, cl);
+
+    mbRight:
+      if between(cl, 0, bgs - 1) then
+        SetBits(CurrAttr, A_CELL_BG_MASK, cl, 8);
+  end;
+  pbColors.Invalidate;
+  pbCurrCell.Invalidate;
+end;
+
 procedure TfMain.pbColorsPaint(Sender: TObject);
 var
   pb : TPaintBox;
   cnv : TCanvas;
-  cls, fgs, bgs : integer;
+  cls : integer;
   maxr : integer;
-  x, y, r, c : integer;
+  cl, x, y, r, c : integer;
   rect : TRect;
+  bmp : TBitmap;
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
 
   // max colors
   case ColorScheme of
-    COLORSCHEME_BASIC:
-      begin
-        fgs := 8;
-        bgs := 8;
-        cls := 8;
-      end;
-
-    COLORSCHEME_BBS:
-      begin
-        fgs := 16;
-        bgs := 8;
-        cls := 16;
-      end;
-
-    COLORSCHEME_ICE:
-      begin
-        fgs := 16;
-        bgs := 16;
-        cls := 16;
-      end;
-
-    COLORSCHEME_256:
-      begin
-        fgs := 256;
-        bgs := 256;
-        cls := 256;
-      end;
+    COLORSCHEME_BASIC: begin cls := 8; end;
+    COLORSCHEME_BBS: begin cls := 16; end;
+    COLORSCHEME_ICE: begin cls := 16; end;
+    COLORSCHEME_256: begin cls := 256; end;
   end;
 
   maxr := cls div 16;  // 16 colors per row
@@ -2323,18 +2170,34 @@ begin
       rect.top :=    y;
       rect.width :=  20;
       rect.height := 20;
-      cnv.Brush.Color := ANSIColor[(r << 4) + c];
-      cnv.FillRect(rect);
 
+      cl := (r << 4) + c;
+
+      cnv.Brush.Color := ANSIColor[cl];
+      cnv.FillRect(rect);
       cnv.pen.color := clblack;
       cnv.Rectangle(rect);
 
-      //rect.inflate(-1,-1);
-      //DrawRectangle3D(cnv, rect, true);
-      //rect.inflate(-1,-1);
-      //DrawRectangle3D(cnv, rect, true);
+      if cl = GetBits(CurrAttr, A_CELL_FG_MASK) then
+      begin
+        bmp := TBitmap.create;
+        bmp.PixelFormat:=pf32bit;
+        ilButtons.GetBitmap(47, bmp);
+        cnv.Draw(x + 2, y + 2, bmp);
+        bmp.free;
+      end;
+
+      if cl = GetBits(CurrAttr, A_CELL_BG_MASK, 8) then
+      begin
+        bmp := TBitmap.create;
+        bmp.PixelFormat:=pf32bit;
+        ilButtons.GetBitmap(48, bmp);
+        cnv.Draw(x + 2, y + 2, bmp);
+        bmp.free;
+      end;
+
       x += 22;
-    end;
+      end;
     y += 22;
   end;
 
@@ -3514,8 +3377,7 @@ begin
     CursorCol := 0;
     SkipScroll := false;
     SetAttrButtons(CurrAttr);
-    SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_RESIZE, ColorScheme);
-    SendMessage(fColorBox.Handle, WM_VTXEDIT, WA_COLOR_SETVALS, CurrAttr);
+    pbColors.Invalidate;
 
     ResizeScrolls;
     GenerateBmpPage;
@@ -3723,8 +3585,7 @@ var
   hw : HWND;
 begin
   hw := GetActiveWindow;
-  if (hw = fColorBox.Handle)
-  or (hw = fPreviewBox.Handle) then
+  if (hw = fPreviewBox.Handle) then
   begin
     BringToFront;
     Activate;
@@ -4051,12 +3912,7 @@ begin
   rarea := pb.ClientRect;
   rarea.left := rarea.Right - rarea.Height;
   rarea.width := rarea.height;
-
   r := rarea;
-//  DrawRectangle3D(cnv, r, false);
-//  r.Inflate(-1, -1);
-//  DrawRectangle3D(cnv, r, false);
-//  r.Inflate(-1, -1);
 
   // change this to background color in VTX mode
   cnv.Brush.Color := ANSIColor[16];
@@ -4350,112 +4206,6 @@ begin
   end;
 end;
 
-// paintboxbutton
-
-procedure TfMain.bPBBMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  v : Uint32;
-  pb : TPaintBox;
-  down : boolean;
-begin
-  pb := TPaintBox(Sender);
-  v := pb.tag;
-  down := HasBits(v, PBB_DOWN);
-  if not HasBits(v, PBB_TYPE_BUTTON) then
-    SetBit(v, PBB_DOWN, not down)
-  else
-    SetBit(v, PBB_DOWN, true);
-  pb.tag := v;
-  pb.Invalidate;
-end;
-
-procedure TfMain.bPBBMouseUp(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  v : Uint32;
-  pb : TPaintBox;
-begin
-  pb := TPaintBox(Sender);
-  v := pb.tag;
-  if HasBits(v, PBB_TYPE_BUTTON) then
-    SetBit(v, PBB_DOWN, false);
-  pb.tag := v;
-  pb.Invalidate;
-end;
-
-procedure TfMain.bPBBMouseEnter(Sender: TObject);
-var
-  v : Uint32;
-  pb : TPaintBox;
-begin
-  pb := TPaintBox(Sender);
-  v := pb.tag;
-  SetBit(v, PBB_HOVER, true);
-  pb.tag := v;
-  pb.Invalidate;
-end;
-
-procedure TfMain.bPBBMouseLeave(Sender: TObject);
-var
-  v : Uint32;
-  pb : TPaintBox;
-begin
-  pb := TPaintBox(Sender);
-  v := pb.tag;
-  SetBit(v, PBB_HOVER, false);
-  pb.tag := v;
-  pb.Invalidate;
-end;
-
-
-procedure TfMain.bPBBPaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r : TRect;
-  bmp : TBGRABitmap;
-  n : integer;
-  size : integer;
-  adj : integer;
-  down : boolean;
-begin
-  // use tag for states
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  down := HasBits(pb.Tag, PBB_DOWN);
-
-  // get icon
-  n := GetBits(pb.Tag, PBB_IMAGE_MASK);
-  size := iconsNormal.Height;
-  r.Top := 0;
-  r.Left := n * size;
-  r.Width := size;
-  r.Height := size;
-  if not pb.Enabled then
-    bmp := iconsGrayed.GetPart(r) as TBGRABitmap
-  else if HasBits(pb.tag, PBB_HOVER) then
-    bmp := iconsHilite.GetPart(r) as TBGRABitmap
-  else if HasBits(pb.tag, PBB_DOWN) then
-    bmp := iconsDown.GetPart(r) as TBGRABitmap
-  else
-    bmp := iconsNormal.GetPart(r) as TBGRABitmap;
-
-  // draw button
-  if down then
-    textureDown.Draw(cnv, 0,0)
-  else
-    textureUp.Draw(cnv, 0, 0);
-
-  adj := 0;
-  if down then adj := 1;
-  cnv.Draw(
-    ((pb.Width - bmp.Width) >> 1),
-    ((pb.Height - bmp.Height) >> 1) - 2 + adj,
-    bmp.Bitmap);
-  bmp.free;
-end;
-
 function GetKeyAction(str : string) : integer;
 var
   i : integer;
@@ -4484,15 +4234,10 @@ begin
   q := StrToQuad(iin.ReadString(sect, 'Window','64,64 640,480'));
   SetFormQuad(fMain, q);
 
-  q := StrToQuad(iin.ReadString(sect, 'ColorBox','64,64 640,480'));
-  q.v2 := 0;
-  SetFormQuad(fColorBox, q);
-
   q := StrToQuad(iin.ReadString(sect, 'PreviewBox', '64,64 640,480'));
   q.v2 := 0;
   SetFormQuad(fPreviewBox, q);
 
-  if iin.ReadBool(sect, 'ColorBoxOpen', false) then fColorBox.Show;
   if iin.ReadBool(sect, 'PreviewBoxOpen', false) then fPreviewBox.Show;
   if iin.ReadBool(sect, 'WindowMax', false) then fMain.WindowState := wsMaximized;
 
@@ -5127,10 +4872,7 @@ begin
 
   // window positions
   iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
-  iin.WriteString(sect, 'ColorBox', QuadToStr(GetFormQuad(fColorBox)));
   iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
-
-  iin.WriteBool(sect, 'ColorBoxOpen', fColorBox.Showing);
   iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
 
   iin.WriteBool(sect, 'WindowMax', fMain.WindowState = wsMaximized);
