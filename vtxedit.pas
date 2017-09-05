@@ -1750,24 +1750,6 @@ begin
   bmp.Free();
 
 end;
-{
-procedure TfMain.pToolsPaint(Sender: TObject);
-var
-  p : TPanel;
-  cnv : TCanvas;
-begin
-  p := TPanel(Sender);
-  cnv := p.Canvas;
-
-  cnv.Brush.Color := ANSIColor[1];
-  cnv.FillRect(p.ClientRect);
-
-  DrawLine(cnv, Ctrl3D[1], 0, 0, p.Width, 0);
-  DrawLine(cnv, Ctrl3D[3], 0, 0, 0, p.Height);
-  DrawLine(cnv, Ctrl3D[1], pSettings.Width - 1, p.Height - 1, p.Width - 1, p.Height - 1);
-  DrawLine(cnv, Ctrl3D[1], p.Width - 1, p.Height - 1, p.Width - 1, 0);
-end;
-}
 
 procedure TfMain.sbVertChange(Sender: TObject);
 begin
@@ -2332,14 +2314,6 @@ begin
   SetBit(CurrAttr, A_CELL_SHADOW, tbAttrShadow.Down);
 
   pbCurrCell.Invalidate;
-end;
-
-function iif(cond : boolean; trueval : variant; falseval : variant) : variant;
-begin
-  if cond then
-    result := trueval
-  else
-    result := falseval;
 end;
 
 procedure TfMain.tbAttrMouseDown(Sender: TObject; Button: TMouseButton;
@@ -4054,11 +4028,6 @@ begin
   cnv := pb.Canvas;
   with cnv do
   begin
-//    DrawLine(cnv, Ctrl3D[4], 0, 0, 0, pb.Height - 1);
-//    DrawLine(cnv, Ctrl3D[4], 0, 0, pb.Width - 1, 0);
-//    DrawLine(cnv, Ctrl3D[0], pbRulerLeft.Width - 1, pb.Height - 1, pb.Width - 1, pb.Height - 1);
-//    DrawLine(cnv, Ctrl3D[0], pb.Width - 1, pb.Height - 1, pb.Width - 1, 0);
-
     Pen.Color := clBlack;
     Brush.Style := bsClear;
     Font.Color := clBlack;

@@ -51,13 +51,8 @@ procedure Swap(var val1, val2 : UInt32); inline;
 function Brighten(color : TColor; factor: real): TColor;
 function DrawTextCentered(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
 function DrawTextRight(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
-//procedure DrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
-//procedure DrawRectangle3D(cnv: TCanvas; x1, y1, x2, y2 : integer; raised:boolean);
-//procedure DrawRectangle3D(cnv: TCanvas; rect : TRect; raised:boolean);
 procedure DrawRectangle(cnv: TCanvas; x1, y1, x2, y2 : integer; clr : TColor);
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
-//procedure DrawRectangleButton(cnv: TCanvas; x1, y1, x2, y2 : integer; down : boolean);
-//procedure DrawRectangleButton(cnv: TCanvas; rect : TRect; down : boolean);
 procedure LineCalcInit(x0, y0, x1, y1 : integer);
 function LineCalcNext(var xo, yo : integer) : boolean;
 function QuadToStr(q : TQuad) : unicodestring;
@@ -66,14 +61,12 @@ procedure SetFormQuad(f : TForm; q : TQuad);
 function GetFormQuad(f : TForm) : TQuad;
 function CharsToStr(src : array of char; len : integer) : unicodestring;
 function isInteger(str : unicodestring) : boolean;
+function iif(cond : boolean; trueval : variant; falseval : variant) : variant; inline;
 
 // downstates in tag of tpaintbox buttons
 procedure SetDown(pb : TPaintBox; val : boolean); inline;
 function GetDown(pb : TPaintBox) : boolean; inline;
 function GetIgnore(pb : TPaintBox) : boolean; inline;
-
-// tool moving
-procedure movetools(h : hwnd; x, y : integer);
 
 var
   Version : string;
@@ -95,6 +88,14 @@ implementation
 {*****************************************************************************}
 
 { Support Functions }
+
+function iif(cond : boolean; trueval : variant; falseval : variant) : variant; inline;
+begin
+  if cond then
+    result := trueval
+  else
+    result := falseval;
+end;
 
 // get offset of codepoint of glyph in UVGA16. return 0 if not found
 // called like GetGlyphOff(9673, @UVGA16, sizeof(UVGA16));
@@ -354,63 +355,20 @@ begin
   result := RGB(Unnorm(r), Unnorm(g), Unnorm(b));
 end;
 
-function DrawTextCentered(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
+function DrawTextCentered(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
 var
-  DrawRect: TRect;
-  DrawFlags: Cardinal;
-  DrawParams: TDrawTextParams;
+  sz : TSize;
 begin
-  DrawRect := r;
-  DrawFlags := DT_END_ELLIPSIS or DT_NOPREFIX or DT_WORDBREAK or
-    DT_EDITCONTROL or DT_CENTER;
-  DrawText(cnv.Handle, PChar(S), -1, DrawRect, DrawFlags or DT_CALCRECT);
-  DrawRect.Right := R.Right;
-  if DrawRect.Bottom < R.Bottom then
-    OffsetRect(DrawRect, 0, (R.Bottom - DrawRect.Bottom) div 2)
-  else
-    DrawRect.Bottom := R.Bottom;
-  ZeroMemory(@DrawParams, SizeOf(DrawParams));
-  DrawParams.cbSize := SizeOf(DrawParams);
-  DrawTextEx(cnv.Handle, PChar(S), -1, DrawRect, DrawFlags, @DrawParams);
-  Result := DrawParams.uiLengthDrawn;
+  sz := cnv.TextExtent(s);
+  cnv.TextOut((r.Width - sz.cx) >> 1, (r.Height - sz.cy) >> 1, s);
 end;
 
-function DrawTextRight(cnv: TCanvas; const r: TRect; s: unicodeString): Integer;
+function DrawTextRight(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
 var
-  DrawRect: TRect;
-  DrawFlags: Cardinal;
-  DrawParams: TDrawTextParams;
+  sz : TSize;
 begin
-  DrawRect := r;
-  DrawFlags := DT_END_ELLIPSIS or DT_NOPREFIX or DT_WORDBREAK or
-    DT_EDITCONTROL or DT_RIGHT;
-  DrawText(cnv.Handle, PChar(S), -1, DrawRect, DrawFlags or DT_CALCRECT);
-  DrawRect.Right := R.Right;
-  if DrawRect.Bottom < R.Bottom then
-    OffsetRect(DrawRect, 0, (R.Bottom - DrawRect.Bottom) div 2)
-  else
-    DrawRect.Bottom := R.Bottom;
-  ZeroMemory(@DrawParams, SizeOf(DrawParams));
-  DrawParams.cbSize := SizeOf(DrawParams);
-  DrawTextEx(cnv.Handle, PChar(S), -1, DrawRect, DrawFlags, @DrawParams);
-  Result := DrawParams.uiLengthDrawn;
-end;
-
-procedure XDrawLine(cnv : TCanvas; clr : TBGRAPixel; x1, y1, x2, y2 : integer);
-var
-  tmp : TBGRABitmap;
-  r : TRect;
-begin
-  r.Left := 0;
-  r.Right := 0;
-  r.Width := cnv.Width;
-  r.Height := cnv.Height;
-  tmp := TBGRABitmap.Create(cnv.Width, cnv.Height);
-  BitBlt(tmp.Canvas.Handle, 0, 0, cnv.Width, cnv.Height, cnv.Handle, 0, 0, SRCCOPY);
-  tmp.DrawLine(x1,y1,x2,y2,clr,true);
-  tmp.Draw(cnv, 0, 0, true);
-  tmp.free;
-
+  sz := cnv.TextExtent(s);
+  cnv.TextOut(r.Right - sz.cx, (r.Height - sz.cy) >> 1, s);
 end;
 
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
@@ -445,7 +403,6 @@ function GetIgnore(pb : TPaintBox) : boolean; inline;
 begin
   result := ((pb.Tag and PBB_IGNORE) > 0);
 end;
-
 
 // http://members.chello.at/~easyfilter/bresenham.html
 
@@ -559,13 +516,6 @@ begin
   len := length(src);
   for i := 0 to len - 1 do
     result += src[i];
-end;
-
-
-// move this window + all snapped
-procedure movetools(h : hwnd; x, y : integer);
-begin
-  SetWindowPos(h, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE or SWP_NOACTIVATE);
 end;
 
 end.
