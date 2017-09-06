@@ -80,7 +80,8 @@ unit VTXEdit;
 interface
 
 uses
-  Windows,
+//  Windows,
+  LCLType,
   Classes,
   SysUtils,
   strutils,
@@ -774,7 +775,8 @@ begin
     if uni = Blocks2x1[i] then
       break;
 
-  FillMemory(@result, 2, bg);
+  FillChar(result, 2, bg);
+
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -794,7 +796,8 @@ begin
     if uni = Blocks1x2[i] then
       break;
 
-  FillMemory(@result, 2, bg);
+  FillChar(result, 2, bg);
+
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -813,7 +816,8 @@ begin
     if uni = Blocks2x2[i] then
       break;
 
-  FillMemory(@result, 4, bg);
+  FillChar(result, 4, bg);
+
   if HasBits(i, %0001) then result[0] := fg;
   if HasBits(i, %0010) then result[1] := fg;
   if HasBits(i, %0100) then result[2] := fg;
@@ -955,7 +959,8 @@ begin
     // reduce other 3 blocks to 1 color + this color
     // get color count.
     setlength(count, 256);
-    FillMemory(@count[0], 256, 0);
+    FillChar(count[0], 256, 0);
+
     tot := 0;
     mval := 0;
     mclr := -1;     // other color with highest count
@@ -3568,6 +3573,7 @@ var
   mr, mc, sx, sy : integer;
   hw : HWND;
 begin
+  {
   hw := GetActiveWindow;
   if (hw = fPreviewBox.Handle) then
   begin
@@ -3576,6 +3582,7 @@ begin
   end
   else if hw <> Handle then
     exit;
+  }
 
   // update mouse position
   MouseRow := PageTop + floor(Y / CellHeightZ);
