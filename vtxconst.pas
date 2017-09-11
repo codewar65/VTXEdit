@@ -39,22 +39,49 @@ uses
 type
 
   TKeyBinds = record
-    Ctrl, Shift, Alt : boolean;
-    KeyCode : integer;
-    KeyStr : string;  // the string rep of this key ( Ctrl+C eg.)
-    Action : integer;
-    Val : string;
+    Ctrl, Shift, Alt :  boolean;
+    KeyCode :           int16;
+    KeyStr :            string;  // the string rep of this key ( Ctrl+C eg.)
+    Action :            int16;
+    Val :               string;
   end;
 
   TCell = packed record
-    Chr :       UInt16;     // unicode codepoint
-    Attr :      UInt32;     // attributes
+    Chr :               UInt16;     // unicode codepoint
+    Attr :              UInt32;     // attributes
   end;
 
-  TUndoCell = packed record
-    Row, Col :  UInt16;
-    Cell :      TCell;
+  // item in ANSI art object linked list.
+  PPlacedCell =         ^TPlacedCell;
+  TPlacedCell = packed record
+    Row, Col :          UInt16;
+    Cell :              TCell;
+    Next :              PPlacedCell; // nil = eol
   end;
+
+  // ANSI art objects / pasted object from clipboard.
+  TObj = packed record
+    Name :              unicodestring;
+    First :             PPlacedCell;
+    Locked, Hidden :    boolean;
+  end;
+
+  // a single undo/redo item on undo 'stack'
+  TUndoCell = packed record
+    Flag :              byte;       // Start of block, end of block, operation..
+    Row, Col :          UInt16;     // location on page.
+    OldCell,                        // previous cell that got overwritten
+    NewCell :           TCell;      // new cell.
+  end;
+
+  // copy / paste region selection info
+  TLoc = packed record
+    Neighbors :         byte;       // 1=n,2=e,4=s,8=w
+    Row, Col :          int16;
+  end;
+
+  // copy selection area
+  TSelection = array of TLoc;
 
   // http://www.acid.org/info/sauce/sauce.htm
   TSauceHeader = packed record
@@ -2594,7 +2621,7 @@ const
   // a binary serch (GetGlyphOff).
   // UVGA16 font - 18 bytes per glyph }
   UVGA16_COUNT = 2910;  // number of glyphs
-  UVGA16 : array [0..UVGA16_COUNT * 18 - 1] of byte = (
+  UVGA16 : packed array [0..UVGA16_COUNT * 18 - 1] of byte = (
     $00, $00, {|}  $00, $00, $DA, $02, $80, $82, $02, $80, $82, $02, $80, $B6, $00, $00, $00, $00,  // char 0
     $00, $20, {|}  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,  // char 32
     $00, $21, {|}  $00, $00, $18, $3C, $3C, $3C, $18, $18, $18, $00, $18, $18, $00, $00, $00, $00,  // char 33
@@ -5516,7 +5543,7 @@ const
 
   // MicroKnightPlus
   MicroKnightPlus_COUNT = 256;  // number of glyphs
-  MicroKnightPlus : array [0..MicroKnightPlus_COUNT * 18 - 1] of byte = (
+  MicroKnightPlus : packed array [0..MicroKnightPlus_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $02, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
@@ -5776,7 +5803,7 @@ const
 
   // MicroKnight
   MicroKnight_COUNT = 256;  // number of glyphs
-  MicroKnight : array [0..MicroKnight_COUNT * 18 - 1] of byte = (
+  MicroKnight : packed array [0..MicroKnight_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $02, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
@@ -6036,7 +6063,7 @@ const
 
   // P0T-NOoDLE
   P0T_NOoDLE_COUNT = 256; // number of glyphs
-  P0T_NOoDLE : array [0..P0T_NOoDLE_COUNT * 18 - 1] of byte = (
+  P0T_NOoDLE : packed array [0..P0T_NOoDLE_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $FF, $FF, $83, $83, $39, $39, $29, $29, $23, $23, $3F, $3F, $81, $81, $FF, $FF,
     $00, $02, {|} $FF, $FF, $83, $83, $39, $39, $21, $21, $39, $39, $39, $39, $39, $39, $7F, $7F,
@@ -6297,7 +6324,7 @@ const
 
   // Topaz Plus
   TopazPlus_COUNT = 256;  // number of glyphs
-  TopazPlus : array [0..TopazPlus_COUNT * 18 - 1] of byte = (
+  TopazPlus : packed array [0..TopazPlus_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $83, $83, $39, $39, $21, $21, $29, $29, $21, $21, $3F, $3F, $87, $87, $FF, $FF,
     $00, $02, {|} $C3, $C3, $99, $99, $99, $99, $81, $81, $99, $99, $99, $99, $99, $99, $FF, $FF,
@@ -6557,7 +6584,7 @@ const
 
   // Topaz
   Topaz_COUNT = 256;  // number of glyphs
-  Topaz : array [0..Topaz_COUNT * 18 - 1] of byte = (
+  Topaz : packed array [0..Topaz_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $83, $83, $39, $39, $21, $21, $29, $29, $21, $21, $3F, $3F, $87, $87, $FF, $FF,
     $00, $02, {|} $C3, $C3, $99, $99, $99, $99, $81, $81, $99, $99, $99, $99, $99, $99, $FF, $FF,
@@ -6817,7 +6844,7 @@ const
 
   // mO'sOul
   mOsOul_COUNT = 256; // number of glyphs
-  mOsOul : array [0..mOsOul_COUNT * 18 - 1] of byte = (
+  mOsOul : packed array [0..mOsOul_COUNT * 18 - 1] of byte = (
     $00, $00, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $01, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
     $00, $02, {|} $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00,
@@ -7180,9 +7207,6 @@ const
 //TELETEXT: new Uint16Array([ // TELETEXT
 //RAW: new Uint16Array([   // for RAW converted fonts - mapped to ASCII/PETSCII points
 
-
-
-
     (   Name :            'UTF8';
         EncodingLUT :     nil;
         GlyphTable :      @UVGA16;
@@ -7289,12 +7313,9 @@ const
   KA_FILEOPEN =         26;
   KA_FILESAVE =         27;
   KA_FILEEXIT =         28;
-  KA_SHOWATTRIBUTES =   29;
-  KA_SHOWCOLORS =       30;
-  KA_SHOWCHARACTERS =   31;
-  KA_SHOWPREVIEW =      32;
+  KA_SHOWPREVIEW =      29;
 
-  KA_EOL = 33;
+  KA_EOL = 30;
 
   KeyActions : array [0..KA_EOL] of string = (
     'CursorUp',
@@ -7328,13 +7349,22 @@ const
     'FileSave',
     'FileExit',
 
-    'ShowAttributes',
-    'ShowColors',
-    'ShowCharacters',
     'ShowPreview',
 
     ''
   );
+
+  // selection flags for nbeightboring cells
+  NEIGHBOR_NORTH = %0001;
+  NEIGHBOR_EAST =  %0010;
+  NEIGHBOR_SOUTH = %0100;
+  NEIGHBOR_WEST =  %1000;
+
+  // copy selection drag modes
+  DRAG_NEW    = 0;
+  DRAG_ADD    = 1;
+  DRAG_REMOVE = 2;
+
 
 implementation
 

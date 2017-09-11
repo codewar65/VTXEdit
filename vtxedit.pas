@@ -90,6 +90,7 @@ uses
   Dialogs,
   ExtCtrls,
   Menus,
+  LCL,
   StdCtrls,
   Buttons,
   Graphics,
@@ -139,6 +140,13 @@ type
     Label7: TLabel;
     Label8: TLabel;
     Label9: TLabel;
+    lvObjects: TListView;
+    MenuItem1: TMenuItem;
+    MenuItem2: TMenuItem;
+    MenuItem3: TMenuItem;
+    MenuItem4: TMenuItem;
+    MenuItem5: TMenuItem;
+    MenuItem6: TMenuItem;
     PageControl1: TPageControl;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
@@ -177,6 +185,7 @@ type
     SpeedButton1: TSpeedButton;
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
+    TabSheet3: TTabSheet;
     tbCodePage: TEdit;
     tbSauceAuthor: TEdit;
     tbSauceDate: TEdit;
@@ -195,6 +204,8 @@ type
     tbFont9: TToolButton;
     tbFont10: TToolButton;
     tbUnicode: TEdit;
+    ToolBar1: TToolBar;
+    bObjMoveBack: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
     tbModeLeftRights: TToolButton;
@@ -227,10 +238,21 @@ type
     tbFont6: TToolButton;
     tbFont11: TToolButton;
     tbFont12: TToolButton;
+    bObjMoveToBack: TToolButton;
+    bObnjMoveForward: TToolButton;
+    bObjMoveToFront: TToolButton;
+    bObjFlipHorz: TToolButton;
+    bObjFlipVert: TToolButton;
+    bObjMerge: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
     procedure BuildCharacterPalette;
+    function BuildDisplayCopySelection : TSelection;
+    procedure lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
+      ARect: TRect; AState: TOwnerDrawState);
+    procedure lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pbCharsPaint(Sender: TObject);
@@ -361,8 +383,7 @@ implementation
 
 {*****************************************************************************}
 
-{ Private Globels }
-
+{ Private Globals }
 var
   // tool windows
   fPreviewBox : TfPreview;
@@ -398,6 +419,12 @@ var
   MouseMiddle,
   MouseRight :              boolean;
 
+  // region selection
+  CopySelection :           TSelection;
+  drag :                    boolean;    // in drag mode
+  dragType :                integer;    // 0=select,1=add,2=remove
+  dragRow, dragCol :        integer;    // start of drag
+
   // fonts. (CSI 10-19 / 80-85 <space> D
   Fonts :                   array [0..15] of TEncoding;
 
@@ -411,6 +438,8 @@ var
 procedure TfMain.DoBlink;
 var
   x, y, r, c : integer;
+  i, l : integer;
+  cnv : TCanvas;
   docell : boolean;
 begin
   if bmpPage <> nil then
@@ -424,6 +453,7 @@ begin
     if PageZoom >= 1 then
     begin
       // only display blink on normal or higher zoom
+      cnv := pbPage.Canvas;
       y := 0;
       for r := PageTop to NumRows - 1 do
       begin
@@ -445,7 +475,8 @@ begin
             docell := true;
 
           if docell then
-            DrawCellEx(pbPage.Canvas, x, y, r, c);
+            DrawCellEx(cnv, x, y, r, c);
+
           x += CellWidthZ;
         end;
         y += CellHeightZ;
@@ -557,8 +588,8 @@ begin
   PageTop := 0;
   PageLeft := 0;
   PageZoom := 1;
-  WindowCols := pbPage.Width div CellWidth;
-  WindowRows := pbPage.Height div CellHeight;
+  WindowCols := (pbPage.Width div CellWidth) + 1;
+  WindowRows := (pbPage.Height div CellHeight) + 1;
 
   // blink states
   BlinkSlow := false;
@@ -655,6 +686,7 @@ begin
   bmpPreview.Free;
   fPreviewBox.Free;
   if bmpCharPalette <> nil then bmpCharPalette.Free;
+  setlength(CopySelection, 0);
 end;
 
 
@@ -679,18 +711,16 @@ begin
     if (bmpPage.Width <> w) or (bmpPage.Height <> h) then
     begin
       bmpPage.Free;
-      bmpPreview.Free;
       bmpPage := TBGRABitmap.Create(w, h);
     end
     else
-    begin
       bmpPage.FillRect(0,0,w,h,clBlack);
-    end;
   end
   else
-  begin
     bmpPage := TBGRABitmap.Create(w, h);
-  end;
+
+  if bmpPreview <> nil then
+    bmpPreview.Free;
 
   bmp := TBGRABitmap.Create(CellWidth, CellHeight);
   y := 0;
@@ -1408,18 +1438,6 @@ begin
         Close;
       end;
 
-    KA_SHOWATTRIBUTES:
-      begin
-      end;
-
-    KA_SHOWCOLORS:
-      begin
-      end;
-
-    KA_SHOWCHARACTERS:
-      begin
-      end;
-
     KA_SHOWPREVIEW:
       begin
         case KeyValue of
@@ -1671,7 +1689,7 @@ end;
 procedure TfMain.ResizeScrolls;
 begin
   // get width of page panel
-  WindowCols := round(pbPage.Width / CellWidthZ);
+  WindowCols := (pbPage.Width div CellWidthZ) + 1;
   if WindowCols >= NumCols then
   begin
     sbHorz.Enabled:=false;
@@ -1686,7 +1704,7 @@ begin
     sbHorz.PageSize := WindowCols;
   end;
 
-  WindowRows := round(pbPage.Height / CellHeightZ);
+  WindowRows := (pbPage.Height div CellHeightZ) + 1;
   if WindowRows >= NumRows then
   begin
     sbVert.Enabled:=false;
@@ -1811,6 +1829,7 @@ begin
   ResizePage;
   GenerateBmpPage;
   UpdateTitles;
+  setlength(CopySelection, 0);
   pbPage.Invalidate();
 end;
 
@@ -3404,8 +3423,17 @@ begin
     mbRight : MouseRight := false;
   end;
 
-  if Button = mbRight then
+  if Button = mbMiddle then
     MousePan := false;
+
+  // stop any dragging
+  if drag then
+  begin
+    // add / remove selection
+    CopySelection := BuildDisplayCopySelection;
+    drag := false;
+    pbPage.invalidate;
+  end;
 end;
 
 
@@ -3485,7 +3513,7 @@ begin
   end;
 
   pSettings.SetFocus;
-  if Button = mbRight then
+  if Button = mbMiddle then
   begin
     DrawCell(LastDrawRow, LastDrawCol);
     MousePan := true;
@@ -3494,18 +3522,61 @@ begin
     MousePanX := X;
     MousePanY := Y;
   end
-  else if Button = mbLeft then
+  else
   begin
     case ToolMode of
       tmNormal:
-        // move cursor
-        if between(MouseRow, 0, NumRows - 1)
-          and between(MouseCol, 0, NumCols - 1) then
-          CursorMove(MouseRow, MouseCol);
+        begin
+          // move cursor or select region
+          // drag = new selection
+          // shift drag = add to selection
+          // ctrl drag = remove from selection
+          // click = cell to new selection / move cursor
+          // shift click = add cell from selection
+          // ctrl click = remove cell from selection
+          if between(MouseRow, 0, NumRows - 1)
+            and between(MouseCol, 0, NumCols - 1) then
+          begin
+
+            if ssShift in Shift then
+            begin
+              // add to selection
+              // clear previous selection.
+              drag := true;
+              dragType := DRAG_ADD;
+              dragRow := MouseRow;
+              dragCol := MouseCol;
+            end
+            else if ssCtrl in Shift then
+            begin
+              // remove from selection
+              // clear previous selection.
+              drag := true;
+              dragType := DRAG_REMOVE;
+              dragRow := MouseRow;
+              dragCol := MouseCol;
+            end
+            else
+            begin
+              CursorMove(MouseRow, MouseCol);
+
+              // clear previous selection.
+              setlength(CopySelection, 0);
+              pbPage.invalidate;
+
+              // normal click / start selection
+              drag := true;
+              dragType := DRAG_NEW;
+              dragRow := MouseRow;
+              dragCol := MouseCol;
+            end;
+          end;
+        end;
 
       tmDraw:
         begin
           // draw current character.
+          // left click = draw, right click = erase
           if between(MouseRow, 0, NumRows-1)
             and between(MouseCol, 0, NumCols-1) then
           begin
@@ -3622,6 +3693,15 @@ begin
         i := sbVert.Max - WindowRows + 1;
       sbVert.Position := i;
     end;
+  end
+  else if drag then
+  begin
+    // dragging copy selection
+    // let paint draw selection information
+    if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
+      dragType := DRAG_ADD;
+
+    pbPage.Invalidate();
   end
   else
   begin
@@ -3782,6 +3862,156 @@ begin
   end;
 end;
 
+// add to selection. no dupes allowed
+procedure SelectionAdd(var selection : TSelection; r, c : integer);
+var
+  neighbor : integer;
+  i, l : integer;
+begin
+  neighbor := 0;
+  l := length(selection);
+  for i := 0 to l - 1 do
+  begin
+    if (selection[i].Row = r) and (selection[i].Col = c) then
+      exit;
+    if (selection[i].Row = r - 1) and (selection[i].Col = c) then
+    begin
+      SetBit(selection[i].Neighbors, NEIGHBOR_SOUTH, true);
+      SetBit(neighbor, NEIGHBOR_NORTH, true);
+    end;
+    if (selection[i].Row = r + 1) and (selection[i].Col = c) then
+    begin
+      SetBit(selection[i].Neighbors, NEIGHBOR_NORTH, true);
+      SetBit(neighbor, NEIGHBOR_SOUTH, true);
+    end;
+    if (selection[i].Row = r) and (selection[i].Col = c - 1) then
+    begin
+      SetBit(selection[i].Neighbors, NEIGHBOR_EAST, true);
+      SetBit(neighbor, NEIGHBOR_WEST, true);
+    end;
+    if (selection[i].Row = r) and (selection[i].Col = c + 1) then
+    begin
+      SetBit(selection[i].Neighbors, NEIGHBOR_WEST, true);
+      SetBit(neighbor, NEIGHBOR_EAST, true);
+    end;
+  end;
+  setlength(selection, l + 1);
+  selection[l].Neighbors := neighbor;
+  selection[l].Row := r;
+  selection[l].Col := c;
+end;
+
+function TfMain.BuildDisplayCopySelection : TSelection;
+var
+  i, l, r, c, r1, c1, r2, c2 : integer;
+begin
+  setlength(result, 0);
+  if drag then
+  begin
+    r1 := MouseRow;
+    c1 := MouseCol;
+    r2 := dragRow;
+    c2 := dragCol;
+    if r2 < r1 then Swap(r1, r2);
+    if c2 < c1 then Swap(c1, c2);
+    if dragType = DRAG_ADD then
+      // add these straight up
+      for r := r1 to r2 do
+        for c := c1 to c2 do
+          SelectionAdd(result, r, c);
+  end;
+  l := length(CopySelection);
+  for i := 0 to l - 1 do
+  begin
+    // add if not already in selection and not inside a remove drag
+    if drag and (dragType = DRAG_REMOVE) then
+    begin
+      if not between(CopySelection[i].Row, r1, r2)
+        or not between(CopySelection[i].Col, c1, c2) then
+        SelectionAdd(result, CopySelection[i].Row, CopySelection[i].Col);
+    end
+    else
+      SelectionAdd(result, CopySelection[i].Row, CopySelection[i].Col);
+  end;
+end;
+
+procedure TfMain.lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
+  ARect: TRect; AState: TOwnerDrawState);
+var
+  cnv : TCanvas;
+  bmp : TBitmap;
+  i, j, l : integer;
+  val : string;
+begin
+  // draw lock / hidden icons and name
+  // 56/57 = unlock/lock
+  // 58/59 = hidden/shown
+  cnv := Sender.Canvas;
+  bmp := TBitmap.Create;
+  bmp.PixelFormat:=pf32bit;
+  bmp.SetSize(16,16);
+
+  // draw row backgrounds
+  if AState = [] then
+  begin
+    cnv.Brush.Color := clBtnFace;
+    cnv.Font.Color := clBtnText;
+  end
+  else
+  begin
+    cnv.Brush.Color := clHighlight;
+    cnv.Font.Color := clHighlightText;
+  end;
+
+  cnv.FillRect(ARect);
+  val := AItem.Caption;
+  if val.Chars[0] = '0' then
+    ilButtons.GetBitmap(56, bmp)
+  else
+    ilButtons.GetBitmap(57, bmp);
+  cnv.Draw(ARect.Left + 6, ARect.Top,bmp);
+  if val.Chars[1] = '0' then
+    ilButtons.GetBitmap(58, bmp)
+  else
+    ilButtons.GetBitmap(59, bmp);
+  cnv.Draw(ARect.Left + 24, ARect.Top,bmp);
+  bmp.free;
+  cnv.Brush.Style := bsClear;
+  cnv.TextOut(ARect.Left + 48, ARect.Top, val.substring(2));
+end;
+
+procedure TfMain.lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  lv : TListView;
+  itm : TListItem;
+  cv : char;
+begin
+  // click on lock/unlock hide/shown
+  lv := TListView(Sender);
+  itm := lv.GetItemAt(X, Y);
+  if between(X, 6, 6 + 16) then
+  begin
+    cv := itm.Caption.Chars[0];
+    if cv = '0' then
+      cv := '1'
+    else
+      cv := '0';
+    itm.Caption := cv + itm.Caption.substring(1);
+    lvObjects.Invalidate;
+  end
+  else if between(X, 24, 24 + 16) then
+  begin
+    cv := itm.Caption.Chars[1];
+    if cv = '0' then
+      cv := '1'
+    else
+      cv := '0';
+    itm.Caption := itm.Caption.Chars[0] + cv + itm.Caption.substring(2);
+    lvObjects.Invalidate;
+  end;
+  itm.Caption
+end;
 
 // draw the document
 procedure TfMain.pbPagePaint(Sender: TObject);
@@ -3791,6 +4021,8 @@ var
   r, c : integer;
   pr : TRect;
   tmp, tmp2 : TBGRABitmap;
+  tmpreg : TSelection;
+  i : integer;
 begin
   if bmpPage = nil then exit;
 
@@ -3804,7 +4036,6 @@ begin
   // extract displayable part unscaled
   pr.Top := PageTop * CellHeight;
   pr.Left := PageLeft * CellWidth;
-
   if PageLeft + WindowCols >= NumCols then
     pr.Width := (NumCols - PageLeft) * CellWidth
   else
@@ -3814,12 +4045,11 @@ begin
     pr.Height := (NumRows - PageTop) * CellHeight
   else
     pr.Height := WindowRows * CellHeight;
+
   tmp := bmpPage.GetPart(pr) as TBGRABitmap;
 
   pr.Top := 0;
   pr.Left := 0;
-
-
   if PageLeft + WindowCols >= NumCols then
     pr.Width := (NumCols - PageLeft) * CellWidthZ
   else
@@ -3838,6 +4068,27 @@ begin
   tmp2.Draw(cnv, 0, 0);
   tmp.Free;
   tmp2.free;
+
+  // build selection region info
+  // draw selection information
+  cnv.pen.color := clAqua;
+  tmpreg := BuildDisplayCopySelection;
+  for i := 0 to length(tmpreg) - 1 do
+  begin
+    pr.Top := (tmpreg[i].Row - PageTop) * CellHeightZ;
+    pr.Left := (tmpreg[i].Col - PageLeft) * CellWidthZ;
+    pr.Width := CellWidthZ;
+    pr.Height := CellHeightZ;
+    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_NORTH) then
+      cnv.line(pr.left, pr.top, pr.Right - 1, pr.Top);
+    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_SOUTH) then
+      cnv.line(pr.left, pr.bottom - 1, pr.Right, pr.bottom - 1);
+    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_WEST) then
+      cnv.line(pr.left, pr.top, pr.left, pr.bottom - 1);
+    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_EAST) then
+      cnv.line(pr.right - 1, pr.top, pr.Right - 1, pr.bottom - 1);
+  end;
+  setlength(tmpreg, 0);
 
   // draw page guidelines
   cnv.Pen.Color := clLime;
@@ -4095,7 +4346,8 @@ var
   attr :          Uint32;
   rect :          TRect;
   bslow, bfast :  boolean;
-  cp : TEncoding;
+  cp :            TEncoding;
+  i, l : integer;
 
 begin
   if bmpPage = nil then exit; // ?!
@@ -4129,6 +4381,7 @@ begin
       bmp.ResampleFilter := rfMitchell;
       bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
       bmp2.Draw(bmpPreview.Canvas, col * (CellWidth >> 2), row * (CellHeight >> 2));
+      bmp2.free;
 
       UpdatePreview;
 
@@ -4186,6 +4439,29 @@ begin
     end;
     bmp.Draw(cnv, rect);
     bmp.free;
+
+    // need to draw selection borders
+    l := length(CopySelection) - 1;
+    cnv.Pen.Color := clAqua;
+    for i := 0 to l do
+    begin
+      if (CopySelection[i].Row = row) and (CopySelection[i].Col = col) then
+      begin
+        if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_NORTH) then
+          cnv.Line(rect.Left, rect.Top, rect.Right - 1, rect.Top);
+
+        if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_SOUTH) then
+          cnv.Line(rect.Left, rect.Bottom - 1, rect.Right - 1, rect.Bottom - 1);
+
+        if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_WEST) then
+          cnv.Line(rect.Left, rect.Top, rect.Left, rect.Bottom - 1);
+
+        if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_EAST) then
+          cnv.Line(rect.Right - 1, rect.Top, rect.Right - 1, rect.Bottom - 1);
+        break;
+      end;
+    end;
+
   end;
 end;
 
@@ -4824,15 +5100,6 @@ begin
 
         KA_FILEEXIT:
           miFileExit.ShortCut := shortcut;
-
-        KA_SHOWATTRIBUTES:
-          miToolsAttr.ShortCut := Shortcut;
-
-        KA_SHOWCOLORS:
-          miToolsColors.ShortCut := shortcut;
-
-        KA_SHOWCHARACTERS:
-          miToolsCharacters.ShortCut := shortcut;
 
         KA_SHOWPREVIEW:
           miToolsPreview.ShortCut := shortcut;

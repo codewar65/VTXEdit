@@ -45,8 +45,9 @@ function Between(val, lo, hi : char) : boolean; inline;
 function HasBits(val, mask : UInt32) : boolean; inline;
 function GetBits(val, mask : UInt32; shift : integer = 0) : UInt32; inline;
 procedure SetBits(var val : UInt32; mask, bits : UInt32; shift : integer = 0); inline;
-procedure SetBit(var val : UInt32; mask : UInt32; bit : boolean);
-procedure SetBit(var val : longint; mask : longint; bit : boolean);
+procedure SetBit(var val : byte; mask : byte; bit : boolean); inline;
+procedure SetBit(var val : UInt32; mask : UInt32; bit : boolean); inline;
+procedure SetBit(var val : longint; mask : longint; bit : boolean); inline;
 procedure Swap(var val1, val2 : integer); inline;
 procedure Swap(var val1, val2 : UInt32); inline;
 function Brighten(color : TColor; factor: real): TColor;
@@ -293,6 +294,16 @@ begin
   val := ((val and not mask) or ((bits << shift) and mask));
 end;
 
+procedure SetBit(var val : byte; mask : byte; bit : boolean);
+var
+  bitval : byte;
+begin
+  bitval := mask;
+  if not bit then
+    bitval := 0;
+  val := ((val and not mask) or bitval);
+end;
+
 procedure SetBit(var val : UInt32; mask : UInt32; bit : boolean);
 var
   bitval : UInt32;
@@ -367,15 +378,23 @@ var
   sz : TSize;
 begin
   sz := cnv.TextExtent(s);
-  cnv.TextOut((r.Width - sz.cx) >> 1, (r.Height - sz.cy) >> 1, s);
+  cnv.TextOut(r.Left + ((r.Width - sz.cx) >> 1), r.Top + ((r.Height - sz.cy) >> 1), s);
 end;
 
 function DrawTextRight(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
 var
   sz : TSize;
+  rtop, rleft, rright, rwidth, rheight : integer;
 begin
   sz := cnv.TextExtent(s);
-  cnv.TextOut(r.Right - sz.cx, (r.Height - sz.cy) >> 1, s);
+  rtop  :=   r.top;
+  rleft :=   r.left;
+  rright :=  r.right;
+  rwidth :=  r.width;
+  rheight := r.height;
+  if rheight < sz.cy then
+    rheight := sz.cy;
+  cnv.TextOut(rright - sz.cx, rtop + ((rheight - sz.cy) >> 1), s);
 end;
 
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
