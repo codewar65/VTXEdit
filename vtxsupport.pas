@@ -38,6 +38,9 @@ uses
   Classes, Forms, SysUtils, ExtCtrls, VTXConst, BGRABitmap, BGRABitmapTypes,
   Windows, Graphics;
 
+procedure DrawDashLine(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
+procedure DrawDashRect(cnv : TCanvas; rect : TRect; clr1, clr2 : TColor);
+procedure DrawDashRect(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
 function GetGlyphOff(codepoint : integer; table : PByte; size : integer) : integer;
 procedure GetGlyphBmp(var bmp : TBGRABitmap; base : pbyte; off : integer; attr : Uint32; blink : boolean);
 function Between(val, lo, hi : integer) : boolean; inline;
@@ -63,7 +66,12 @@ procedure SetFormQuad(f : TForm; q : TQuad);
 function GetFormQuad(f : TForm) : TQuad;
 function CharsToStr(src : array of char; len : integer) : unicodestring;
 function isInteger(str : unicodestring) : boolean;
-function iif(cond : boolean; trueval : variant; falseval : variant) : variant; inline;
+function iif(cond : boolean; trueval, falseval : integer) : integer; inline;
+function iif(cond : boolean; trueval, falseval : byte) : byte; inline;
+function iif(cond : boolean; trueval, falseval : char) : char; inline;
+function iif(cond : boolean; trueval, falseval : string) : string; inline;
+function iif(cond : boolean; trueval, falseval : unicodestring) : unicodestring; inline;
+function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
 
 // downstates in tag of tpaintbox buttons
 procedure SetDown(pb : TPaintBox; val : boolean); inline;
@@ -97,12 +105,34 @@ begin
   result := ((b << 16) or (g << 8) or r);
 end;
 
-function iif(cond : boolean; trueval : variant; falseval : variant) : variant; inline;
+function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
 begin
-  if cond then
-    result := trueval
-  else
-    result := falseval;
+  if cond then result := trueval else result := falseval;
+end;
+
+function iif(cond : boolean; trueval, falseval : unicodestring) : unicodestring; inline;
+begin
+  if cond then result := trueval else result := falseval;
+end;
+
+function iif(cond : boolean; trueval, falseval : string) : string; inline;
+begin
+  if cond then result := trueval else result := falseval;
+end;
+
+function iif(cond : boolean; trueval, falseval : char) : char; inline;
+begin
+  if cond then result := trueval else result := falseval;
+end;
+
+function iif(cond : boolean; trueval, falseval : integer) : integer; inline;
+begin
+  if cond then result := trueval else result := falseval;
+end;
+
+function iif(cond : boolean; trueval, falseval : byte) : byte; inline;
+begin
+  if cond then result := trueval else result := falseval;
 end;
 
 // get offset of codepoint of glyph in UVGA16. return 0 if not found
@@ -542,6 +572,42 @@ begin
   len := length(src);
   for i := 0 to len - 1 do
     result += src[i];
+end;
+
+procedure DrawDashLine(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
+begin
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr1;
+  cnv.Pen.Style := psSolid;
+  cnv.Line(x1, y1, x2, y2);
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr2;
+  cnv.Pen.Style := psDot;
+  cnv.Line(x1, y1, x2, y2);
+end;
+
+procedure DrawDashRect(cnv : TCanvas; rect : TRect; clr1, clr2 : TColor);
+begin
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr1;
+  cnv.Pen.Style := psSolid;
+  cnv.Rectangle(rect);
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr2;
+  cnv.Pen.Style := psDot;
+  cnv.Rectangle(rect);
+end;
+
+procedure DrawDashRect(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
+begin
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr1;
+  cnv.Pen.Style := psSolid;
+  cnv.Rectangle(x1, y1, x2, y2);
+  cnv.Brush.Style := bsClear;
+  cnv.Pen.Color := clr2;
+  cnv.Pen.Style := psDot;
+  cnv.Rectangle(x1, y1, x2, y2);
 end;
 
 end.

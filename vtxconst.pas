@@ -51,20 +51,29 @@ type
     Attr :              UInt32;     // attributes
   end;
 
+  TCellList = array of TCell;
+
   // item in ANSI art object linked list.
-  PPlacedCell =         ^TPlacedCell;
   TPlacedCell = packed record
     Row, Col :          UInt16;
     Cell :              TCell;
-    Next :              PPlacedCell; // nil = eol
   end;
 
+  TPlacedCellList = array of TPlacedCell;
+
   // ANSI art objects / pasted object from clipboard.
-  TObj = packed record
+  TObj = record
     Name :              unicodestring;
-    First :             PPlacedCell;
-    Locked, Hidden :    boolean;
+    Row, Col :          integer;          // position on page
+    Width, Height :     integer;          // size
+    Page,
+    Locked,
+    Hidden :            boolean;
+    Data :              TCellList;
   end;
+
+  // objects on document
+  TObjList = array of TObj;
 
   // a single undo/redo item on undo 'stack'
   TUndoCell = packed record
@@ -81,7 +90,7 @@ type
   end;
 
   // copy selection area
-  TSelection = array of TLoc;
+  TLocList = array of TLoc;
 
   // http://www.acid.org/info/sauce/sauce.htm
   TSauceHeader = packed record
@@ -161,7 +170,7 @@ type
     encWIN1255, encWIN1256, encWIN1257,
     encUTF8, encUTF16 );
 
-  TToolModes = ( tmNormal, tmDraw, tmFill, tmLine, tmRect, tmEllipse );
+  TToolModes = ( tmSelect, tmDraw, tmFill, tmLine, tmRect, tmEllipse );
   TDrawModes = ( dmChars, dmLeftRights, dmTopBottoms, dmQuarters, dmSixels );
 
   TCodePageRec = packed record
@@ -186,6 +195,19 @@ type
   end;
 
 const
+
+  clSelectedObject1 =   $FFFF00;
+  clSelectedObject2 =   $888800;
+  clUnselectedObject1 = $888800;
+  clUnselectedObject2 = $444400;
+  clSelectionArea1 =    $0088FF;
+  clSelectionArea2 =    $004488;
+  clDrawCursor1 =       $FFFFFF;  // drawing mode cursor colors
+  clDrawCursor2 =       $888888;
+  clPageBorder1 =       $00FF00;
+  clPageBorder2 =       $008800;
+
+  BLANK : TCell = ( Chr: $20; Attr: $0007; );
 
   SauceID : array [1..5] of char = 'SAUCE';
 
@@ -396,6 +418,8 @@ const
   _G       = $47;
   _DEL     = $7F;
   _SHY     = $2010;  // similar character to replace soft-hyphen
+
+  EMPTYCHAR = $DFFF;   // invalid character used to mark holes in objects
 
   ANSIColor : packed array [0..255] of UInt32 = (
       // these are in BBGGRR order
@@ -7283,71 +7307,65 @@ const
   PAGETYPE_VTX =        2;
 
   // Keyboard Actions
-  KA_CURSORUP =         0;
-  KA_CURSORDOWN =       1;
-  KA_CURSORLEFT =       2;
-  KA_CURSORRIGHT =      3;
-  KA_NEXTFG =           4;
-  KA_PREVFG =           5;
-  KA_NEXTBG =           6;
-  KA_PREVBG =           7;
-  KA_CURSORNEWLINE =    8;
-  KA_CURSORFORWARDTAB = 9;
-  KA_CURSORBACK =       10;
-  KA_PRINT =            11;
-  KA_FKEYSET =          12;
-  KA_MODECHARS =        13;
-  KA_MODELEFTRIGHTBLOCKS = 14;
-  KA_MODETOPBOTTOMBLOCKS = 15;
-  KA_MODEQUARTERBLOCKS = 16;
-  KA_MODESIXELS =       17;
-  KA_TOOLSELECT =       18;
-  KA_TOOLDRAW =         19;
-  KA_TOOLFILL =         20;
-  KA_TOOLLINE =         21;
-  KA_TOOLRECTANGLE =    22;
-  KA_TOOLELLIPSE =      23;
-  KA_TOOLEYEDROPPER =   24;
-
-  KA_FILENEW =          25;
-  KA_FILEOPEN =         26;
-  KA_FILESAVE =         27;
-  KA_FILEEXIT =         28;
-  KA_SHOWPREVIEW =      29;
-
-  KA_EOL = 30;
+  KA_CURSORUP =             0;
+  KA_CURSORDOWN =           1;
+  KA_CURSORLEFT =           2;
+  KA_CURSORRIGHT =          3;
+  KA_NEXTFG =               4;
+  KA_PREVFG =               5;
+  KA_NEXTBG =               6;
+  KA_PREVBG =               7;
+  KA_CURSORNEWLINE =        8;
+  KA_CURSORFORWARDTAB =     9;
+  KA_CURSORBACK =           10;
+  KA_PRINT =                11;
+  KA_FKEYSET =              12;
+  KA_MODECHARS =            13;
+  KA_MODELEFTRIGHTBLOCKS =  14;
+  KA_MODETOPBOTTOMBLOCKS =  15;
+  KA_MODEQUARTERBLOCKS =    16;
+  KA_MODESIXELS =           17;
+  KA_TOOLSELECT =           18;
+  KA_TOOLDRAW =             19;
+  KA_TOOLFILL =             20;
+  KA_TOOLLINE =             21;
+  KA_TOOLRECTANGLE =        22;
+  KA_TOOLELLIPSE =          23;
+  KA_TOOLEYEDROPPER =       24;
+  KA_FILENEW =              25;
+  KA_FILEOPEN =             26;
+  KA_FILESAVE =             27;
+  KA_FILEEXIT =             28;
+  KA_EDITREDO =             29;
+  KA_EDITUNDO =             30;
+  KA_EDITCUT =              31;
+  KA_EDITCOPY =             32;
+  KA_EDITPASTE =            33;
+  KA_SHOWPREVIEW =          34;
+  KA_EOL =                  35;
 
   KeyActions : array [0..KA_EOL] of string = (
-    'CursorUp',
-    'CursorDown',
-    'CursorLeft',
-    'CursorRight',
-    'NextFG',
-    'PrevFG',
-    'NextBG',
-    'PrevBG',
+
+    'CursorUp','CursorDown','CursorLeft','CursorRight',
+
+    'NextFG','PrevFG','NextBG','PrevBG',
+
     'CursorNewLine',
     'CursorForwardTab',
     'CursorBack',
+
     'Print',      // takes parameters Val
     'FKeySet',    // takes parameters Val
-    'ModeChars',
-    'ModeLeftRightBlocks',
-    'ModeTopBottomBlocks',
-    'ModeQuarterBlocks',
+
+    'ModeChars','ModeLeftRightBlocks','ModeTopBottomBlocks','ModeQuarterBlocks',
     'ModeSixels',
-    'ToolSelect',
-    'ToolDraw',
-    'ToolFill',
-    'ToolLine',
-    'ToolRectangle',
-    'ToolEllipse',
+
+    'ToolSelect','ToolDraw','ToolFill','ToolLine','ToolRectangle','ToolEllipse',
     'ToolEyeDropper',
 
-    'FileNew',
-    'FileOpen',
-    'FileSave',
-    'FileExit',
+    'FileNew','FileOpen','FileSave','FileExit',
+
+    'EditRedo', 'EditUndo','EditCut','EditCopy','EditPaste',
 
     'ShowPreview',
 
@@ -7364,7 +7382,6 @@ const
   DRAG_NEW    = 0;
   DRAG_ADD    = 1;
   DRAG_REMOVE = 2;
-
 
 implementation
 

@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 123
+  Left = 230
   Height = 647
-  Top = 210
+  Top = 213
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627
@@ -1169,6 +1169,7 @@ object fMain: TfMain
             OwnerDraw = True
             ParentFont = False
             ReadOnly = True
+            RowSelect = True
             ScrollBars = ssAutoVertical
             ShowColumnHeaders = False
             TabOrder = 1
@@ -1204,37 +1205,28 @@ object fMain: TfMain
     end
     object miEdit: TMenuItem
       Caption = '&Edit'
-      object MenuItem1: TMenuItem
+      object miEditUndo: TMenuItem
         Caption = 'Undo'
       end
-      object MenuItem3: TMenuItem
+      object miEditRedo: TMenuItem
         Caption = 'Redo'
       end
       object MenuItem4: TMenuItem
         Caption = '-'
       end
-      object MenuItem2: TMenuItem
+      object miEditCut: TMenuItem
         Caption = 'Cut'
       end
-      object MenuItem5: TMenuItem
+      object miEditCopy: TMenuItem
         Caption = 'Copy'
       end
-      object MenuItem6: TMenuItem
+      object miEditPaste: TMenuItem
         Caption = 'Paste'
       end
     end
-    object miTools: TMenuItem
-      Caption = '&Tools'
-      object miToolsAttr: TMenuItem
-        Caption = 'Attributes'
-      end
-      object miToolsColors: TMenuItem
-        Caption = 'Colors'
-      end
-      object miToolsCharacters: TMenuItem
-        Caption = 'Characters'
-      end
-      object miToolsPreview: TMenuItem
+    object miView: TMenuItem
+      Caption = '&View'
+      object miViewPreview: TMenuItem
         Caption = 'Preview'
         OnClick = pbPreviewClick
       end
