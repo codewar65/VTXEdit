@@ -1720,7 +1720,13 @@ begin
     KA_EDITCOPY:
       // copy selection or object to clipboard.
       begin
-      if length(CopySelection) > 0 then
+      if SelectedObject >= 0 then
+      begin
+        // copy object to clipboard
+        setlength(ClipBoard.Data, 0);
+        CopyObject(Objects[SelectedObject], Clipboard);
+      end
+      else if length(CopySelection) > 0 then
         begin
           Clipboard := CopySelectionToObject;
         end;
@@ -1760,11 +1766,14 @@ begin
           if SelectedObject >= 0 then
           begin
             // delete object
-            RemoveObject(SelectedObject);
-            LoadlvObjects;
-            SelectedObject := -1;
-            lvObjects.ItemIndex := selectedObject;
-            pbPage.Invalidate;
+            if not Objects[SelectedObject].Locked then
+            begin
+              RemoveObject(SelectedObject);
+              LoadlvObjects;
+              SelectedObject := -1;
+              lvObjects.ItemIndex := selectedObject;
+              pbPage.Invalidate;
+            end;
           end
           else if length(CopySelection) > 0 then
           begin
