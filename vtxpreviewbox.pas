@@ -89,6 +89,8 @@ var
   fw, w, h : integer;
 begin
   // set size of pbPreview to max zoom out for bmpPage
+  if bmpPreview = nil then exit;
+
   w := floor(bmpPreview.Width * XScale);
   h := bmpPreview.Height;
   fw := w + 8;
@@ -119,15 +121,11 @@ var
   bmp : TBGRABitmap;
 
 begin
+  if bmpPreview = nil then exit;
+
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
-
   bmpPreview.Draw(cnv, pb.ClientRect, false);
-
-//  bmp := bmpPage.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
-//  bmp.Draw(cnv, pb.ClientRect);
-//  bmp.Free;
-//  cnv.StretchDraw(pb.ClientRect, bmpPage.Bitmap);
 end;
 
 procedure TfPreview.FormShow(Sender: TObject);

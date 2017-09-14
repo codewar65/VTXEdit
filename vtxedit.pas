@@ -35,7 +35,25 @@ UTF 8 nas no characters in the  128-191 range
 
   TODO :
 
-    ** move blink / cursor blink to separate procedure
+    Merge / Move back - from / copy / flip objects
+
+    save / load objects
+
+    save objects in vtx file
+
+    paste object to center of window
+
+    undo / redo painting and object manipulation
+
+    row attributes
+
+    page / border / cursor attributes
+
+    transparent black in vtx mode
+
+    border on display / center document on window
+
+    line / rectangle / ellipse / fill tools
 
     Zoom on mouse position
 
@@ -136,6 +154,20 @@ type
     Label8: TLabel;
     Label9: TLabel;
     lvObjects: TListView;
+    MenuItem1: TMenuItem;
+    miObjNext: TMenuItem;
+    miObjPrev: TMenuItem;
+    miObjBackOne: TMenuItem;
+    miObjMerge: TMenuItem;
+    MenuItem11: TMenuItem;
+    miObjForwardOne: TMenuItem;
+    MenuItem3: TMenuItem;
+    miObjFlipHorz: TMenuItem;
+    MenuItem6: TMenuItem;
+    miObjToFront: TMenuItem;
+    miObjToBack: TMenuItem;
+    miObjFlipVert: TMenuItem;
+    miObjects: TMenuItem;
     miEditUndo: TMenuItem;
     miEditCut: TMenuItem;
     miEditRedo: TMenuItem;
@@ -239,6 +271,25 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure miObjNextClick(Sender: TObject);
+    procedure miObjPrevClick(Sender: TObject);
+    procedure RemoveObject(objnum : integer);
+    procedure ObjFlipHorz;
+    procedure ObjFlipVert;
+    procedure ObjMoveBack;
+    procedure ObjMoveForward;
+    procedure ObjMoveToBack;
+    procedure ObjMoveToFront;
+    procedure ObjMerge;
+    procedure ObjNext;
+    procedure ObjPrev;
+    procedure bObjFlipHorzClick(Sender: TObject);
+    procedure bObjFlipVertClick(Sender: TObject);
+    procedure bObjMergeClick(Sender: TObject);
+    procedure bObjMoveBackClick(Sender: TObject);
+    procedure bObjMoveToBackClick(Sender: TObject);
+    procedure bObjMoveToFrontClick(Sender: TObject);
+    procedure bObnjMoveForwardClick(Sender: TObject);
     procedure RefreshObject(objnum : integer);
     function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
     function GetObject(row, col : integer) : integer;
@@ -309,6 +360,7 @@ type
     procedure CursorStatus;
     procedure CursorNewLine;
     procedure CursorForwardTab;
+    procedure CursorBackwardTab;
     procedure CursorMove(row, col : integer);
     procedure seXScaleChange(Sender: TObject);
     procedure DrawMouseBox;
@@ -367,6 +419,8 @@ var
 
 procedure DebugStart;
 procedure nop;
+
+procedure CopyObject(objin : TObj; var objout : TObj);
 
 
 implementation
@@ -437,7 +491,7 @@ var
 function TfMain.GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
 var
   i :             integer;
-  po :            ^TObj;
+  po :            PObj;
   objr, objc, p : integer;
 begin
   for i := length(Objects) - 1 downto 0 do
@@ -478,7 +532,7 @@ end;
 function TfMain.GetObject(row, col : integer) : integer;
 var
   i :             integer;
-  po :            ^TObj;
+  po :            PObj;
   objr, objc, p : integer;
 begin
   for i := length(Objects) - 1 downto 0 do
@@ -1372,6 +1426,20 @@ begin
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
+procedure TfMain.CursorBackwardTab;
+var
+  v0, v1 : integer;
+begin
+  v0 := CursorRow;
+  v1 := CursorCol;
+  CursorCol := (((CursorCol - 1) >> 3)) << 3;
+  if CursorCol < 0 then
+    CursorCol := 0;
+  DrawCell(v0, v1);
+  DrawCell(CursorRow, CursorCol);
+  ScrollToCursor; // keep cursor on screen if typing
+end;
+
 procedure TfMain.CursorMove(row, col : integer);
 var
   v0, v1 : integer;
@@ -1405,12 +1473,29 @@ begin
   UpdatePreview;
 end;
 
+procedure CopyObject(objin : TObj; var objout : TObj);
+var
+  i, l : integer;
+begin
+  objout.Name:= objin.Name;
+  objout.Row := objin.Row;
+  objout.Col := objin.Col;
+  objout.Width := objin.Width;
+  objout.Height := objin.Height;
+  objout.Page := objin.Page;
+  objout.Locked := objin.Locked;
+  objout.Hidden:= objin.Hidden;
+  l := length(objin.Data);
+  setlength(objout.Data, l);
+  for i := 0 to l - 1 do
+    objout.Data[i] := objin.Data[i];
+end;
+
 // for special keys
 procedure TfMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
-  i, j, l, ch : integer;
+  i, l, ch : integer;
   r, c :        integer;
-  pb :          TPaintBox;
   shft :        TShiftState;
   KeyAction :   integer;
   KeyValue :    string;
@@ -1448,17 +1533,10 @@ begin
 
   unk := false;
   case KeyAction of
-    KA_CURSORUP:
-      CursorUp;
-
-    KA_CURSORDOWN:
-      CursorDown;
-
-    KA_CURSORLEFT:
-      CursorLeft;
-
-    KA_CURSORRIGHT:
-      CursorRight;
+    KA_CURSORUP:      CursorUp;
+    KA_CURSORDOWN:    CursorDown;
+    KA_CURSORLEFT:    CursorLeft;
+    KA_CURSORRIGHT:   CursorRight;
 
     KA_NEXTFG:
       begin
@@ -1520,17 +1598,14 @@ begin
         pbCurrCell.Invalidate;
       end;
 
-    KA_CURSORNEWLINE:
-      CursorNewLine;
-
-    KA_CURSORFORWARDTAB:
-      CursorForwardTab;
+    KA_CURSORNEWLINE:       CursorNewLine;
+    KA_CURSORFORWARDTAB:    CursorForwardTab;
+    KA_CURSORBACKWARDTAB:   CursorBackwardTab;
 
     KA_CURSORBACK:
       begin
         if CursorCol > 0 then
           CursorLeft;
-        Key := 0;
       end;
 
     KA_FKEYSET:
@@ -1615,25 +1690,10 @@ begin
     KA_TOOLEYEDROPPER:
       if tbToolEyedropper.Enabled then tbToolEyedropper.Click;
 
-    KA_FILENEW:
-      begin
-        NewFile;
-      end;
-
-    KA_FILEOPEN:
-      begin
-        miFileOpenClick(miFileOpen);
-      end;
-
-    KA_FILESAVE:
-      begin
-        miFileSaveClick(miFileSave);
-      end;
-
-    KA_FILEEXIT:
-      begin
-        Close;
-      end;
+    KA_FILENEW:   NewFile;
+    KA_FILEOPEN:  miFileOpenClick(miFileOpen);
+    KA_FILESAVE:  miFileSaveClick(miFileSave);
+    KA_FILEEXIT:  Close;
 
     KA_EDITREDO:
       ;
@@ -1674,12 +1734,69 @@ begin
           // paste as new object.
           l := length(Objects);
           setlength(Objects, l + 1);
-          Objects[l] := Clipboard;
+          CopyObject(Clipboard, Objects[l]);
           // drop it onto window. top left for now
           Objects[l].Row := PageTop;
           Objects[l].Col := PageLeft;
           LoadlvObjects;
           pbPage.Invalidate;
+        end;
+      end;
+
+    KA_OBJECTMOVEBACK:      ObjMoveBack;
+    KA_OBJECTMOVEFORWARD:   ObjMoveForward;
+    KA_OBJECTMOVETOBACK:    ObjMoveToBack;
+    KA_OBJECTMOVETOFRONT:   ObjMoveToFront;
+    KA_OBJECTFLIPHORZ:      ObjFlipHorz;
+    KA_OBJECTFLIPVERT:      ObjFlipVert;
+    KA_OBJECTMERGE:         ObjMerge;
+    KA_OBJECTNEXT:          ObjNext;
+    KA_OBJECTPREV:          ObjPrev;
+
+    KA_DELETE:
+      begin
+        if ToolMode = tmSelect then
+        begin
+          if SelectedObject >= 0 then
+          begin
+            // delete object
+            RemoveObject(SelectedObject);
+            LoadlvObjects;
+            SelectedObject := -1;
+            lvObjects.ItemIndex := selectedObject;
+            pbPage.Invalidate;
+          end
+          else if length(CopySelection) > 0 then
+          begin
+            // delete selected area
+            for i := length(CopySelection) - 1 downto 0 do
+            begin
+              r := CopySelection[i].Row;
+              c := CopySelection[i].Col;
+              Page.Rows[r].Cells[c] := BlankCell;
+              DrawCell(r, c, false);
+            end;
+            setlength(CopySelection, 0);
+            pbPage.Invalidate;
+          end;
+        end;
+      end;
+
+    KA_ESCAPE:
+      begin
+        if ToolMode = tmSelect then
+        begin
+          if SelectedObject >= 0 then
+          begin
+            SelectedObject := -1;
+            lvObjects.ItemIndex := selectedObject;
+            pbPage.Invalidate;
+          end
+          else if length(CopySelection) > 0 then
+          begin
+            setlength(CopySelection, 0);
+            pbPage.Invalidate;
+          end;
         end;
       end;
 
@@ -1703,7 +1820,6 @@ end;
 // for alphanumerica etc
 procedure TfMain.FormKeyPress(Sender: TObject; var Key: char);
 begin
-
   if seRows.Focused
     or seCols.Focused
     or seXScale.Focused
@@ -2882,8 +2998,6 @@ var
   buff : TBytes;
 
   len :               integer;
-  p :                 longint;
-  i, j, k :           integer;
   SaveRow, SaveCol :  integer;
   SaveAttr :          Uint32;
   chr :               integer;
@@ -2898,10 +3012,8 @@ var
   bomskip :           integer;
   checkenc :          TDetectEnc;
   charslen :          integer;
-  z :                 integer;
   ansi :              UnicodeString;
   chars :             array of UInt16;
-  uchars :            array of WideChar;
   Sauce :             TSauceHeader;
   ValidSauce :        Boolean;
 
@@ -3755,8 +3867,6 @@ var
   bcolor :        integer;
   dattr, dchar :  integer;
   objnum :        integer;
-  cell :          TCell;
-  neighbors :     byte;
   tmp :           integer;
 begin
   // left click to type.
@@ -4106,7 +4216,6 @@ end;
 procedure TfMain.DrawMouseBox;
 var
   x, y : integer;
-  cnv : TCanvas;
 begin
   // erase the previous
   if (DrawX <> LastDrawX) or (DrawY <> LastDrawY) then
@@ -4456,6 +4565,296 @@ begin
         if between(rr, 0, NumRows - 1) and between(cc, 0, NumCols - 1) then
           DrawCell(rr, cc);
       end;
+end;
+
+procedure TfMain.ObjFlipHorz;
+var
+  po :            PObj;
+  i, j, r, c :    integer;
+  p1, p2 :        integer;
+  tmp :           TCell;
+  fnt :           integer;
+  cp :            TEncoding;
+  chr, flipchr :  integer;
+begin
+  if SelectedObject >= 0 then
+  begin
+    po := @Objects[SelectedObject];
+    for r := 0 to po^.Height - 1 do
+    begin
+      // flip this rows character positions
+      for c := 1 to po^.Width div 2 do
+      begin
+        p1 := (r * po^.Width) + (c - 1);
+        p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
+        tmp := po^.Data[p1];
+        po^.Data[p1] := po^.Data[p2];
+        po^.Data[p2] := tmp;
+      end;
+      //  flip the characters in the row if we can
+      for c := 0 to po^.Width - 1 do
+      begin
+        p1 := (r * po^.Width) + c;
+
+        // get encoding number for this character
+        fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+        cp := Fonts[fnt];
+
+        chr := GetUnicode(po^.Data[p1]);
+        i := 0;
+        while i < CPages[cp].MirrorTableSize do
+        begin
+          if CPages[cp].MirrorTable[i] = chr then
+          begin
+            flipchr := CPages[cp].MirrorTable[i + 1];
+            // convert flip unicode back to this codepage
+            for j := 0 to 255 do
+              if flipchr = CPages[cp].EncodingLUT[j] then
+              begin
+                po^.Data[p1].Chr := j;
+                break;
+              end;
+            break;
+          end;
+          i += 3;
+        end;
+      end;
+    end;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjFlipVert;
+var
+  po :            PObj;
+  i, j, r, c :    integer;
+  p1, p2 :        integer;
+  tmp :           TCell;
+  fnt :           integer;
+  cp :            TEncoding;
+  chr, flipchr :  integer;
+begin
+  if SelectedObject >= 0 then
+  begin
+    po := @Objects[SelectedObject];
+    for c := 0 to po^.Width - 1 do
+    begin
+      // flip this rows character positions
+      for r := 1 to po^.Height div 2 do
+      begin
+        p1 := ((r - 1) * po^.Width) + c;
+        p2 := ((po^.Height - r) * po^.Width) + c;
+        tmp := po^.Data[p1];
+        po^.Data[p1] := po^.Data[p2];
+        po^.Data[p2] := tmp;
+      end;
+      //  flip the characters in the row if we can
+      for r := 0 to po^.Height - 1 do
+      begin
+        p1 := (r * po^.Width) + c;
+
+        // get encoding number for this character
+        fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+        cp := Fonts[fnt];
+
+        chr := GetUnicode(po^.Data[p1]);
+        i := 0;
+        while i < CPages[cp].MirrorTableSize do
+        begin
+          if CPages[cp].MirrorTable[i] = chr then
+          begin
+            flipchr := CPages[cp].MirrorTable[i + 2];
+            // convert flip unicode back to this codepage
+            for j := 0 to 255 do
+              if flipchr = CPages[cp].EncodingLUT[j] then
+              begin
+                po^.Data[p1].Chr := j;
+                break;
+              end;
+            break;
+          end;
+          i += 3;
+        end;
+      end;
+    end;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveBack;
+var
+  tmp : TObj;
+begin
+  if SelectedObject > 0 then
+  begin
+    // swap objects
+    tmp := Objects[SelectedObject];
+    Objects[SelectedObject] := Objects[SelectedObject - 1];
+    Objects[SelectedObject - 1] := tmp;
+    SelectedObject -= 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveForward;
+var
+  tmp : TObj;
+begin
+  if SelectedObject < length(Objects) - 1 then
+  begin
+    // swap objects
+    tmp := Objects[SelectedObject];
+    Objects[SelectedObject] := Objects[SelectedObject + 1];
+    Objects[SelectedObject + 1] := tmp;
+    SelectedObject += 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveToBack;
+var
+  tmp : TObj;
+begin
+  if SelectedObject > 0 then
+  begin
+    tmp := Objects[0];
+    Objects[0] := Objects[SelectedObject];
+    Objects[SelectedObject] := tmp;
+    SelectedObject := 0;
+    LoadlvObjects;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveToFront;
+var
+  l : integer;
+  tmp : TObj;
+begin
+  l := length(Objects);
+  if SelectedObject < l - 1 then
+  begin
+    tmp := Objects[l - 1];
+    Objects[l - 1] := Objects[SelectedObject];
+    Objects[SelectedObject] := tmp;
+    SelectedObject := l - 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.RemoveObject(objnum : integer);
+var
+  i : integer;
+begin
+  for i := objnum + 1 to length(Objects) - 1 do
+    Objects[i - 1] := Objects[i];
+  Setlength(Objects, length(Objects) - 1);
+end;
+
+procedure TfMain.ObjMerge;
+var
+  po : PObj;
+  pd : PCell;
+  r, c : integer;
+begin
+  // merge this object to page. and remove object
+  if SelectedObject >= 0 then
+  begin
+    po := @Objects[SelectedObject];
+    pd := @po^.Data[0];
+    for r := po^.Row to po^.Row + po^.Height - 1 do
+      for c := po^.Col to po^.Col + po^.Width - 1 do
+      begin
+        if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
+          if pd^.Chr <> EMPTYCHAR then
+          begin
+            Page.Rows[r].Cells[c] := pd^;
+            DrawCell(r, c, false);
+          end;
+        pd += 1;
+      end;
+    RemoveObject(SelectedObject);
+    SelectedObject := -1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjNext;
+begin
+  if length(Objects) >= 0 then
+  begin
+    SelectedObject += 1;
+    if SelectedObject >= length(Objects) then
+      SelectedObject := 0;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjPrev;
+begin
+  if length(Objects) >= 0 then
+  begin
+    SelectedObject -= 1;
+    if SelectedObject < 0 then
+      SelectedObject := length(Objects) - 1;
+    lvObjects.ItemIndex := SelectedObject;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.bObjMoveBackClick(Sender: TObject);
+begin
+  ObjMoveBack;
+end;
+
+procedure TfMain.bObnjMoveForwardClick(Sender: TObject);
+begin
+  ObjMoveForward;
+end;
+
+procedure TfMain.bObjMoveToBackClick(Sender: TObject);
+begin
+  ObjMoveToBack;
+end;
+
+procedure TfMain.bObjMoveToFrontClick(Sender: TObject);
+begin
+  ObjMoveToFront;
+end;
+
+procedure TfMain.bObjMergeClick(Sender: TObject);
+begin
+  ObjMerge;
+end;
+
+procedure TfMain.bObjFlipHorzClick(Sender: TObject);
+begin
+  ObjFlipHorz;
+end;
+
+procedure TfMain.bObjFlipVertClick(Sender: TObject);
+begin
+  ObjFlipVert;
+end;
+
+procedure TfMain.miObjPrevClick(Sender: TObject);
+begin
+  ObjPrev;
+end;
+
+procedure TfMain.miObjNextClick(Sender: TObject);
+begin
+  ObjNext;
 end;
 
 // draw the document
@@ -4873,12 +5272,10 @@ var
   bmp, bmp2 :     TBGRABitmap;
   ch :            Uint16;
   off :           integer;
-  fgc :           integer;
   attr :          Uint32;
   rect :          TRect;
   bslow, bfast :  boolean;
   cp :            TEncoding;
-  i, j, l :       integer;
 begin
   if bmpPage = nil then exit; // ?!
 
@@ -5045,7 +5442,7 @@ begin
               keybinds[i].KeyStr := 'Clear';
             end;
 
-          'RETURN':
+          'RETURN','ENTER':
             begin
               KeyBinds[i].KeyCode := 13;
               keybinds[i].KeyStr := 'Return';
@@ -5057,7 +5454,7 @@ begin
               keybinds[i].KeyStr := 'Pause';
             end;
 
-          'ESCAPE':
+          'ESCAPE','ESC':
             begin
               KeyBinds[i].KeyCode := 27;
               keybinds[i].KeyStr := 'Esc';
@@ -5069,23 +5466,22 @@ begin
               keybinds[i].KeyStr := 'Space';
             end;
 
-          'PRIOR':
+          'PRIOR', 'PGUP':
             begin
               KeyBinds[i].KeyCode := 33;
               keybinds[i].KeyStr := 'PgUp';
             end;
-
-          'NEXT':
+          'NEXT', 'PGDN':
             begin
               KeyBinds[i].KeyCode := 34;
               keybinds[i].KeyStr := 'PgDn';
             end;
+
           'END':
             begin
               KeyBinds[i].KeyCode := 35;
               keybinds[i].KeyStr := 'End';
             end;
-
           'HOME':
             begin
               KeyBinds[i].KeyCode := 36;
@@ -5097,38 +5493,35 @@ begin
               KeyBinds[i].KeyCode := 37;
               keybinds[i].KeyStr := 'Left';
             end;
-
           'UP':
             begin
               KeyBinds[i].KeyCode := 38;
               keybinds[i].KeyStr := 'Up';
             end;
-
           'RIGHT':
             begin
               KeyBinds[i].KeyCode := 39;
               keybinds[i].KeyStr := 'Right';
             end;
-
           'DOWN':
             begin
               KeyBinds[i].KeyCode := 40;
               keybinds[i].KeyStr := 'Down';
             end;
 
-          'SNAPSHOT':
+          'SNAPSHOT','PRTSCR','PRINTSCREEN':
             begin
               KeyBinds[i].KeyCode := 44;
               keybinds[i].KeyStr := 'PrtScr';
             end;
 
-          'INSERT':
+          'INSERT','INS':
             begin
               KeyBinds[i].KeyCode := 45;
               keybinds[i].KeyStr := 'Insert';
             end;
 
-          'DELETE':
+          'DELETE','DEL':
             begin
               KeyBinds[i].KeyCode := 46;
               keybinds[i].KeyStr := 'Delete';
@@ -5586,18 +5979,28 @@ begin
 
         KA_TOOLEYEDROPPER:  tbToolEyedropper.Hint := tbToolEyedropper.Hint+' ' + KeyBinds[i].KeyStr;
 
-        KA_FILENEW:         miFileNew.ShortCut := shortcut;
-        KA_FILEOPEN:        miFileOpen.ShortCut := shortcut;
-        KA_FILESAVE:        miFileSave.ShortCut := shortcut;
-        KA_FILEEXIT:        miFileExit.ShortCut := shortcut;
+        KA_FILENEW:           miFileNew.ShortCut := shortcut;
+        KA_FILEOPEN:          miFileOpen.ShortCut := shortcut;
+        KA_FILESAVE:          miFileSave.ShortCut := shortcut;
+        KA_FILEEXIT:          miFileExit.ShortCut := shortcut;
 
-        KA_EDITREDO:        miEditRedo.ShortCut := shortcut;
-        KA_EDITUNDO:        miEditUndo.ShortCut := shortcut;
-        KA_EDITCUT:         miEditCut.ShortCut := shortcut;
-        KA_EDITCOPY:        miEditCopy.ShortCut := shortcut;
-        KA_EDITPASTE:       miEditPaste.ShortCut := shortcut;
+        KA_EDITREDO:          miEditRedo.ShortCut := shortcut;
+        KA_EDITUNDO:          miEditUndo.ShortCut := shortcut;
+        KA_EDITCUT:           miEditCut.ShortCut := shortcut;
+        KA_EDITCOPY:          miEditCopy.ShortCut := shortcut;
+        KA_EDITPASTE:         miEditPaste.ShortCut := shortcut;
 
-        KA_SHOWPREVIEW:     miViewPreview.ShortCut := shortcut;
+        KA_OBJECTMOVEBACK:    miObjBackOne.ShortCut := shortcut;
+        KA_OBJECTMOVEFORWARD: miObjForwardOne.ShortCut := shortcut;
+        KA_OBJECTMOVETOBACK:  miObjToBack.ShortCut := shortcut;
+        KA_OBJECTMOVETOFRONT: miObjToFront.ShortCut := shortcut;
+        KA_OBJECTFLIPHORZ:    miObjFlipHorz.ShortCut := shortcut;
+        KA_OBJECTFLIPVERT:    miObjFlipVert.ShortCut := shortcut;
+        KA_OBJECTMERGE:       miObjMerge.ShortCut := shortcut;
+        KA_OBJECTNEXT:        miObjNext.ShortCut := shortcut;
+        KA_OBJECTPREV:        miObjPrev.ShortCut := shortcut;
+
+        KA_SHOWPREVIEW:       miViewPreview.ShortCut := shortcut;
 
       end;
     end;
@@ -5875,7 +6278,7 @@ begin
   enc := 0;
   for c := 0 to chars - 1 do
   begin
-    write(fout, format(' $%2.2x, $%2.2x, {|} ', [ (enc and $ff00) shr 8, enc and $FF ] ));
+    write(fout, format(' $%2.2x, $%2.2x, | ', [ (enc and $ff00) shr 8, enc and $FF ] ));
     for b := 0 to h - 1 do
     begin
       v := fin.readbyte;

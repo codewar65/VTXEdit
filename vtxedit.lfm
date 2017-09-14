@@ -1104,6 +1104,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjMoveBack'
               ImageIndex = 49
+              OnClick = bObjMoveBackClick
             end
             object bObjMoveToBack: TToolButton
               Left = 24
@@ -1111,6 +1112,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjMoveToBack'
               ImageIndex = 50
+              OnClick = bObjMoveToBackClick
             end
             object bObnjMoveForward: TToolButton
               Left = 47
@@ -1118,6 +1120,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObnjMoveForward'
               ImageIndex = 51
+              OnClick = bObnjMoveForwardClick
             end
             object bObjMoveToFront: TToolButton
               Left = 70
@@ -1125,6 +1128,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjMoveToFront'
               ImageIndex = 52
+              OnClick = bObjMoveToFrontClick
             end
             object bObjFlipHorz: TToolButton
               Left = 93
@@ -1132,6 +1136,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjFlipHorz'
               ImageIndex = 53
+              OnClick = bObjFlipHorzClick
             end
             object bObjFlipVert: TToolButton
               Left = 116
@@ -1139,6 +1144,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjFlipVert'
               ImageIndex = 54
+              OnClick = bObjFlipVertClick
             end
             object bObjMerge: TToolButton
               Left = 139
@@ -1146,6 +1152,7 @@ object fMain: TfMain
               Top = 2
               Caption = 'bObjMerge'
               ImageIndex = 55
+              OnClick = bObjMergeClick
             end
           end
           object lvObjects: TListView
@@ -1229,6 +1236,57 @@ object fMain: TfMain
       object miViewPreview: TMenuItem
         Caption = 'Preview'
         OnClick = pbPreviewClick
+      end
+    end
+    object miObjects: TMenuItem
+      Caption = '&Objects'
+      object miObjPrev: TMenuItem
+        Caption = 'Prev Object'
+        OnClick = miObjPrevClick
+      end
+      object miObjNext: TMenuItem
+        Caption = 'Next Object'
+        OnClick = miObjNextClick
+      end
+      object MenuItem1: TMenuItem
+        Caption = '-'
+      end
+      object miObjBackOne: TMenuItem
+        Caption = 'Back One'
+        OnClick = bObjMoveBackClick
+      end
+      object miObjForwardOne: TMenuItem
+        Caption = 'Forward One'
+        OnClick = bObnjMoveForwardClick
+      end
+      object MenuItem3: TMenuItem
+        Caption = '-'
+      end
+      object miObjToBack: TMenuItem
+        Caption = 'To Back'
+        OnClick = bObjMoveToBackClick
+      end
+      object miObjToFront: TMenuItem
+        Caption = 'To Front'
+        OnClick = bObjMoveToFrontClick
+      end
+      object MenuItem6: TMenuItem
+        Caption = '-'
+      end
+      object miObjFlipHorz: TMenuItem
+        Caption = 'Flip Horizontally'
+        OnClick = bObjFlipHorzClick
+      end
+      object miObjFlipVert: TMenuItem
+        Caption = 'Flip Vertically'
+        OnClick = bObjFlipVertClick
+      end
+      object MenuItem11: TMenuItem
+        Caption = '-'
+      end
+      object miObjMerge: TMenuItem
+        Caption = 'Merge to Page'
+        OnClick = bObjMergeClick
       end
     end
     object miHelp: TMenuItem

@@ -51,6 +51,8 @@ type
     Attr :              UInt32;     // attributes
   end;
 
+  PCell = ^TCell;
+
   TCellList = array of TCell;
 
   // item in ANSI art object linked list.
@@ -71,6 +73,8 @@ type
     Hidden :            boolean;
     Data :              TCellList;
   end;
+
+  PObj = ^TObj;
 
   // objects on document
   TObjList = array of TObj;
@@ -176,6 +180,8 @@ type
   TCodePageRec = packed record
     Name :            string;       // name of this codepage 'CP437' e.g.
     EncodingLUT :     PUint16;      // in this table. (256 entrues)
+    MirrorTable :     PUint16;      // mirroring table
+    MirrorTableSize : integer;
     GlyphTable :      PByte;        // base pointer to Glyph Array (Unicode + 8x16)
     GlyphTableSize :  integer;      // size of glyph table
     QuickGlyph :      array [0..255] of integer;  // pointer to glyph in glyph table
@@ -5045,15 +5051,11 @@ const
     $25, $7D, {|}  $18, $18, $18, $18, $18, $18, $18, $1C, $1C, $1C, $1C, $1C, $1C, $1C, $1C, $1C,  // char 9597
     $25, $7E, {|}  $00, $00, $00, $00, $00, $00, $00, $FF, $FC, $00, $00, $00, $00, $00, $00, $00,  // char 9598
     $25, $7F, {|}  $1C, $1C, $1C, $1C, $1C, $1C, $1C, $1C, $1C, $18, $18, $18, $18, $18, $18, $18,  // char 9599
-
     $25, $80, {|}  $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $00, $00, $00, $00, $00, $00, $00, $00,  // char 9600
-
     $25, $81, {|}  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $FF, $FF,  // char 9601
     $25, $82, {|}  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $FF, $FF, $FF, $FF,  // char 9602
     $25, $83, {|}  $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $FF, $FF, $FF, $FF, $FF, $FF,  // char 9603
-
     $25, $84, {|}  $00, $00, $00, $00, $00, $00, $00, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,  // char 9604
-
     $25, $85, {|}  $00, $00, $00, $00, $00, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,  // char 9605
     $25, $86, {|}  $00, $00, $00, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,  // char 9606
     $25, $87, {|}  $00, $00, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,  // char 9607
@@ -5564,6 +5566,175 @@ const
     $FE, $FF, {|}  $F1, $35, $55, $8A, $E0, $06, $95, $D6, $B5, $97, $00, $EE, $8A, $EE, $28, $E8,  // char 65279
     $FF, $FD, {|}  $00, $38, $7C, $7C, $C6, $92, $F2, $E6, $FE, $E6, $7C, $7C, $38, $00, $00, $00   // char 65533
   );
+  UVGA16Mirrors : packed array [0..(167*3)-1] of Uint16 = (
+  //nrml horz vert
+        40,  41,  40,
+        41,  40,  41,
+        47,  92,  92,
+        92,  47,  47,
+        60,  62,  60,
+        62,  60,  62,
+        91,  93,  91,
+        93,  91,  93,
+       123, 125, 123,
+       125, 123, 125,
+      9484,9488,9492,
+      9485,9489,9493,
+      9486,9490,9494,
+      9487,9491,9495,
+      9488,9494,9496,
+      9489,9495,9497,
+      9490,9496,9498,
+      9491,9497,9499,
+      9492,9496,9484,
+      9493,9497,9485,
+      9494,9498,9486,
+      9495,9499,9487,
+      9496,9492,9488,
+      9497,9493,9489,
+      9498,9494,9490,
+      9499,9495,9491,
+      9500,9508,9500,
+      9501,9509,9501,
+      9502,9510,9503,
+      9503,9511,9502,
+      9504,9512,9504,
+      9505,9513,9506,
+      9506,9514,9505,
+      9507,9515,9507,
+      9508,9500,9508,
+      9509,9501,9509,
+      9510,9502,9511,
+      9511,9503,9510,
+      9512,9504,9512,
+      9513,9505,9514,
+      9514,9506,9513,
+      9515,9507,9515,
+      9516,9516,9524,
+      9517,9518,9525,
+      9518,9517,9526,
+      9519,9519,9527,
+      9520,9520,9528,
+      9521,9522,9529,
+      9522,9521,9530,
+      9523,9523,9531,
+      9524,9524,9516,
+      9525,9526,9517,
+      9526,9525,9518,
+      9527,9527,9519,
+      9528,9528,9520,
+      9529,9530,9521,
+      9530,9529,9522,
+      9531,9531,9523,
+      9533,9534,9533,
+      9534,9533,9534,
+      9536,9536,9537,
+      9537,9537,9536,
+      9539,9540,9541,
+      9540,9539,9542,
+      9541,9542,9540,
+      9542,9541,9539,
+      9543,9543,9544,
+      9544,9544,9543,
+      9545,9546,9545,
+      9546,9545,9546,
+      9554,9557,9560,
+      9555,9558,9561,
+      9556,9559,9562,
+      9557,9554,9563,
+      9558,9555,9564,
+      9559,9556,9565,
+      9560,9563,9554,
+      9561,9564,9555,
+      9562,9565,9556,
+      9563,9560,9557,
+      9564,9561,9558,
+      9565,9562,9559,
+      9566,9569,9566,
+      9567,9570,9567,
+      9568,9571,9568,
+      9569,9566,9569,
+      9570,9567,9570,
+      9571,9568,9571,
+      9572,9572,9575,
+      9573,9573,9576,
+      9574,9574,9577,
+      9575,9575,9572,
+      9576,9576,9573,
+      9577,9577,9574,
+      9581,9582,9584,
+      9582,9581,9583,
+      9583,9584,9582,
+      9584,9583,9581,
+      9585,9586,9586,
+      9586,9585,9585,
+      9588,9590,9588,
+      9589,9589,9591,
+      9590,9588,9590,
+      9591,9591,9589,
+      9592,9594,9592,
+      9593,9593,9595,
+      9594,9592,9594,
+      9595,9595,9593,
+      9596,9598,9596,
+      9597,9597,9599,
+      9598,9596,9598,
+      9599,9599,9597,
+      9601,9602,9620,
+      9600,9600,9604,
+      9604,9604,9600,
+      9612,9616,9612,
+      9615,9621,9615,
+      9616,9612,9616,
+      9621,9615,9621,
+      9622,9623,9624,
+      9623,9622,9629,
+      9624,9629,9622,
+      9625,9631,9627,
+      9626,9630,9630,
+      9627,9628,9625,
+      9628,9627,9631,
+      9629,9624,9623,
+      9630,9626,9626,
+      9631,9625,9628,
+      9650,9650,9660,
+      9651,9651,9661,
+      9652,9652,9662,
+      9653,9653,9663,
+      9654,9664,9654,
+      9655,9665,9655,
+      9556,9666,9656,
+      9557,9667,9657,
+      9658,9668,9658,
+      9659,9669,9659,
+      9660,9660,9650,
+      9661,9661,9651,
+      9662,9662,9652,
+      9663,9663,9653,
+      9664,9654,9664,
+      9665,9655,9665,
+      9666,9656,9666,
+      9667,9657,9667,
+      9668,9658,9668,
+      9669,9659,9669,
+      9680,9681,9680,
+      9681,9680,9681,
+      9682,9682,9683,
+      9683,9683,9682,
+      9686,9687,9686,
+      9687,9686,9687,
+      9690,9690,9691,
+      9691,9691,9690,
+      9692,9693,9695,
+      9693,9692,9694,
+      9694,9695,9693,
+      9695,9594,9692,
+      9696,9696,9697,
+      9697,9697,9696,
+      9698,9699,9701,
+      9699,9698,9700,
+      9700,9701,9699,
+      9701,9700,9698 );
 
   // MicroKnightPlus
   MicroKnightPlus_COUNT = 256;  // number of glyphs
@@ -5824,6 +5995,7 @@ const
     $00, $FD, {|} $18, $18, $20, $20, $C6, $C6, $C6, $C6, $C6, $C6, $7E, $7E, $06, $06, $7C, $7C,
     $00, $FE, {|} $C0, $C0, $C0, $C0, $F8, $F8, $CC, $CC, $C6, $C6, $FC, $FC, $C0, $C0, $C0, $C0,
     $00, $FF, {|} $6C, $6C, $00, $00, $C6, $C6, $C6, $C6, $C6, $C6, $7E, $7E, $06, $06, $7C, $7C );
+  //MicroKnightPlusMirrors = packed array [0..(0*3)-1] of Uint16;
 
   // MicroKnight
   MicroKnight_COUNT = 256;  // number of glyphs
@@ -6084,6 +6256,7 @@ const
     $00, $FD, {|} $18, $18, $20, $20, $C6, $C6, $C6, $C6, $C6, $C6, $7E, $7E, $06, $06, $7C, $7C,
     $00, $FE, {|} $C0, $C0, $C0, $C0, $F8, $F8, $CC, $CC, $C6, $C6, $FC, $FC, $C0, $C0, $C0, $C0,
     $00, $FF, {|} $6C, $6C, $00, $00, $C6, $C6, $C6, $C6, $C6, $C6, $7E, $7E, $06, $06, $7C, $7C );
+  //MicroKnightMirrors = packed array [0..(0*3)-1] of Uint16;
 
   // P0T-NOoDLE
   P0T_NOoDLE_COUNT = 256; // number of glyphs
@@ -6345,6 +6518,7 @@ const
     $00, $FE, {|} $F0, $F0, $60, $60, $7C, $7C, $66, $66, $66, $66, $7C, $7C, $60, $60, $F0, $F0,
     $00, $FF, {|} $00, $00, $C6, $C6, $80, $80, $C6, $C6, $C6, $C6, $6C, $6C, $38, $38, $F0, $F0
   );
+  //P0T_NOoDLEMirrors = packed array [0..(0*3)-1] of Uint16;
 
   // Topaz Plus
   TopazPlus_COUNT = 256;  // number of glyphs
@@ -6605,6 +6779,7 @@ const
     $00, $FD, {|} $0C, $0C, $18, $18, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30,
     $00, $FE, {|} $60, $60, $60, $60, $7C, $7C, $66, $66, $66, $66, $7C, $7C, $60, $60, $60, $60,
     $00, $FF, {|} $00, $00, $66, $66, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30 );
+  //TopazPlusMirrors = packed array [0..(0*3)-1] of Uint16;
 
   // Topaz
   Topaz_COUNT = 256;  // number of glyphs
@@ -6865,6 +7040,7 @@ const
     $00, $FD, {|} $0C, $0C, $18, $18, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30,
     $00, $FE, {|} $60, $60, $60, $60, $7C, $7C, $66, $66, $66, $66, $7C, $7C, $60, $60, $60, $60,
     $00, $FF, {|} $00, $00, $66, $66, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30 );
+  //TopazMirrors = packed array [0..(0*3)-1] of Uint16;
 
   // mO'sOul
   mOsOul_COUNT = 256; // number of glyphs
@@ -7125,6 +7301,7 @@ const
     $00, $FD, {|} $0C, $0C, $18, $18, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30,
     $00, $FE, {|} $60, $60, $60, $60, $7C, $7C, $66, $66, $66, $66, $7C, $7C, $60, $60, $60, $60,
     $00, $FF, {|} $00, $00, $66, $66, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30 );
+  //mOsOulMirrors = packed array [0..(0*3)-1] of Uint16;
 
   WM_VTXEDIT =            $0400;
   WA_ATTR_ENABLEALL =     1;
@@ -7142,102 +7319,446 @@ const
 
     (   Name :            'CP437';          // keep this one as the first
         EncodingLUT :     @CP437;           // encoding. insert more between
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
         GlyphTable :      @UVGA16;          // here and UTF8 / UTF16 on the
         GlyphTableSize :  sizeof(UVGA16)),  // end.
 
-    (   Name: 'CP667';      EncodingLUT: @CP667;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP668';      EncodingLUT: @CP668;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CP737';      EncodingLUT: @CP737;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP770';      EncodingLUT: @CP770;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP771';      EncodingLUT: @CP771;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP772';      EncodingLUT: @CP772;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP773';      EncodingLUT: @CP773;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP774';      EncodingLUT: @CP774;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP775';      EncodingLUT: @CP775;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP790';      EncodingLUT: @CP667;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CP808';      EncodingLUT: @CP808;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP813';      EncodingLUT: @CP813;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP819';      EncodingLUT: @ISO8859_1;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP850';      EncodingLUT: @CP850;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP851';      EncodingLUT: @CP851;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP852';      EncodingLUT: @CP852;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP853';      EncodingLUT: @CP853;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP855';      EncodingLUT: @CP855;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP857';      EncodingLUT: @CP857;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP858';      EncodingLUT: @CP858;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP859';      EncodingLUT: @CP859;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP860';      EncodingLUT: @CP860;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP861';      EncodingLUT: @CP861;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP862';      EncodingLUT: @CP862;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP863';      EncodingLUT: @CP863;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP864';      EncodingLUT: @CP864;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP865';      EncodingLUT: @CP865;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP866';      EncodingLUT: @CP866;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP867';      EncodingLUT: @CP867;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP869';      EncodingLUT: @CP869;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP872';      EncodingLUT: @CP872;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP878';      EncodingLUT: @CP878;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP895';      EncodingLUT: @CP867;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CP900';      EncodingLUT: @CP866;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP912';      EncodingLUT: @CP912;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP915';      EncodingLUT: @CP915;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP920';      EncodingLUT: @CP920;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP991';      EncodingLUT: @CP667;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CP1117';     EncodingLUT: @CP1117;     GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP1118';     EncodingLUT: @CP774;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP1119';     EncodingLUT: @CP772;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP1131';     EncodingLUT: @CP1131;     GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CP28593';    EncodingLUT: @ISO8859_3;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'CP28594';    EncodingLUT: @ISO8859_4;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'CPMIK';      EncodingLUT: @CPMIK;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'ARMSCII-8';  EncodingLUT: @ARMSCII_8;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-
-    (   Name: 'ISO8859-1';  EncodingLUT: @ISO8859_1;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-2';  EncodingLUT: @ISO8859_2;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-3';  EncodingLUT: @ISO8859_3;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-4';  EncodingLUT: @ISO8859_4;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-5';  EncodingLUT: @ISO8859_5;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-6';  EncodingLUT: @ISO8859_6;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-7';  EncodingLUT: @ISO8859_7;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-8';  EncodingLUT: @ISO8859_8;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-9';  EncodingLUT: @ISO8859_9;  GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-10'; EncodingLUT: @ISO8859_10; GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-13'; EncodingLUT: @ISO8859_13; GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-14'; EncodingLUT: @ISO8859_14; GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-15'; EncodingLUT: @ISO8859_15; GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'ISO8859-16'; EncodingLUT: @ISO8859_16; GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'KAIK8';      EncodingLUT: @HAIK8;      GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'KOI8-R';     EncodingLUT: @KOI8_R;     GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'KOI8-U';     EncodingLUT: @KOI8_U;     GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
-    (   Name: 'WIN1250';    EncodingLUT: @WIN1250;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1251';    EncodingLUT: @WIN1251;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1253';    EncodingLUT: @WIN1253;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1254';    EncodingLUT: @WIN1254;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1255';    EncodingLUT: @WIN1255;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1256';    EncodingLUT: @WIN1256;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-    (   Name: 'WIN1257';    EncodingLUT: @WIN1257;    GlyphTable: @UVGA16; GlyphTableSize: sizeof(UVGA16)),
-
+    (   Name: 'CP667';
+        EncodingLUT: @CP667;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP668';
+        EncodingLUT: @CP668;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP737';
+        EncodingLUT: @CP737;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP770';
+        EncodingLUT: @CP770;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP771';
+        EncodingLUT: @CP771;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP772';
+        EncodingLUT: @CP772;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP773';
+        EncodingLUT: @CP773;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP774';
+        EncodingLUT: @CP774;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP775';
+        EncodingLUT: @CP775;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP790';
+        EncodingLUT: @CP667;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP808';
+        EncodingLUT: @CP808;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP813';
+        EncodingLUT: @CP813;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP819';
+        EncodingLUT: @ISO8859_1;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP850';
+        EncodingLUT: @CP850;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP851';
+        EncodingLUT: @CP851;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP852';
+        EncodingLUT: @CP852;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP853';
+        EncodingLUT: @CP853;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP855';
+        EncodingLUT: @CP855;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP857';
+        EncodingLUT: @CP857;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP858';
+        EncodingLUT: @CP858;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP859';
+        EncodingLUT: @CP859;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP860';
+        EncodingLUT: @CP860;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP861';
+        EncodingLUT: @CP861;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP862';
+        EncodingLUT: @CP862;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP863';
+        EncodingLUT: @CP863;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP864';
+        EncodingLUT: @CP864;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP865';
+        EncodingLUT: @CP865;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP866';
+        EncodingLUT: @CP866;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP867';
+        EncodingLUT: @CP867;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP869';
+        EncodingLUT: @CP869;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP872';
+        EncodingLUT: @CP872;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP878';
+        EncodingLUT: @CP878;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP895';
+        EncodingLUT: @CP867;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP900';
+        EncodingLUT: @CP866;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP912';
+        EncodingLUT: @CP912;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP915';
+        EncodingLUT: @CP915;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP920';
+        EncodingLUT: @CP920;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP991';
+        EncodingLUT: @CP667;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP1117';
+        EncodingLUT: @CP1117;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP1118';
+        EncodingLUT: @CP774;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP1119';
+        EncodingLUT: @CP772;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP1131';
+        EncodingLUT: @CP1131;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP28593';
+        EncodingLUT: @ISO8859_3;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CP28594';
+        EncodingLUT: @ISO8859_4;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'CPMIK';
+        EncodingLUT: @CPMIK;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ARMSCII-8';
+        EncodingLUT: @ARMSCII_8;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-1';
+        EncodingLUT: @ISO8859_1;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-2';
+        EncodingLUT: @ISO8859_2;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-3';
+        EncodingLUT: @ISO8859_3;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-4';
+        EncodingLUT: @ISO8859_4;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-5';
+        EncodingLUT: @ISO8859_5;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-6';
+        EncodingLUT: @ISO8859_6;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-7';
+        EncodingLUT: @ISO8859_7;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-8';
+        EncodingLUT: @ISO8859_8;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-9';
+        EncodingLUT: @ISO8859_9;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-10';
+        EncodingLUT: @ISO8859_10;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-13';
+        EncodingLUT: @ISO8859_13;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-14';
+        EncodingLUT: @ISO8859_14;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-15';
+        EncodingLUT: @ISO8859_15;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'ISO8859-16';
+        EncodingLUT: @ISO8859_16;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'KAIK8';
+        EncodingLUT: @HAIK8;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'KOI8-R';
+        EncodingLUT: @KOI8_R;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'KOI8-U';
+        EncodingLUT: @KOI8_U;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1250';
+        EncodingLUT: @WIN1250;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1251';
+        EncodingLUT: @WIN1251;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1253';
+        EncodingLUT: @WIN1253;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1254';
+        EncodingLUT: @WIN1254;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1255';
+        EncodingLUT: @WIN1255;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1256';
+        EncodingLUT: @WIN1256;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
+    (   Name: 'WIN1257';
+        EncodingLUT: @WIN1257;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
+        GlyphTable: @UVGA16;
+        GlyphTableSize: sizeof(UVGA16)),
 
 //TELETEXT: new Uint16Array([ // TELETEXT
 //RAW: new Uint16Array([   // for RAW converted fonts - mapped to ASCII/PETSCII points
 
     (   Name :            'UTF8';
         EncodingLUT :     nil;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
         GlyphTable :      @UVGA16;
         GlyphTableSize :  sizeof(UVGA16)),
 
     (   Name :            'UTF16';
         EncodingLUT :     nil;
+        MirrorTable :     @UVGA16Mirrors;
+        MirrorTableSize : sizeof(UVGA16Mirrors);
         GlyphTable :      @UVGA16;
         GlyphTableSize :  sizeof(UVGA16))
   );
@@ -7317,32 +7838,48 @@ const
   KA_PREVBG =               7;
   KA_CURSORNEWLINE =        8;
   KA_CURSORFORWARDTAB =     9;
-  KA_CURSORBACK =           10;
-  KA_PRINT =                11;
-  KA_FKEYSET =              12;
-  KA_MODECHARS =            13;
-  KA_MODELEFTRIGHTBLOCKS =  14;
-  KA_MODETOPBOTTOMBLOCKS =  15;
-  KA_MODEQUARTERBLOCKS =    16;
-  KA_MODESIXELS =           17;
-  KA_TOOLSELECT =           18;
-  KA_TOOLDRAW =             19;
-  KA_TOOLFILL =             20;
-  KA_TOOLLINE =             21;
-  KA_TOOLRECTANGLE =        22;
-  KA_TOOLELLIPSE =          23;
-  KA_TOOLEYEDROPPER =       24;
-  KA_FILENEW =              25;
-  KA_FILEOPEN =             26;
-  KA_FILESAVE =             27;
-  KA_FILEEXIT =             28;
-  KA_EDITREDO =             29;
-  KA_EDITUNDO =             30;
-  KA_EDITCUT =              31;
-  KA_EDITCOPY =             32;
-  KA_EDITPASTE =            33;
-  KA_SHOWPREVIEW =          34;
-  KA_EOL =                  35;
+  KA_CURSORBACKWARDTAB =    10;
+  KA_CURSORBACK =           11;
+  KA_PRINT =                12;
+  KA_FKEYSET =              13;
+  KA_MODECHARS =            14;
+  KA_MODELEFTRIGHTBLOCKS =  15;
+  KA_MODETOPBOTTOMBLOCKS =  16;
+  KA_MODEQUARTERBLOCKS =    17;
+  KA_MODESIXELS =           18;
+  KA_TOOLSELECT =           19;
+  KA_TOOLDRAW =             20;
+  KA_TOOLFILL =             21;
+  KA_TOOLLINE =             22;
+  KA_TOOLRECTANGLE =        23;
+  KA_TOOLELLIPSE =          24;
+  KA_TOOLEYEDROPPER =       25;
+  KA_FILENEW =              26;
+  KA_FILEOPEN =             27;
+  KA_FILESAVE =             28;
+  KA_FILEEXIT =             29;
+  KA_EDITREDO =             30;
+  KA_EDITUNDO =             31;
+  KA_EDITCUT =              32;
+  KA_EDITCOPY =             33;
+  KA_EDITPASTE =            34;
+
+  KA_OBJECTMOVEBACK =       35;
+  KA_OBJECTMOVEFORWARD =    36;
+  KA_OBJECTMOVETOBACK =     37;
+  KA_OBJECTMOVETOFRONT =    38;
+  KA_OBJECTFLIPHORZ =       39;
+  KA_OBJECTFLIPVERT =       40;
+  KA_OBJECTMERGE =          41;
+  KA_OBJECTNEXT =           42;
+  KA_OBJECTPREV =           43;
+  KA_OBJECTDELETE =         44;
+
+  KA_DELETE =               45;   // delete selection, object, etc
+  KA_ESCAPE =               46;   // clear selection, unselect object, etc
+
+  KA_SHOWPREVIEW =          47;
+  KA_EOL =                  48;
 
   KeyActions : array [0..KA_EOL] of string = (
 
@@ -7352,6 +7889,7 @@ const
 
     'CursorNewLine',
     'CursorForwardTab',
+    'CursorBackwardTab',
     'CursorBack',
 
     'Print',      // takes parameters Val
@@ -7366,6 +7904,12 @@ const
     'FileNew','FileOpen','FileSave','FileExit',
 
     'EditRedo', 'EditUndo','EditCut','EditCopy','EditPaste',
+
+    'ObjectMoveBack', 'ObjectMoveForward', 'ObjectMoveToBack',
+    'ObjectMoveToFront', 'ObjectFlipHorz', 'ObjectFlipVert',
+    'ObjectMerge', 'ObjectNext', 'ObjectPrev', 'ObjectDelete',
+
+    'Delete', 'Escape',
 
     'ShowPreview',
 
