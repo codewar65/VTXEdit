@@ -35,8 +35,6 @@ UTF 8 nas no characters in the  128-191 range
 
   TODO :
 
-    Merge / Move back - from / copy / flip objects
-
     save / load objects
 
     save objects in vtx file
@@ -155,6 +153,7 @@ type
     Label9: TLabel;
     lvObjects: TListView;
     MenuItem1: TMenuItem;
+    miEditDelete: TMenuItem;
     miObjNext: TMenuItem;
     miObjPrev: TMenuItem;
     miObjBackOne: TMenuItem;
@@ -174,6 +173,7 @@ type
     MenuItem4: TMenuItem;
     miEditCopy: TMenuItem;
     miEditPaste: TMenuItem;
+    odObject: TOpenDialog;
     PageControl1: TPageControl;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
@@ -197,6 +197,7 @@ type
     miHelp: TMenuItem;
     pbStatusBar: TPaintBox;
     pSettings: TPanel;
+    sdObject: TSaveDialog;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
     sbChars: TScrollBox;
@@ -230,6 +231,8 @@ type
     tbUnicode: TEdit;
     ToolBar1: TToolBar;
     bObjMoveBack: TToolButton;
+    bObjSave: TToolButton;
+    bObjLoad: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
     tbModeLeftRights: TToolButton;
@@ -271,6 +274,8 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure bObjLoadClick(Sender: TObject);
+    procedure bObjSaveClick(Sender: TObject);
     procedure miObjNextClick(Sender: TObject);
     procedure miObjPrevClick(Sender: TObject);
     procedure RemoveObject(objnum : integer);
@@ -1704,7 +1709,17 @@ begin
     KA_EDITCUT:
       // copy selection or object to clipboard, removing the thing
       begin
-      if length(CopySelection) > 0 then
+      if SelectedObject >= 0 then
+      begin
+        setlength(ClipBoard.Data, 0);
+        CopyObject(Objects[SelectedObject], Clipboard);
+        RemoveObject(SelectedObject);
+        LoadlvObjects;
+        SelectedObject := -1;
+        lvObjects.ItemIndex := selectedObject;
+        pbPage.Invalidate;
+      end
+      else if length(CopySelection) > 0 then
         begin
           Clipboard := CopySelectionToObject;
           for i := 0 to length(CopySelection) - 1 do
@@ -2211,9 +2226,12 @@ end;
 
 procedure TfMain.LoadVTXFile(fname : string);
 var
-  fin : TFileStream;
-  head : TVTXFileHeader;
-  i, r, c : integer;
+  fin :         TFileStream;
+  head :        TVTXFileHeader;
+  i, j, r, c :  integer;
+  numobj :      integer;
+  b :           byte;
+  namein :      packed array [0..63] of char;
 const
   ID = 'VTXEDIT';
 begin
@@ -2237,12 +2255,13 @@ begin
   for i := 0 to 15 do
     Fonts[i] := TEncoding(head.Fonts[i]);
   ColorScheme := head.Colors;
-  NumRows := head.NumRows;
-  NumCols := head.NumCols;
+  NumRows := head.Height;
+  NumCols := head.Width;
   XScale := head.XScale;
   Page.PageAttr := head.PageAttr;
   Page.CrsrAttr := head.CrsrAttr;
   move(head.Sauce, Page.Sauce, sizeof(TSauceHeader));
+  numobj := head.NumObjects;
 
   if length(Page.Rows) < NumRows then
     setlength(Page.Rows, NumRows);
@@ -2252,12 +2271,30 @@ begin
     fin.Read(Page.Rows[r].Attr, sizeof (Page.Rows[r].Attr));
     if length(Page.Rows[r].Cells) < NumCols then
       setlength(Page.Rows[r].Cells, NumCols);
-
     for c := 0 to NumCols - 1 do
     begin
-      // cells here
       fin.Read(Page.Rows[r].Cells[c], sizeof(TCell));
     end;
+  end;
+
+  // load objects
+  setlength(Objects, numobj);
+  for i := 0 to numobj - 1 do
+  begin
+    Objects[i].Row := fin.ReadWord;
+    Objects[i].Col := fin.ReadWord;
+    Objects[i].Width := fin.ReadWord;
+    Objects[i].Height := fin.ReadWord;
+    Objects[i].Page := (fin.ReadByte = 1);
+    Objects[i].Locked := (fin.ReadByte = 1);
+    Objects[i].Hidden := (fin.ReadByte = 1);
+
+    // get name
+    fin.Read(namein, 64);
+    Objects[i].Name := namein;
+    setlength(Objects[i].Data, Objects[i].Width * Objects[i].Height);
+    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
+      fin.Read(Objects[i].Data[j], sizeof(TCell));
   end;
 
   fin.free;
@@ -2267,8 +2304,8 @@ procedure TfMain.SaveVTXFile(fname : string);
 var
   fout : TFileStream;
   head : TVTXFileHeader;
-  i, r, c : integer;
-
+  i, j, r, c : integer;
+  nameout : packed array [0..63] of char;
 const
   ID = 'VTXEDIT';
 begin
@@ -2280,27 +2317,53 @@ begin
   for i := 0 to 15 do
     head.Fonts[i] := word(ord(Fonts[i]));
   head.Colors := ColorScheme;
-  head.NumRows := NumRows;
-  head.NumCols := NumCols;
+  head.Height := NumRows;
+  head.Width := NumCols;
+  FillMemory(@head.Name[0], 64, 0);
+  for i := 0 to length(fname) - 1 do
+  begin
+    if i >= 63 then break;
+    head.Name[i] := fname.Chars[i];
+  end;
 
-  // page / cursor attr here
   head.XScale := XScale;
   head.PageAttr := Page.PageAttr;
   head.CrsrAttr := Page.CrsrAttr;
   move(Page.Sauce, head.Sauce, sizeof(TSauceHeader));
+  head.NumObjects := length(Objects);
   fout.Write(head, sizeof(TVTXFileHeader));
 
   for r := 0 to numrows-1 do
   begin
-    // row attributes here
     fout.WriteDWord(Page.Rows[r].Attr);
-
     for c := 0 to numcols-1 do
-    begin
-      // cells here
       fout.Write(Page.Rows[r].Cells[c], sizeof(TCell));
-    end;
   end;
+
+  // save objects
+  for i := 0 to length(Objects) - 1 do
+  begin
+    // save row, col, width, height, Page, Locked, Hidden, name, and data only
+    fout.WriteWord(Objects[i].Row);
+    fout.WriteWord(Objects[i].Col);
+    fout.WriteWord(Objects[i].Width);
+    fout.WriteWord(Objects[i].Height);
+    fout.WriteByte(iif(Objects[i].Page, 1, 0));
+    fout.WriteByte(iif(Objects[i].Locked, 1, 0));
+    fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
+
+    FillMemory(@nameout[0], 64, 0);
+    for j := 0 to length(Objects[i].Name) - 1 do
+    begin
+      if j >= 63 then break;
+      nameout[j] := char(Objects[i].Name.charAt(j));
+    end;
+    fout.Write(nameout[0], 64);
+
+    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
+      fout.Write(Objects[i].Data[j], sizeof(TCell));
+  end;
+
   fout.free;
 end;
 
@@ -2665,10 +2728,10 @@ begin
     'tbAttrBG':
       tb.Down := false;
 
-    'tbBlinkSlow':
+    'tbAttrBlinkSlow':
       tbAttrBlinkFast.Down := false;
 
-    'tbBlinkFast':
+    'tbAttrBlinkFast':
       tbAttrBlinkSlow.Down := false;
 
     'tbAttrConceal':
@@ -4864,6 +4927,101 @@ end;
 procedure TfMain.miObjNextClick(Sender: TObject);
 begin
   ObjNext;
+end;
+
+procedure TfMain.bObjLoadClick(Sender: TObject);
+var
+  fin : TFileStream;
+  head : TVTXObjHeader;
+  i, l : integer;
+  obj : TObj;
+const
+  ID = 'VTXEDIT';
+begin
+  if odObject.Execute then
+  begin
+    fin := TFileStream.Create(odObject.FileName, fmOpenRead or fmShareDenyNone);
+
+    fin.Read(head, sizeof(TVTXObjHeader));
+
+    if CompareByte(ID, head.ID, 7) <> 0 then
+    begin
+      ShowMessage('Bad Header.');
+      fin.Free;
+      exit;
+    end;
+    if head.Version <> $0001 then
+    begin
+      ShowMessage('Bad Version.');
+      fin.Free;
+      exit;
+    end;
+
+    if head.PageType <> 3 then
+    begin
+      ShowMessage('Not an Object file.');
+      fin.Free;
+      exit;
+    end;
+
+    obj.Name := ExtractFileNameOnly(odObject.FileName);
+    obj.Width := head.Width;
+    obj.Height := head.Height;
+    obj.Locked := false;
+    obj.Hidden := false;
+    obj.Page := false;
+    setlength(obj.Data, head.Width * head.Height);
+    for i := 0 to head.Width * head.Height - 1 do
+      fin.Read(obj.Data[i], sizeof(TCell));
+    fin.free;
+
+    l := length(Objects);
+    setlength(Objects, l + 1);
+    CopyObject(Obj, Objects[l]);
+    setlength(obj.Data, 0);
+    // drop it onto window. top left for now
+    Objects[l].Row := PageTop;
+    Objects[l].Col := PageLeft;
+    LoadlvObjects;
+    pbPage.Invalidate;
+  end
+end;
+
+// save selected object to file
+procedure TfMain.bObjSaveClick(Sender: TObject);
+var
+  fout : TFileStream;
+  head : TVTXObjHeader;
+  i : integer;
+  fname : string;
+const
+  ID = 'VTXEDIT';
+begin
+  if SelectedObject >= 0 then
+  begin
+    sdObject.FileName := Objects[SelectedObject].Name + '.vof';
+    if sdObject.Execute then
+    begin
+      fout := TFileStream.Create(sdObject.FileName, fmCreate or fmShareExclusive);
+      move(ID, head.ID, 7);
+      head.ID[7] := 0;
+      head.Version := $0001;
+      head.PageType := 3;
+      head.Width := Objects[SelectedObject].Width;
+      head.Height := Objects[SelectedObject].Height;
+      FillMemory(@head.Name[0], 64, 0);
+      fname := ExtractFileNameOnly(sdObject.FileName);
+      for i := 0 to length(sdObject.Filename) - 1 do
+      begin
+        if i >= 63 then break;
+        head.Name[i] := fname.Chars[i];
+      end;
+      fout.Write(head, sizeof(TVTXObjHeader));
+      for i := 0 to head.Height * head.Width - 1 do
+        fout.Write(Objects[SelectedObject].Data[i], sizeof(TCell));
+      fout.free;
+    end;
+  end;
 end;
 
 // draw the document

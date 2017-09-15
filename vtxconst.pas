@@ -132,20 +132,31 @@ type
     ID:         array [1..64] of char;
   end;
 
+  TVTXObjHeader = record
+    ID          : array [0..7] of Byte;     // VTXEDIT
+    Version     : Word;                     //
+    PageType    : Word;                     // 0=bbs, 1=cterm, 2=vtx, 3=obj
+    Width       : Word;
+    Height      : Word;
+    Name        : packed array [0..63] of char;
+  end;
+
   TVTXFileHeader = record
     ID          : array [0..7] of Byte;     // VTXEDIT
-    Version     : Word;                 //
-    PageType    : Word;                     // bbs, cterm, vtx
-    Fonts       : array [0..15] of Word;    // all the font / codepages. internal vals
-    Colors      : Word;                     // basic, bbs, ice, 256
-    NumRows     : Word;
-    NumCols     : Word;
+    Version     : Word;                     //
+    PageType    : Word;                     // 0=bbs, 1=cterm, 2=vtx, 3=obj
+    Width       : Word;
+    Height      : Word;
+    Name        : packed array [0..63] of char;
 
     // page / cursor attr - rest of Page rec
+    Fonts       : array [0..15] of Word;    // all the font / codepages. internal vals
+    Colors      : Word;                     // basic, bbs, ice, 256
     XScale      : double;
     PageAttr    : DWORD;
     CrsrAttr    : DWORD;
     Sauce       : TSauceHeader;
+    NumObjects  : word;                     // number of object recors appended to end of file.
   end;
 
   TRow = packed record
