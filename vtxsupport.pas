@@ -73,6 +73,8 @@ function iif(cond : boolean; trueval, falseval : string) : string; inline;
 function iif(cond : boolean; trueval, falseval : unicodestring) : unicodestring; inline;
 function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
 
+function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
+
 // downstates in tag of tpaintbox buttons
 procedure SetDown(pb : TPaintBox; val : boolean); inline;
 function GetDown(pb : TPaintBox) : boolean; inline;
@@ -91,6 +93,13 @@ var
   XScale :                  double;     // horizontal stretch. 1.0 = 100%
   CellWidth, CellHeight :   integer;    // pixels
   CellWidthZ, CellHeightZ : integer;    // adjusted by PageZoom
+  NumCols, NumRows :        integer;    // doc size
+
+  // objects on doc
+  Objects :                 TObjList;
+
+  // fonts. (CSI 10-19 / 80-85 <space> D
+  Fonts :                   array [0..15] of TEncoding;
 
   KeyBinds : array of TKeyBinds;
 
@@ -99,6 +108,47 @@ implementation
 {*****************************************************************************}
 
 { Support Functions }
+
+function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
+var
+  i :             integer;
+  po :            PObj;
+  objr, objc, p : integer;
+begin
+  for i := length(Objects) - 1 downto 0 do
+  begin
+    po := @Objects[i];
+    if (row >= po^.Row) and (row < (po^.Row + po^.Height)) and (not po^.Hidden) then
+    begin
+      // on the row
+      if (col >= po^.Col) and (col < (po^.Col + po^.Width)) then
+      begin
+        // on the col
+        objr := row - po^.Row;
+        objc := col - po^.Col;
+        p := objr * po^.Width + objc;
+        if po^.Data[p].Chr <> EMPTYCHAR then
+        begin
+          neighbors := %0000;
+          if (objr > 0) and (po^.Data[p - po^.Width].Chr <> EMPTYCHAR) then
+            neighbors := neighbors or NEIGHBOR_NORTH;
+          if (objr < po^.Height - 1) and (po^.Data[p + po^.Width].Chr <> EMPTYCHAR) then
+            neighbors := neighbors or NEIGHBOR_SOUTH;
+          if (objc > 0) and (po^.Data[p - 1].Chr <> EMPTYCHAR) then
+            neighbors := neighbors or NEIGHBOR_WEST;
+          if (objc < po^.Width - 1) and (po^.Data[p + 1].Chr <> EMPTYCHAR) then
+            neighbors := neighbors or NEIGHBOR_EAST;
+          cell := po^.Data[objr * po^.Width + objc];
+          exit(i);
+        end;
+      end;
+    end;
+  end;
+  cell.Chr := EMPTYCHAR;
+  cell.Attr := $0007;
+  neighbors := %1111;
+  result := -1;
+end;
 
 function VTXRGB(r, g, b : byte) : dword; inline;
 begin

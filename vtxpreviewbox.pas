@@ -116,16 +116,67 @@ end;
 // and only draw displayable chunk?
 procedure TfPreview.pbPreviewPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  bmp : TBGRABitmap;
-
+  pb :              TPaintBox;
+  cnv :             TCanvas;
+  bmp, bmp2 :       TBGRABitmap;
+  i, r, c, x, y :   integer;
+  off :             longint;
+  cell :            TCell;
+  cp :              TEncoding;
+  objonrow :        boolean;
+  objnum :          integer;
+  neighbors :       byte;
 begin
   if bmpPreview = nil then exit;
 
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
   bmpPreview.Draw(cnv, pb.ClientRect, false);
+
+  // draw objects over top
+  // from topmost to bottommost
+  bmp := TBGRABitmap.Create(8, 16);
+  for r := 0 to NumRows - 1do
+  begin
+    // any objects on this row?
+    objonrow := false;
+    for i := length(Objects) - 1 downto 0 do
+      if (Objects[i].Row <= r) and (Objects[i].Row + Objects[i].Height > r) and (not Objects[i].Hidden) then
+      begin
+        objonrow := true;
+        break;
+      end;
+
+    if objonrow then
+    begin
+      y := (r << 2);
+      for c := 0 to NumCols - 1 do
+      begin
+        x := floor((c << 1) * XScale);
+        objnum := GetObjectCell(r, c, cell, neighbors);
+        if (objnum >= 0) and (not Objects[objnum].Hidden) then
+          if cell.Chr <> EMPTYCHAR then
+          begin
+            // object here.
+            cp := Fonts[GetBits(cell.Attr, A_CELL_FONT_MASK, 28)];
+            if (cp = encUTF8) or (cp = encUTF16) then
+              off := GetGlyphOff(cell.Chr, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
+            else
+            begin
+              if cell.Chr > 255 then cell.Chr := 0;
+              off := CPages[cp].QuickGlyph[cell.Chr];
+            end;
+            GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, cell.Attr, false);
+            bmp.ResampleFilter:=rfMitchell;
+            bmp2 := bmp.Resample(2, 4, rmFineResample) as TBGRABitmap;
+            cnv.Draw(x, y, bmp2.Bitmap);
+            bmp2.free;
+          end;
+      end;
+    end;
+  end;
+  bmp.free;
+
 end;
 
 procedure TfPreview.FormShow(Sender: TObject);

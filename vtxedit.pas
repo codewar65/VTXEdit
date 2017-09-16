@@ -153,6 +153,11 @@ type
     Label9: TLabel;
     lvObjects: TListView;
     MenuItem1: TMenuItem;
+    MenuItem2: TMenuItem;
+    MenuItem5: TMenuItem;
+    miObjMergeAll: TMenuItem;
+    miFileSaveAs: TMenuItem;
+    miFileExport: TMenuItem;
     miEditDelete: TMenuItem;
     miObjNext: TMenuItem;
     miObjPrev: TMenuItem;
@@ -233,6 +238,8 @@ type
     bObjMoveBack: TToolButton;
     bObjSave: TToolButton;
     bObjLoad: TToolButton;
+    bObjHideOutlines: TToolButton;
+    ToolButton1: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
     tbModeLeftRights: TToolButton;
@@ -271,11 +278,20 @@ type
     bObjFlipHorz: TToolButton;
     bObjFlipVert: TToolButton;
     bObjMerge: TToolButton;
+    ToolButton2: TToolButton;
+    bObjMergeAll: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure bObjHideOutlinesClick(Sender: TObject);
+    procedure bObjMergeAllClick(Sender: TObject);
+    function lvObjIndex(idx : integer) : integer;
     procedure bObjLoadClick(Sender: TObject);
     procedure bObjSaveClick(Sender: TObject);
+    procedure lvObjectsEdited(Sender: TObject; Item: TListItem; var AValue: string);
+    procedure lvObjectsEditing(Sender: TObject; Item: TListItem; var AllowEdit: Boolean);
+    procedure miFileExportClick(Sender: TObject);
+    procedure miFileSaveAsClick(Sender: TObject);
     procedure miObjNextClick(Sender: TObject);
     procedure miObjPrevClick(Sender: TObject);
     procedure RemoveObject(objnum : integer);
@@ -286,6 +302,7 @@ type
     procedure ObjMoveToBack;
     procedure ObjMoveToFront;
     procedure ObjMerge;
+    procedure ObjMergeAll;
     procedure ObjNext;
     procedure ObjPrev;
     procedure bObjFlipHorzClick(Sender: TObject);
@@ -296,7 +313,6 @@ type
     procedure bObjMoveToFrontClick(Sender: TObject);
     procedure bObnjMoveForwardClick(Sender: TObject);
     procedure RefreshObject(objnum : integer);
-    function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
     function GetObject(row, col : integer) : integer;
     procedure LoadlvObjects;
     function CopySelectionToObject : TObj;
@@ -421,6 +437,8 @@ var
       ( $AE, $AF, $F2, $F3, $A9, $AA, $FD, $F6, $AB, $AC ),
       ( $E3, $F1, $F4, $F5, $EA, $9D, $E4, $F8, $FB, $FC ));
 
+  ObjectRename : boolean = false;
+  ObjectOutlines : boolean = true;
 
 procedure DebugStart;
 procedure nop;
@@ -442,7 +460,6 @@ var
   CurrFileName :            unicodestring;
   CurrFileChanged :         boolean;
   Page :                    TPage;      // main doc
-  NumCols, NumRows :        integer;    // doc size
   PageTop, PageLeft :       integer;    // upper left corner position
   WindowCols, WindowRows :  integer;    // visible area of window
   MouseRow, MouseCol :      integer;    // mouse position (-1 if off page)
@@ -472,7 +489,6 @@ var
 
   // objects
   SelectedObject :          integer;
-  Objects :                 TObjList;
   dragObj :                 boolean;    // in object move mode?
   Clipboard :               TObj;
 
@@ -482,58 +498,30 @@ var
   dragType :                integer;    // 0=select, 1=add, 2=remove
   dragRow, dragCol :        integer;    // start of drag
 
-  // fonts. (CSI 10-19 / 80-85 <space> D
-  Fonts :                   array [0..15] of TEncoding;
 
   SkipScroll :              boolean;      // disable scroll to cursor
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
 
   bmpCharPalette : TBGRABitmap = nil;
 
+
 {*****************************************************************************}
 
-// return the topmost cell of an object at row, cell or EMPTYCELL
-function TfMain.GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
-var
-  i :             integer;
-  po :            PObj;
-  objr, objc, p : integer;
+// convert object number to lvObjects index
+function TfMain.lvObjIndex(idx : integer) : integer;
 begin
-  for i := length(Objects) - 1 downto 0 do
-  begin
-    po := @Objects[i];
-    if (row >= po^.Row) and (row < (po^.Row + po^.Height)) and (not po^.Hidden) then
-    begin
-      // on the row
-      if (col >= po^.Col) and (col < (po^.Col + po^.Width)) then
-      begin
-        // on the col
-        objr := row - po^.Row;
-        objc := col - po^.Col;
-        p := objr * po^.Width + objc;
-        if po^.Data[p].Chr <> EMPTYCHAR then
-        begin
-          neighbors := %0000;
-          if (objr > 0) and (po^.Data[p - po^.Width].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_NORTH;
-          if (objr < po^.Height - 1) and (po^.Data[p + po^.Width].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_SOUTH;
-          if (objc > 0) and (po^.Data[p - 1].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_WEST;
-          if (objc < po^.Width - 1) and (po^.Data[p + 1].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_EAST;
-          cell := po^.Data[objr * po^.Width + objc];
-          exit(i);
-        end;
-      end;
-    end;
-  end;
-  cell.Chr := EMPTYCHAR;
-  cell.Attr := $0007;
-  neighbors := %1111;
-  result := -1;
+  if idx = -1 then exit(-1);
+  result := lvObjects.Items.Count - idx - 1;
 end;
 
+procedure TfMain.bObjHideOutlinesClick(Sender: TObject);
+begin
+  // toggle outlines on objects
+  ObjectOutlines := bObjHideOutlines.Down;
+  pbPage.Invalidate;
+end;
+
+// return the topmost cell of an object at row, cell or EMPTYCELL
 function TfMain.GetObject(row, col : integer) : integer;
 var
   i :             integer;
@@ -569,7 +557,8 @@ var
   neighbors :   byte;
   h1, h2,
   v1, v2 :      integer;
-  i : integer;
+  i :           integer;
+  cl1, cl2 :    TColor;
 begin
   if bmpPage <> nil then
   begin
@@ -675,34 +664,34 @@ begin
             else
             begin
               // never a object border on a cursor
-              cnv.Brush.Style := bsClear;
-              if objnum = SelectedObject then
-                cnv.Pen.Color := clSelectedObject1
-              else
-                cnv.Pen.Color := clUnselectedObject1;
-              cnv.Pen.Style := psSolid;
-              if not HasBits(neighbors, NEIGHBOR_NORTH) then
-                cnv.Line(x, y, x + CellWidthZ - 1, y);
-              if not HasBits(neighbors, NEIGHBOR_SOUTH) then
-                cnv.Line(x, y + CellHeightZ - 1, x + CellWidthZ - 1, y + CellHeightZ - 1);
-              if not HasBits(neighbors, NEIGHBOR_WEST) then
-                cnv.Line(x, y, x, y + CellHeightZ - 1);
-              if not HasBits(neighbors, NEIGHBOR_EAST) then
-                cnv.Line(x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ - 1);
+              if ObjectOutlines then
+              begin
+                cnv.Brush.Style := bsClear;
 
-              if objnum = SelectedObject then
-                cnv.Pen.Color := clSelectedObject2
-              else
-                cnv.Pen.Color := clUnselectedObject2;
-              cnv.Pen.Style := psDot;
-              if not HasBits(neighbors, NEIGHBOR_NORTH) then
-                cnv.Line(x, y, x + CellWidthZ - 1, y);
-              if not HasBits(neighbors, NEIGHBOR_SOUTH) then
-                cnv.Line(x, y + CellHeightZ - 1, x + CellWidthZ - 1, y + CellHeightZ - 1);
-              if not HasBits(neighbors, NEIGHBOR_WEST) then
-                cnv.Line(x, y, x, y + CellHeightZ - 1);
-              if not HasBits(neighbors, NEIGHBOR_EAST) then
-                cnv.Line(x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ - 1);
+                if objnum = SelectedObject then
+                begin
+                  cl1 := clSelectedObject1;
+                  cl2 := clSelectedObject2;
+                end
+                else
+                begin
+                  cl1 := clUnselectedObject1;
+                  cl2 := clUnselectedObject2;
+                end;
+
+                if not HasBits(neighbors, NEIGHBOR_NORTH) then
+                  DrawDashLine(cnv, x, y,
+                    x + CellWidthZ - 1, y, cl1, cl2);
+                if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+                  DrawDashLine(cnv, x, y + CellHeightZ - 1,
+                    x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
+                if not HasBits(neighbors, NEIGHBOR_WEST) then
+                  DrawDashLine(cnv, x, y,
+                    x, y + CellHeightZ - 1, cl1, cl2);
+                if not HasBits(neighbors, NEIGHBOR_EAST) then
+                  DrawDashLine(cnv, x + CellWidthZ - 1, y,
+                    x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
+              end;
             end;
           end;
           x += CellWidthZ;
@@ -843,7 +832,7 @@ begin
     CPages[cp].CanDrawMode[dmSixels] := false;
 
     // build glyph luts
-    if (cp <> encUTF8) and (cp <> encUTF16) then
+    if not (cp in [ encUTF8, encUTF16 ]) then
     begin
       for i := 0 to 255 do
       begin
@@ -914,19 +903,12 @@ end;
 procedure TfMain.LoadlvObjects;
 var
   i, l : integer;
-  str : string;
 begin
   // rebuild listview with objects
   lvObjects.Items.Clear;
   l := length(Objects) - 1;
-  for i := 0 to l do
-  begin
-    str :=
-      iif(Objects[i].Locked, '1','0') +
-      iif(Objects[i].Hidden, '1','0') +
-      Objects[i].Name;
-    lvObjects.AddItem(str, nil);
-  end;
+  for i := l downto 0 do
+    lvObjects.AddItem(Objects[i].Name, nil);
   lvObjects.Invalidate;
 end;
 
@@ -986,7 +968,7 @@ begin
 
       // get codepage for this ch
       cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
-      if (cp = encUTF8) or (cp = encUTF16) then
+      if cp in [ encUTF8, encUTF16 ] then
         off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
       else
       begin
@@ -1019,7 +1001,7 @@ begin
   // convert chr to unicode
   result := cell.chr;
   cp := Fonts[GetBits(cell.attr, A_CELL_FONT_MASK, 28)];
-  if (cp <> encUTF8) and (cp <> encUTF16) then
+  if not (cp in [ encUTF8, encUTF16 ]) then
     result := CPages[cp].EncodingLUT[result];
 end;
 
@@ -1028,7 +1010,7 @@ function TfMain.GetCPChar(cp : TEncoding; unicode : integer) : integer;
 var
   i : integer;
 begin
-  if (cp = encUTF8) or (cp = encUTF16) then
+  if cp in [ encUTF8, encUTF16 ] then
     result := unicode
   else
   begin
@@ -1499,7 +1481,7 @@ end;
 // for special keys
 procedure TfMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
-  i, l, ch : integer;
+  i, l, ch :    integer;
   r, c :        integer;
   shft :        TShiftState;
   KeyAction :   integer;
@@ -1513,7 +1495,8 @@ begin
   if seRows.Focused
     or seCols.Focused
     or seXScale.Focused
-    or seCharacter.Focused then
+    or seCharacter.Focused
+    or ObjectRename then
     exit;
 
   if (Key = VK_SHIFT) or (Key = VK_CONTROL) or (Key = VK_MENU) then exit;
@@ -1716,7 +1699,7 @@ begin
         RemoveObject(SelectedObject);
         LoadlvObjects;
         SelectedObject := -1;
-        lvObjects.ItemIndex := selectedObject;
+        lvObjects.ItemIndex := lvObjIndex(selectedObject);
         pbPage.Invalidate;
       end
       else if length(CopySelection) > 0 then
@@ -1760,6 +1743,8 @@ begin
           Objects[l].Row := PageTop;
           Objects[l].Col := PageLeft;
           LoadlvObjects;
+          SelectedObject := l;
+          lvObjects.ItemIndex := lvObjIndex(SelectedObject);
           pbPage.Invalidate;
         end;
       end;
@@ -1771,6 +1756,7 @@ begin
     KA_OBJECTFLIPHORZ:      ObjFlipHorz;
     KA_OBJECTFLIPVERT:      ObjFlipVert;
     KA_OBJECTMERGE:         ObjMerge;
+    KA_OBJECTMERGEALL:      ObjMergeAll;
     KA_OBJECTNEXT:          ObjNext;
     KA_OBJECTPREV:          ObjPrev;
 
@@ -1786,7 +1772,7 @@ begin
               RemoveObject(SelectedObject);
               LoadlvObjects;
               SelectedObject := -1;
-              lvObjects.ItemIndex := selectedObject;
+              lvObjects.ItemIndex := lvObjIndex(SelectedObject);
               pbPage.Invalidate;
             end;
           end
@@ -1813,7 +1799,7 @@ begin
           if SelectedObject >= 0 then
           begin
             SelectedObject := -1;
-            lvObjects.ItemIndex := selectedObject;
+            lvObjects.ItemIndex := lvObjIndex(SelectedObject);
             pbPage.Invalidate;
           end
           else if length(CopySelection) > 0 then
@@ -1847,7 +1833,8 @@ begin
   if seRows.Focused
     or seCols.Focused
     or seXScale.Focused
-    or seCharacter.Focused then
+    or seCharacter.Focused
+    or ObjectRename then
     exit;
 
   if Between(Key, ' ', '~') then
@@ -2367,6 +2354,16 @@ begin
   fout.free;
 end;
 
+procedure TfMain.miFileExportClick(Sender: TObject);
+begin
+
+end;
+
+procedure TfMain.miFileSaveAsClick(Sender: TObject);
+begin
+
+end;
+
 procedure TfMain.miFileSaveClick(Sender: TObject);
 var
   ansi : unicodestring;
@@ -2412,7 +2409,7 @@ begin
   // build palette
   seCharacter.Enabled := false;
   cell := TBGRABitmap.Create(8,16);
-  if (CurrCodePage = encUTF8) or (CurrCodePage = encUTF16) then
+  if CurrCodePage in [ encUTF8, encUTF16 ] then
   begin
     NumChars := math.floor(length(UVGA16) / 18) - 1;
     seCharacter.MinValue := $0020;
@@ -3191,7 +3188,7 @@ var
     begin
 // CODEPAGE - check sauce
       // assume CP437 if not UTF8/16
-      if (CurrCodePage = encUTF8) or (CurrCodePage = encUTF16) then
+      if CurrCodePage in [ encUTF8, encUTF16 ] then
       begin
         CurrCodePage := encCP437;
         cbCodePage.ItemIndex := ord(CurrCodePage);
@@ -3865,7 +3862,10 @@ begin
     pbPage.invalidate;
   end
   else if dragObj then
+  begin
     dragObj := false;
+    fPreviewBox.Invalidate;
+  end;
 
 end;
 
@@ -3977,7 +3977,7 @@ begin
             RefreshObject(SelectedObject);
           end;
 
-          lvObjects.ItemIndex := SelectedObject;
+          lvObjects.ItemIndex := lvObjIndex(SelectedObject);
           lvObjects.Invalidate;
           if (SelectedObject <> -1) then
           begin
@@ -4374,29 +4374,31 @@ begin
       DrawCellEx(cnv, x, y, row, col, skipUpdate, true, cell.Chr, cell.Attr);
 
       // draw object edges
-      if objnum = SelectedObject then
+      if ObjectOutlines then
       begin
-        cl1 := clSelectedObject1;
-        cl2 := clSelectedObject2;
-      end
-      else
-      begin
-        cl1 := clUnselectedObject1;
-        cl2 := clUnselectedObject2;
+        if objnum = SelectedObject then
+        begin
+          cl1 := clSelectedObject1;
+          cl2 := clSelectedObject2;
+        end
+        else
+        begin
+          cl1 := clUnselectedObject1;
+          cl2 := clUnselectedObject2;
+        end;
+
+        if not HasBits(neighbors, NEIGHBOR_NORTH) then
+          DrawDashLine(cnv, x, y, x + CellWidthZ, y, cl1, cl2);
+
+        if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+          DrawDashLine(cnv, x, y + CellHeightZ - 1, x + CellWidthZ, y + CellHeightZ - 1, cl1, cl2);
+
+        if not HasBits(neighbors, NEIGHBOR_WEST) then
+          DrawDashLine(cnv, x, y, x, y + CellHeightZ, cl1, cl2);
+
+        if not HasBits(neighbors, NEIGHBOR_EAST) then
+          DrawDashLine(cnv, x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ, cl1, cl2);
       end;
-
-      if not HasBits(neighbors, NEIGHBOR_NORTH) then
-        DrawDashLine(cnv, x, y, x + CellWidthZ, y, cl1, cl2);
-
-      if not HasBits(neighbors, NEIGHBOR_SOUTH) then
-        DrawDashLine(cnv, x, y + CellHeightZ - 1, x + CellWidthZ, y + CellHeightZ - 1, cl1, cl2);
-
-      if not HasBits(neighbors, NEIGHBOR_WEST) then
-        DrawDashLine(cnv, x, y, x, y + CellHeightZ, cl1, cl2);
-
-      if not HasBits(neighbors, NEIGHBOR_EAST) then
-        DrawDashLine(cnv, x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ, cl1, cl2);
-
     end;
   end;
 end;
@@ -4543,82 +4545,28 @@ begin
   end;
 end;
 
-procedure TfMain.lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
-  ARect: TRect; AState: TOwnerDrawState);
-var
-  cnv : TCanvas;
-  bmp : TBitmap;
-  val : string;
-begin
-  // draw lock / hidden icons and name
-  // 56/57 = unlock/lock
-  // 58/59 = hidden/shown
-  cnv := Sender.Canvas;
-  bmp := TBitmap.Create;
-  bmp.PixelFormat:=pf32bit;
-  bmp.SetSize(16,16);
-
-  // draw row backgrounds
-  if LCLType.odSelected in AState then
-  begin
-    cnv.Brush.Color := clHighlight;
-    cnv.Font.Color := clHighlightText;
-  end
-  else
-  begin
-    cnv.Brush.Color := clBtnFace;
-    cnv.Font.Color := clBtnText;
-  end;
-
-  cnv.FillRect(ARect);
-  val := AItem.Caption;
-  if val.Chars[0] = '0' then
-    ilButtons.GetBitmap(56, bmp)
-  else
-    ilButtons.GetBitmap(57, bmp);
-  cnv.Draw(ARect.Left + 6, ARect.Top,bmp);
-  if val.Chars[1] = '1' then
-    ilButtons.GetBitmap(58, bmp)
-  else
-    ilButtons.GetBitmap(59, bmp);
-  cnv.Draw(ARect.Left + 24, ARect.Top,bmp);
-  bmp.free;
-  cnv.Brush.Style := bsClear;
-  cnv.TextOut(ARect.Left + 48, ARect.Top, val.substring(2));
-end;
-
 procedure TfMain.lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  lv : TListView;
+  lv :  TListView;
   itm : TListItem;
-  cv : char;
+  cv :  char;
+  te :  TEdit;
 begin
   // click on lock/unlock hide/shown
   lv := TListView(Sender);
   itm := lv.GetItemAt(X, Y);
-  SelectedObject := lv.ItemIndex;
+  SelectedObject := lvObjIndex(lv.ItemIndex);
   if between(X, 6, 6 + 16) then
   begin
-    cv := itm.Caption.Chars[0];
-    if cv = '0' then
-      cv := '1'
-    else
-      cv := '0';
-    itm.Caption := cv + itm.Caption.substring(1);
-    Objects[SelectedObject].Locked := (cv = '1');
+    Objects[SelectedObject].Locked := not Objects[SelectedObject].Locked;
     lvObjects.Invalidate;
   end
   else if between(X, 24, 24 + 16) then
   begin
-    cv := itm.Caption.Chars[1];
-    if cv = '0' then
-      cv := '1'
-    else
-      cv := '0';
-    itm.Caption := itm.Caption.Chars[0] + cv + itm.Caption.substring(2);
-    Objects[SelectedObject].Hidden := (cv = '1');
+    Objects[SelectedObject].Hidden := not Objects[SelectedObject].Hidden;
     lvObjects.Invalidate;
+    fPreviewBox.Invalidate;
   end;
   pbPage.Invalidate;
 end;
@@ -4680,12 +4628,15 @@ begin
           begin
             flipchr := CPages[cp].MirrorTable[i + 1];
             // convert flip unicode back to this codepage
-            for j := 0 to 255 do
-              if flipchr = CPages[cp].EncodingLUT[j] then
-              begin
-                po^.Data[p1].Chr := j;
-                break;
-              end;
+            if CurrCodePage in [ encUTF8, encUTF16] then
+              po^.Data[p1].Chr := flipchr
+            else
+              for j := 0 to 255 do
+                if flipchr = CPages[cp].EncodingLUT[j] then
+                begin
+                  po^.Data[p1].Chr := j;
+                  break;
+                end;
             break;
           end;
           i += 3;
@@ -4765,7 +4716,7 @@ begin
     Objects[SelectedObject - 1] := tmp;
     SelectedObject -= 1;
     LoadlvObjects;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4782,7 +4733,7 @@ begin
     Objects[SelectedObject + 1] := tmp;
     SelectedObject += 1;
     LoadlvObjects;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4798,7 +4749,7 @@ begin
     Objects[SelectedObject] := tmp;
     SelectedObject := 0;
     LoadlvObjects;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4816,7 +4767,7 @@ begin
     Objects[SelectedObject] := tmp;
     SelectedObject := l - 1;
     LoadlvObjects;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4855,7 +4806,43 @@ begin
     RemoveObject(SelectedObject);
     SelectedObject := -1;
     LoadlvObjects;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMergeAll;
+var
+  po : PObj;
+  pd : PCell;
+  r, c : integer;
+  objnum : integer;
+begin
+  // merge this object to page. and remove object
+  if length(Objects) > 0 then
+  begin
+    for objnum := length(Objects) - 1 downto 0 do
+    begin
+      po := @Objects[objnum];
+      pd := @po^.Data[0];
+      for r := po^.Row to po^.Row + po^.Height - 1 do
+        for c := po^.Col to po^.Col + po^.Width - 1 do
+        begin
+          if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
+            if pd^.Chr <> EMPTYCHAR then
+            begin
+              Page.Rows[r].Cells[c] := pd^;
+              DrawCell(r, c, false);
+            end;
+          pd += 1;
+        end;
+    end;
+    for objnum := length(Objects) - 1 downto 0 do
+      setlength(Objects[objnum].Data, 0);
+    setlength(Objects, 0);
+    SelectedObject := -1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4867,7 +4854,7 @@ begin
     SelectedObject += 1;
     if SelectedObject >= length(Objects) then
       SelectedObject := 0;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4879,7 +4866,7 @@ begin
     SelectedObject -= 1;
     if SelectedObject < 0 then
       SelectedObject := length(Objects) - 1;
-    lvObjects.ItemIndex := SelectedObject;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
   end;
 end;
@@ -4902,6 +4889,11 @@ end;
 procedure TfMain.bObjMoveToFrontClick(Sender: TObject);
 begin
   ObjMoveToFront;
+end;
+
+procedure TfMain.bObjMergeAllClick(Sender: TObject);
+begin
+  ObjMergeAll;
 end;
 
 procedure TfMain.bObjMergeClick(Sender: TObject);
@@ -5022,6 +5014,61 @@ begin
       fout.free;
     end;
   end;
+end;
+
+procedure TfMain.lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
+  ARect: TRect; AState: TOwnerDrawState);
+var
+  cnv : TCanvas;
+  bmp : TBitmap;
+  val : string;
+begin
+  // draw lock / hidden icons and name
+  // 56/57 = unlock/lock
+  // 58/59 = hidden/shown
+  cnv := Sender.Canvas;
+  bmp := TBitmap.Create;
+  bmp.PixelFormat:=pf32bit;
+  bmp.SetSize(16,16);
+
+  // draw row backgrounds
+  if LCLType.odSelected in AState then
+  begin
+    cnv.Brush.Color := clHighlight;
+    cnv.Font.Color := clHighlightText;
+  end
+  else
+  begin
+    cnv.Brush.Color := clBtnFace;
+    cnv.Font.Color := clBtnText;
+  end;
+
+  cnv.FillRect(ARect.Left + 4, ARect.Top, ARect.Right, ARect.Bottom);
+
+  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Locked, 57, 56), bmp);
+  cnv.Draw(ARect.Left + 6, ARect.Top,bmp);
+  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Hidden, 58, 59), bmp);
+  cnv.Draw(ARect.Left + 24, ARect.Top,bmp);
+  bmp.free;
+
+  cnv.Brush.Style := bsClear;
+  val := AItem.Caption;
+  cnv.TextOut(ARect.Left + 48, ARect.Top, val);
+end;
+
+procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem;
+  var AValue: string);
+begin
+  ObjectRename := false;
+  Objects[Item.Index].Name := AValue;
+  nop;
+end;
+
+procedure TfMain.lvObjectsEditing(Sender: TObject; Item: TListItem;
+  var AllowEdit: Boolean);
+begin
+  ObjectRename := true;
+  nop;
 end;
 
 // draw the document
@@ -5149,36 +5196,39 @@ begin
         begin
           // object here.
           DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
-          if objnum = SelectedObject then
+          if ObjectOutlines then
           begin
-            cl1 := clSelectedObject1;
-            cl2 := clSelectedObject2;
-          end
-          else
-          begin
-            cl1 := clUnselectedObject1;
-            cl2 := clUnselectedObject2;
+            if objnum = SelectedObject then
+            begin
+              cl1 := clSelectedObject1;
+              cl2 := clSelectedObject2;
+            end
+            else
+            begin
+              cl1 := clUnselectedObject1;
+              cl2 := clUnselectedObject2;
+            end;
+            if not HasBits(neighbors, NEIGHBOR_NORTH) then
+              DrawDashLine(cnv,
+                x, y,
+                x + CellWidthZ, y,
+                cl1, cl2);
+            if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+              DrawDashLine(cnv,
+                x, y + CellHeightZ - 1,
+                x + CellWidthZ, y + CellHeightZ - 1,
+                cl1, cl2);
+            if not HasBits(neighbors, NEIGHBOR_WEST) then
+              DrawDashLine(cnv,
+                x, y,
+                x, y + CellHeightZ,
+                cl1, cl2);
+            if not HasBits(neighbors, NEIGHBOR_EAST) then
+              DrawDashLine(cnv,
+                x + CellWidthZ - 1, y,
+                x + CellWidthZ - 1, y + CellHeightZ,
+                cl1, cl2);
           end;
-          if not HasBits(neighbors, NEIGHBOR_NORTH) then
-            DrawDashLine(cnv,
-              x, y,
-              x + CellWidthZ, y,
-              cl1, cl2);
-          if not HasBits(neighbors, NEIGHBOR_SOUTH) then
-            DrawDashLine(cnv,
-              x, y + CellHeightZ - 1,
-              x + CellWidthZ, y + CellHeightZ - 1,
-              cl1, cl2);
-          if not HasBits(neighbors, NEIGHBOR_WEST) then
-            DrawDashLine(cnv,
-              x, y,
-              x, y + CellHeightZ,
-              cl1, cl2);
-          if not HasBits(neighbors, NEIGHBOR_EAST) then
-            DrawDashLine(cnv,
-              x + CellWidthZ - 1, y,
-              x + CellWidthZ - 1, y + CellHeightZ,
-              cl1, cl2);
         end;
       end;
     end;
@@ -5223,7 +5273,7 @@ begin
   bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
 
   // get codepage / offset for this ch
-  if (cp = encUTF8) or (cp = encUTF16) then
+  if cp in [ encUTF8, encUTF16 ] then
     off := GetGlyphOff(CurrChar, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
   else
   begin
@@ -5466,7 +5516,7 @@ begin
 
     // convert value in chr to unicode.
     cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
-    if (cp = encUTF8) or (cp = encUTF16) then
+    if cp in [ encUTF8, encUTF16 ] then
       off := GetGlyphOff(ch, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize)
     else
     begin
@@ -6164,6 +6214,7 @@ begin
         KA_OBJECTFLIPHORZ:    miObjFlipHorz.ShortCut := shortcut;
         KA_OBJECTFLIPVERT:    miObjFlipVert.ShortCut := shortcut;
         KA_OBJECTMERGE:       miObjMerge.ShortCut := shortcut;
+        KA_OBJECTMERGEALL:    miObjMergeAll.ShortCut := shortcut;
         KA_OBJECTNEXT:        miObjNext.ShortCut := shortcut;
         KA_OBJECTPREV:        miObjPrev.ShortCut := shortcut;
 

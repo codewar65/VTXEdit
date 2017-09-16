@@ -7314,18 +7314,6 @@ const
     $00, $FF, {|} $00, $00, $66, $66, $00, $00, $66, $66, $66, $66, $3C, $3C, $18, $18, $30, $30 );
   //mOsOulMirrors = packed array [0..(0*3)-1] of Uint16;
 
-  WM_VTXEDIT =            $0400;
-  WA_ATTR_ENABLEALL =     1;
-  WA_ATTR_DISABLENONVTX = 2;
-  WA_ATTR_SETVALS =       3;
-  WA_COLOR_RESIZE =       4;
-  WA_COLOR_SETVALS =      5;
-  WA_COLOR_SINGLE =       6;
-  WA_CHAR_CODEPAGE =      7;
-  WA_CHAR_SETVALS =       8;
-  WA_MAIN_BLINK =         9;
-  WA_MAIN_UPDATE =        10;   // update main with tool vals
-
   CPages : array [encCP437 .. encUTF16] of TCodePageRec = (
 
     (   Name :            'CP437';          // keep this one as the first
@@ -7882,15 +7870,16 @@ const
   KA_OBJECTFLIPHORZ =       39;
   KA_OBJECTFLIPVERT =       40;
   KA_OBJECTMERGE =          41;
-  KA_OBJECTNEXT =           42;
-  KA_OBJECTPREV =           43;
-  KA_OBJECTDELETE =         44;
+  KA_OBJECTMERGEALL =       42;
+  KA_OBJECTNEXT =           43;
+  KA_OBJECTPREV =           44;
+  KA_OBJECTDELETE =         45;
 
-  KA_DELETE =               45;   // delete selection, object, etc
-  KA_ESCAPE =               46;   // clear selection, unselect object, etc
+  KA_DELETE =               46;   // delete selection, object, etc
+  KA_ESCAPE =               47;   // clear selection, unselect object, etc
 
-  KA_SHOWPREVIEW =          47;
-  KA_EOL =                  48;
+  KA_SHOWPREVIEW =          48;
+  KA_EOL =                  49;
 
   KeyActions : array [0..KA_EOL] of string = (
 
@@ -7918,7 +7907,8 @@ const
 
     'ObjectMoveBack', 'ObjectMoveForward', 'ObjectMoveToBack',
     'ObjectMoveToFront', 'ObjectFlipHorz', 'ObjectFlipVert',
-    'ObjectMerge', 'ObjectNext', 'ObjectPrev', 'ObjectDelete',
+    'ObjectMerge', 'ObjectMergeAll', 'ObjectNext', 'ObjectPrev',
+    'ObjectDelete',
 
     'Delete', 'Escape',
 
