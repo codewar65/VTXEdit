@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 415
+  Left = 216
   Height = 647
-  Top = 203
+  Top = 101
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627
@@ -622,9 +622,9 @@ object fMain: TfMain
       TabStop = True
       object Label1: TLabel
         Left = 30
-        Height = 15
+        Height = 16
         Top = 74
-        Width = 31
+        Width = 40
         Caption = 'Rows:'
         ParentColor = False
       end
@@ -643,9 +643,9 @@ object fMain: TfMain
       end
       object Label2: TLabel
         Left = 35
-        Height = 15
+        Height = 16
         Top = 98
-        Width = 26
+        Width = 40
         Caption = 'Cols:'
         ParentColor = False
       end
@@ -664,11 +664,11 @@ object fMain: TfMain
       end
       object cbCodePage: TComboBox
         Left = 64
-        Height = 21
+        Height = 24
         Top = 24
         Width = 100
         Font.Height = -11
-        ItemHeight = 13
+        ItemHeight = 0
         ItemIndex = 0
         Items.Strings = (
           'CP 437'
@@ -684,9 +684,9 @@ object fMain: TfMain
       end
       object Label3: TLabel
         Left = 4
-        Height = 15
+        Height = 16
         Top = 28
-        Width = 57
+        Width = 72
         Caption = 'Codepage:'
         ParentColor = False
       end
@@ -706,19 +706,19 @@ object fMain: TfMain
       end
       object Label4: TLabel
         Left = 21
-        Height = 15
+        Height = 16
         Top = 122
-        Width = 40
+        Width = 64
         Caption = 'X Scale:'
         ParentColor = False
       end
       object cbColorScheme: TComboBox
         Left = 64
-        Height = 21
+        Height = 24
         Top = 48
         Width = 100
         Font.Height = -11
-        ItemHeight = 13
+        ItemHeight = 0
         ItemIndex = 0
         Items.Strings = (
           'ANSI Basic'
@@ -735,19 +735,19 @@ object fMain: TfMain
       end
       object Label5: TLabel
         Left = 24
-        Height = 15
+        Height = 16
         Top = 52
-        Width = 37
+        Width = 56
         Caption = 'Colors:'
         ParentColor = False
       end
       object cbPageType: TComboBox
         Left = 64
-        Height = 21
+        Height = 24
         Top = 0
         Width = 100
         Font.Height = -11
-        ItemHeight = 13
+        ItemHeight = 0
         ItemIndex = 0
         Items.Strings = (
           'BBS'
@@ -763,15 +763,15 @@ object fMain: TfMain
       end
       object Label6: TLabel
         Left = 4
-        Height = 15
+        Height = 16
         Top = 4
-        Width = 57
+        Width = 80
         Caption = 'Page Type:'
         ParentColor = False
       end
       object tbSauceTitle: TEdit
         Left = 64
-        Height = 23
+        Height = 26
         Top = 284
         Width = 100
         Enabled = False
@@ -780,7 +780,7 @@ object fMain: TfMain
       end
       object tbSauceAuthor: TEdit
         Left = 64
-        Height = 23
+        Height = 26
         Top = 310
         Width = 100
         Enabled = False
@@ -789,7 +789,7 @@ object fMain: TfMain
       end
       object tbSauceGroup: TEdit
         Left = 64
-        Height = 23
+        Height = 26
         Top = 336
         Width = 100
         Enabled = False
@@ -798,7 +798,7 @@ object fMain: TfMain
       end
       object tbSauceDate: TEdit
         Left = 64
-        Height = 23
+        Height = 26
         Top = 362
         Width = 100
         Enabled = False
@@ -807,33 +807,33 @@ object fMain: TfMain
       end
       object Label7: TLabel
         Left = 35
-        Height = 15
+        Height = 16
         Top = 286
-        Width = 26
+        Width = 48
         Caption = 'Title:'
         ParentColor = False
       end
       object Label8: TLabel
         Left = 21
-        Height = 15
+        Height = 16
         Top = 312
-        Width = 40
+        Width = 56
         Caption = 'Author:'
         ParentColor = False
       end
       object Label9: TLabel
         Left = 25
-        Height = 15
+        Height = 16
         Top = 338
-        Width = 36
+        Width = 48
         Caption = 'Group:'
         ParentColor = False
       end
       object Label10: TLabel
         Left = 34
-        Height = 15
+        Height = 16
         Top = 366
-        Width = 27
+        Width = 40
         Caption = 'Date:'
         ParentColor = False
       end
@@ -846,17 +846,17 @@ object fMain: TfMain
       end
       object Label11: TLabel
         Left = 4
-        Height = 15
+        Height = 16
         Top = 264
-        Width = 100
+        Width = 144
         Caption = 'Sauce Information:'
         ParentColor = False
       end
       object Label12: TLabel
         Left = 4
-        Height = 15
+        Height = 16
         Top = 144
-        Width = 96
+        Width = 144
         Caption = 'Current Char/Attr:'
         ParentColor = False
       end
@@ -881,8 +881,8 @@ object fMain: TfMain
       TabOrder = 1
       object sbHorz: TScrollBar
         Left = 16
-        Height = 16
-        Top = 538
+        Height = 15
+        Top = 539
         Width = 484
         Anchors = [akLeft, akRight, akBottom]
         Max = 80
@@ -933,10 +933,10 @@ object fMain: TfMain
         Anchors = [akRight, akBottom]
       end
       object sbVert: TScrollBar
-        Left = 500
+        Left = 501
         Height = 522
         Top = 16
-        Width = 16
+        Width = 15
         Anchors = [akTop, akRight, akBottom]
         Kind = sbVertical
         PageSize = 0
@@ -965,8 +965,8 @@ object fMain: TfMain
         TabOrder = 0
         object TabSheet1: TTabSheet
           Caption = 'Colors'
-          ClientHeight = 498
-          ClientWidth = 368
+          ClientHeight = 518
+          ClientWidth = 370
           object pbColors: TPaintBox
             Left = 2
             Height = 325
@@ -997,8 +997,8 @@ object fMain: TfMain
         end
         object TabSheet2: TTabSheet
           Caption = 'Characters'
-          ClientHeight = 498
-          ClientWidth = 368
+          ClientHeight = 518
+          ClientWidth = 370
           object sbChars: TScrollBox
             Left = 0
             Height = 462
@@ -1085,13 +1085,13 @@ object fMain: TfMain
         end
         object TabSheet3: TTabSheet
           Caption = 'Objects'
-          ClientHeight = 524
-          ClientWidth = 368
+          ClientHeight = 518
+          ClientWidth = 370
           object ToolBar1: TToolBar
             Left = 0
             Height = 26
             Top = 0
-            Width = 368
+            Width = 370
             ButtonHeight = 21
             ButtonWidth = 21
             Caption = 'ToolBar1'
@@ -1209,14 +1209,14 @@ object fMain: TfMain
           end
           object lvObjects: TListView
             Left = 0
-            Height = 498
+            Height = 492
             Top = 26
-            Width = 368
+            Width = 370
             Align = alClient
             AutoWidthLastColumn = True
             Columns = <            
               item
-                Width = 364
+                Width = 368
               end>
             ColumnClick = False
             Font.Height = 18

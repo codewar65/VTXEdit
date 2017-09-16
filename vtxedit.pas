@@ -91,7 +91,11 @@ unit VTXEdit;
 interface
 
 uses
+  {$ifdef WINDOWS}
   Windows,
+  {$else}
+  LCLType,
+  {$endif}
   Classes,
   SysUtils,
   strutils,
@@ -101,7 +105,7 @@ uses
   Dialogs,
   ExtCtrls,
   Menus,
-  LCL, LCLType,
+  LCL,
   StdCtrls,
   Buttons,
   Graphics,
@@ -985,9 +989,12 @@ begin
     y += CellHeight;
   end;
   bmp.free;
-
+{$ifdef WINDOWS}
   bmpPage.ResampleFilter := rfMitchell;
   bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2) as TBGRABitmap;
+{$else}
+  bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2, rmSimpleStretch) as TBGRABitmap;
+{$endif}
 
   UpdatePreview;
 
@@ -1037,7 +1044,7 @@ begin
     if uni = Blocks2x1[i] then
       break;
 
-  FillMemory(@result, 2, bg);
+  FillByte(result, 2, bg);
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1057,7 +1064,7 @@ begin
     if uni = Blocks1x2[i] then
       break;
 
-  FillMemory(@result, 2, bg);
+  FillByte(result, 2, bg);
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1076,7 +1083,7 @@ begin
     if uni = Blocks2x2[i] then
       break;
 
-  FillMemory(@result, 4, bg);
+  FillByte(result, 4, bg);
   if HasBits(i, %0001) then result[0] := fg;
   if HasBits(i, %0010) then result[1] := fg;
   if HasBits(i, %0100) then result[2] := fg;
@@ -1218,7 +1225,7 @@ begin
     // reduce other 3 blocks to 1 color + this color
     // get color count.
     setlength(count, 256);
-    FillMemory(@count[0], 256, 0);
+    FillByte(count[0], 256, 0);
     tot := 0;
     mval := 0;
     mclr := -1;     // other color with highest count
@@ -2306,7 +2313,7 @@ begin
   head.Colors := ColorScheme;
   head.Height := NumRows;
   head.Width := NumCols;
-  FillMemory(@head.Name[0], 64, 0);
+  FillByte(head.Name[0], 64, 0);
   for i := 0 to length(fname) - 1 do
   begin
     if i >= 63 then break;
@@ -2339,7 +2346,7 @@ begin
     fout.WriteByte(iif(Objects[i].Locked, 1, 0));
     fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
 
-    FillMemory(@nameout[0], 64, 0);
+    FillByte(nameout[0], 64, 0);
     for j := 0 to length(Objects[i].Name) - 1 do
     begin
       if j >= 63 then break;
@@ -5001,7 +5008,7 @@ begin
       head.PageType := 3;
       head.Width := Objects[SelectedObject].Width;
       head.Height := Objects[SelectedObject].Height;
-      FillMemory(@head.Name[0], 64, 0);
+      FillByte(head.Name[0], 64, 0);
       fname := ExtractFileNameOnly(sdObject.FileName);
       for i := 0 to length(sdObject.Filename) - 1 do
       begin
@@ -5127,7 +5134,11 @@ begin
     pr.Height := WindowRows * CellHeightZ;
 
   if PageZoom < 1 then
+{$ifdef WINDOWS}
     tmp2 := tmp.Resample(pr.Width, pr.Height, rmFineResample) as TBGRABitmap
+{$else}
+    tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap
+{$endif}
   else
     tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap;
 
@@ -5531,8 +5542,12 @@ begin
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
       bmp.Draw(bmpPage.Canvas, col * CellWidth, row * CellHeight);
 
+{$ifdef WINDOWS}
       bmp.ResampleFilter := rfMitchell;
       bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
+{$else}
+      bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2, rmSimpleStretch) as TBGRABitmap;
+{$endif}
       bmp2.Draw(bmpPreview.Canvas, col * (CellWidth >> 2), row * (CellHeight >> 2));
       bmp2.free;
 
@@ -5568,8 +5583,12 @@ begin
       rect.Height := CellHeightZ;
       if PageZoom < 1 then
       begin
+{$ifdef WINDOWS}
         bmp.ResampleFilter:=rfMitchell;
         BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ));
+{$else}
+        BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ, rmSimpleStretch));
+{$endif}
       end;
       bmp.Draw(cnv, rect);
     end;

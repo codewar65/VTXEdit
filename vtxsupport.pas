@@ -30,13 +30,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 unit VTXSupport;
 
 {$mode objfpc}{$H+}
+{$modeswitch advancedrecords}
 
 interface
 
 uses
   UnicodeHelper,
   Classes, Forms, SysUtils, ExtCtrls, VTXConst, BGRABitmap, BGRABitmapTypes,
-  Windows, Graphics;
+  Types,
+  {$ifdef WINDOWS}
+  Windows,
+  {$else}
+  LCLType,
+  {$endif}
+  Graphics;
 
 procedure DrawDashLine(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
 procedure DrawDashRect(cnv : TCanvas; rect : TRect; clr1, clr2 : TColor);
@@ -72,6 +79,8 @@ function iif(cond : boolean; trueval, falseval : char) : char; inline;
 function iif(cond : boolean; trueval, falseval : string) : string; inline;
 function iif(cond : boolean; trueval, falseval : unicodestring) : unicodestring; inline;
 function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
+function RectWidth(r : TRect) : integer; inline;
+function RectHeight(r : TRect) : integer; inline;
 
 function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
 
@@ -453,12 +462,22 @@ begin
   result := VTXRGB(Unnorm(r), Unnorm(g), Unnorm(b));
 end;
 
+function RectWidth(r : TRect) : integer; inline;
+begin
+  result := r.Right - r.Left;
+end;
+
+function RectHeight(r : TRect) : integer; inline;
+begin
+  result := r.Bottom - r.Top;
+end;
+
 function DrawTextCentered(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
 var
   sz : TSize;
 begin
   sz := cnv.TextExtent(s);
-  cnv.TextOut(r.Left + ((r.Width - sz.cx) >> 1), r.Top + ((r.Height - sz.cy) >> 1), s);
+  cnv.TextOut(r.Left + ((RectWidth(r) - sz.cx) >> 1), r.Top + ((RectHeight(r) - sz.cy) >> 1), s);
 end;
 
 function DrawTextRight(cnv : TCanvas; const r : TRect; s : unicodeString) : integer;
@@ -470,8 +489,8 @@ begin
   rtop  :=   r.top;
   rleft :=   r.left;
   rright :=  r.right;
-  rwidth :=  r.width;
-  rheight := r.height;
+  rwidth :=  RectWidth(r);
+  rheight := RectHeight(r);
   if rheight < sz.cy then
     rheight := sz.cy;
   cnv.TextOut(rright - sz.cx, rtop + ((rheight - sz.cy) >> 1), s);
@@ -661,4 +680,5 @@ begin
 end;
 
 end.
+
 
