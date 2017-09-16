@@ -93,9 +93,8 @@ interface
 uses
   {$ifdef WINDOWS}
   Windows,
-  {$else}
-  LCLType,
   {$endif}
+  LCLType,
   Classes,
   SysUtils,
   strutils,
