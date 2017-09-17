@@ -81,6 +81,7 @@ function iif(cond : boolean; trueval, falseval : unicodestring) : unicodestring;
 function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
 function RectWidth(r : TRect) : integer; inline;
 function RectHeight(r : TRect) : integer; inline;
+procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
 
 function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
 
@@ -679,6 +680,14 @@ begin
   cnv.Rectangle(x1, y1, x2, y2);
 end;
 
-end.
+procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
+var
+  tmpbmp : TBGRABitmap;
+begin
+  tmpbmp := bmp.Resample(r.Width, r.Height, rmSimpleStretch) as TBGRABitmap;
+  cnv.Draw(r.Left, r.Top, tmpbmp.Bitmap);
+  tmpbmp.free;
+end;
 
+end.
 

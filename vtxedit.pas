@@ -980,7 +980,7 @@ begin
       end;
 
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      bmp.Draw(bmpPage.Canvas, x, y);
+      bmpPage.Canvas.Draw(x, y, bmp.Bitmap);
 
       x += CellWidth;
     end;
@@ -2110,13 +2110,13 @@ end;
 
 procedure TfMain.pbStatusBarPaint(Sender: TObject);
 var
-  pb:TPaintBox;
-  cnv:TCanvas;
-  r : TRect;
+  pb:             TPaintBox;
+  cnv:            TCanvas;
+  r :             TRect;
   ch, i, u, off : integer;
-  bmp : tbgrabitmap;
-  str : unicodestring;
-  style : TTextStyle;
+  bmp :           TBGRABitmap;
+  str :           UnicodeString;
+  style :         TTextStyle;
 begin
   // background.
   pb:=TPaintBox(Sender);
@@ -2150,7 +2150,7 @@ begin
     u := CP437[ch];               // unicode char
     off := GetGlyphOff(u, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize);
     GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, $0007, false);
-    bmp.Draw(cnv, r.left, 4);
+    cnv.Draw(r.left, 4, bmp.Bitmap);
     r.left += 12;
   end;
   bmp.Free();
@@ -2465,7 +2465,7 @@ begin
     rect.Height := 32;
 
     bmpCharPalette.FillRect(2 + x - 1, 2 + y - 1, 4 + x + 17, 2 + y + 33, clDkGray);
-    cell.Draw(bmpCharPalette.Canvas, rect);
+    DrawStretchedBitmap(bmpCharPalette.Canvas, rect, cell);
   end;
   cell.Free;
   pbChars.Invalidate;
@@ -2525,7 +2525,7 @@ begin
 
   pb.Width := bmpCharPalette.Width;
   pb.Height := bmpCharPalette.Height;
-  bmpCharPalette.Draw(cnv, 0, 0);
+  cnv.Draw(0, 0, bmpCharPalette.Bitmap);
 
   // hilight the selected char
   if CurrCodePage in [ encUTF8, encUTF16 ] then
@@ -5142,7 +5142,7 @@ begin
     tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap;
 
   // display page from bitmap
-  tmp2.Draw(cnv, 0, 0);
+  cnv.Draw(0, 0, tmp2.Bitmap);
   tmp.Free;
   tmp2.free;
 
@@ -5263,14 +5263,14 @@ end;
 // draw the current cell preview
 procedure TfMain.pbCurrCellPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r, rarea : TRect;
-  bmp : TBGRABitmap;
-  off, ch : integer;
-  cp : TEncoding;
-  h, w : integer;
-  fg, bg : integer;
+  pb :        TPaintBox;
+  cnv :       TCanvas;
+  r, rarea :  TRect;
+  bmp :       TBGRABitmap;
+  off, ch :   integer;
+  cp :        TEncoding;
+  h, w :      integer;
+  fg, bg :    integer;
 const
   crsize = 38;
 begin
@@ -5309,7 +5309,7 @@ begin
   r.top :=  rarea.top + (rarea.Height - h) >> 1;
   r.width := w;
   r.height := h;
-  bmp.Draw(cnv, r);
+  DrawStretchedBitmap(cnv, r, bmp);
 
   // draw colors
   rarea := pb.ClientRect;
@@ -5353,7 +5353,7 @@ begin
   r.top :=  rarea.bottom - h - 2;
   r.width := w;
   r.height := h;
-  bmp.Draw(cnv, r);
+  DrawStretchedBitmap(cnv, r, bmp);
   bmp.free;
 end;
 
@@ -5539,15 +5539,11 @@ begin
     if not skipUpdate then
     begin
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      bmp.Draw(bmpPage.Canvas, col * CellWidth, row * CellHeight);
+      bmpPage.Canvas.Draw(col * CellWidth, row * CellHeight, bmp.Bitmap);
 
-{$ifdef WINDOWS}
       bmp.ResampleFilter := rfMitchell;
       bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
-{$else}
-      bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2, rmSimpleStretch) as TBGRABitmap;
-{$endif}
-      bmp2.Draw(bmpPreview.Canvas, col * (CellWidth >> 2), row * (CellHeight >> 2));
+      bmpPreview.Canvas.Draw(col * (CellWidth >> 2), row * (CellHeight >> 2), bmp2.Bitmap);
       bmp2.free;
 
       UpdatePreview;
@@ -5582,14 +5578,10 @@ begin
       rect.Height := CellHeightZ;
       if PageZoom < 1 then
       begin
-{$ifdef WINDOWS}
         bmp.ResampleFilter:=rfMitchell;
         BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ));
-{$else}
-        BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ, rmSimpleStretch));
-{$endif}
       end;
-      bmp.Draw(cnv, rect);
+      DrawStretchedBitmap(cnv, rect, bmp);
     end;
     bmp.free;
   end;
@@ -6580,4 +6572,5 @@ var
   closefile(fin);
   closefile(fout);
 }
+
 

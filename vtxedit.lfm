@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 216
+  Left = 415
   Height = 647
-  Top = 101
+  Top = 203
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627
@@ -881,8 +881,8 @@ object fMain: TfMain
       TabOrder = 1
       object sbHorz: TScrollBar
         Left = 16
-        Height = 15
-        Top = 539
+        Height = 16
+        Top = 538
         Width = 484
         Anchors = [akLeft, akRight, akBottom]
         Max = 80
@@ -933,10 +933,10 @@ object fMain: TfMain
         Anchors = [akRight, akBottom]
       end
       object sbVert: TScrollBar
-        Left = 501
+        Left = 500
         Height = 522
         Top = 16
-        Width = 15
+        Width = 16
         Anchors = [akTop, akRight, akBottom]
         Kind = sbVertical
         PageSize = 0
@@ -965,8 +965,8 @@ object fMain: TfMain
         TabOrder = 0
         object TabSheet1: TTabSheet
           Caption = 'Colors'
-          ClientHeight = 518
-          ClientWidth = 370
+          ClientHeight = 498
+          ClientWidth = 368
           object pbColors: TPaintBox
             Left = 2
             Height = 325
@@ -997,8 +997,8 @@ object fMain: TfMain
         end
         object TabSheet2: TTabSheet
           Caption = 'Characters'
-          ClientHeight = 518
-          ClientWidth = 370
+          ClientHeight = 498
+          ClientWidth = 368
           object sbChars: TScrollBox
             Left = 0
             Height = 462
