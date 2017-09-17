@@ -79,12 +79,12 @@ type
   // objects on document
   TObjList = array of TObj;
 
+  TUndoTypes = ( utCells, utObjAdd, utObjRemove, utObjMove, utObjMerge );
+
   // a single undo/redo item on undo 'stack'
-  TUndoCell = packed record
-    Flag :              byte;       // Start of block, end of block, operation..
-    Row, Col :          UInt16;     // location on page.
-    OldCell,                        // previous cell that got overwritten
-    NewCell :           TCell;      // new cell.
+  TUndoCells = packed record
+    Row, Col :          UInt16;
+    OldCell, NewCell :  TCell;
   end;
 
   // copy / paste region selection info

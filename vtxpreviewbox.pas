@@ -131,7 +131,7 @@ begin
 
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
-  bmpPreview.Draw(cnv, pb.ClientRect, false);
+  cnv.Draw(0, 0, bmpPreview.Bitmap);
 
   // draw objects over top
   // from topmost to bottommost

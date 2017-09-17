@@ -462,7 +462,6 @@ var
 
   CurrFileName :            unicodestring;
   CurrFileChanged :         boolean;
-  Page :                    TPage;      // main doc
   PageTop, PageLeft :       integer;    // upper left corner position
   WindowCols, WindowRows :  integer;    // visible area of window
   MouseRow, MouseCol :      integer;    // mouse position (-1 if off page)
@@ -506,7 +505,6 @@ var
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
 
   bmpCharPalette : TBGRABitmap = nil;
-
 
 {*****************************************************************************}
 
@@ -759,8 +757,6 @@ var
   enc : integer;
 begin
 
-  DebugStart;
-
   CurrFileName := 'Untitled.vtx';
   CurrFileChanged := false;
 
@@ -900,6 +896,10 @@ begin
   Clipboard.Width := 0;
   Clipboard.Height := 0;
   setlength(Clipboard.Data, 0);
+
+  // clear undo stuff
+  CurrUndoData.Create(sizeof(TUndoCells));
+  DebugStart;
 
 end;
 
@@ -3871,6 +3871,11 @@ begin
   begin
     dragObj := false;
     fPreviewBox.Invalidate;
+  end
+  else
+  begin
+    // save CurrUndoData to undolist
+    nop;
   end;
 
 end;
@@ -3943,7 +3948,8 @@ procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   bcolor :        integer;
-  dattr, dchar :  integer;
+  dcell :         TCell;
+//  dattr, dchar :  integer;
   objnum :        integer;
   tmp :           integer;
 begin
@@ -4058,9 +4064,11 @@ begin
             case DrawMode of
               dmChars:
                 begin
-                  dchar := iif(Button = mbLeft, CurrChar, $20);
-                  dattr := iif(Button = mbLeft, CurrAttr, $0007);
-                  PutCharEx(dchar, dattr, MouseRow, MouseCol);
+                  dcell.Chr := iif(Button = mbLeft, CurrChar, $20);
+                  dcell.Attr := iif(Button = mbLeft, CurrAttr, $0007);
+                  CurrUndoData.Clear;
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+                  PutCharEx(dcell.Chr, dcell.Attr, MouseRow, MouseCol);
                 end;
 
               dmLeftRights:
@@ -4068,9 +4076,16 @@ begin
                   bcolor := iif(Button = mbLeft,
                     GetBits(CurrAttr, A_CELL_FG_MASK),
                     GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                  Page.Rows[MouseRow].Cells[MouseCol] :=
-                    SetBlockColor(bcolor, Page.Rows[MouseRow].Cells[MouseCol],
-                      2, 1, SubX, SubY);
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    2, 1, SubX, SubY);
+
+                  CurrUndoData.Clear;
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol, false);
                   CurrFileChanged := true;
                   UpdateTitles;
@@ -4081,9 +4096,16 @@ begin
                   bcolor := iif(Button = mbLeft,
                     GetBits(CurrAttr, A_CELL_FG_MASK),
                     GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                  Page.Rows[MouseRow].Cells[MouseCol] :=
-                    SetBlockColor(bcolor, Page.Rows[MouseRow].Cells[MouseCol],
-                      1, 2, SubX, SubY);
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    1, 2, SubX, SubY);
+
+                  CurrUndoData.Clear;
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol,false);
                   CurrFileChanged := true;
                   UpdateTitles;
@@ -4094,9 +4116,16 @@ begin
                   bcolor := iif(Button = mbLeft,
                     GetBits(CurrAttr, A_CELL_FG_MASK),
                     GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                  Page.Rows[MouseRow].Cells[MouseCol] :=
-                    SetBlockColor(bcolor, Page.Rows[MouseRow].Cells[MouseCol],
-                      2, 2, SubX, SubY);
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    2, 2, SubX, SubY);
+
+                  CurrUndoData.Clear;
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol,false);
                   CurrFileChanged := true;
                   UpdateTitles;
@@ -4115,7 +4144,8 @@ var
   done :            boolean;
   mr, mc, sx, sy :  integer;
   bcolor :          integer;
-  dattr, dchar :    integer;
+  dcell :           TCell;
+//  dattr, dchar :    integer;
 begin
 
   // update mouse position
@@ -4198,12 +4228,15 @@ begin
                 dmChars:
                   begin
                     // add move to
-                    dchar := iif(MouseLeft, CurrChar, $20);
-                    dattr := iif(MouseLeft, CurrAttr, $0007);
+                    dcell.chr := iif(MouseLeft, CurrChar, $20);
+                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
                     LineCalcInit(LastDrawX, LastDrawY, DrawX, DrawY);
                     repeat
                       done := LineCalcNext(LastDrawX, LastDrawY);
-                      PutCharEx(dchar, dattr, LastDrawY, LastDrawX);
+
+                      RecordUndoCell(LastDrawY, LastDrawX, dcell);
+
+                      PutCharEx(dcell.Chr, dcell.Attr, LastDrawY, LastDrawX);
                     until done;
                   end;
 
@@ -4219,9 +4252,15 @@ begin
                       mc := LastDrawX div SubXSize;
                       sx := LastDrawX mod SubXSize;
                       sy := LastDrawY mod SubYSize;
-                      Page.Rows[mr].Cells[mc] :=
-                        SetBlockColor(bcolor, Page.Rows[mr].Cells[mc],
-                          2, 1, sx, sy);
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        2, 1, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+
+                      Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
                       CurrFileChanged := true;
                       UpdateTitles;
@@ -4240,9 +4279,15 @@ begin
                       mc := LastDrawX div SubXSize;
                       sx := LastDrawX mod SubXSize;
                       sy := LastDrawY mod SubYSize;
-                      Page.Rows[mr].Cells[mc] :=
-                        SetBlockColor(bcolor, Page.Rows[mr].Cells[mc],
-                          1, 2, sx, sy);
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        1, 2, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+
+                      Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
                       CurrFileChanged := true;
                       UpdateTitles;
@@ -4261,9 +4306,15 @@ begin
                       mc := LastDrawX div SubXSize;
                       sx := LastDrawX mod SubXSize;
                       sy := LastDrawY mod SubYSize;
-                      Page.Rows[mr].Cells[mc] :=
-                        SetBlockColor(bcolor, Page.Rows[mr].Cells[mc],
-                          2, 2, sx, sy);
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        2, 2, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+
+                      Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc,false);
                       CurrFileChanged := true;
                       UpdateTitles;
@@ -6456,13 +6507,13 @@ end;
 
 
 
+
 procedure nop; begin end;
 
 procedure DebugStart;
+var
+  rec : TCell;
 begin
-
-  exit;
-
 
   nop;
 

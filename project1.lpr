@@ -37,7 +37,7 @@ uses
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
   Forms, VTXEdit, VTXConst, VTXPreviewBox,
-  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper;
+  VTXSupport, Graphics, VTXEncDetect, UnicodeHelper, RecList;
 
 {$R *.res}
 
