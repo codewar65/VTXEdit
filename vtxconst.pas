@@ -34,7 +34,9 @@ unit VTXConst;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes,
+  SysUtils,
+  RecList;
 
 type
 
@@ -55,14 +57,6 @@ type
 
   TCellList = array of TCell;
 
-  // item in ANSI art object linked list.
-  TPlacedCell = packed record
-    Row, Col :          UInt16;
-    Cell :              TCell;
-  end;
-
-  TPlacedCellList = array of TPlacedCell;
-
   // ANSI art objects / pasted object from clipboard.
   TObj = record
     Name :              unicodestring;
@@ -79,12 +73,30 @@ type
   // objects on document
   TObjList = array of TObj;
 
-  TUndoTypes = ( utCells, utObjAdd, utObjRemove, utObjMove, utObjMerge );
+  TUndoTypes = (
+    utCells,        // chunk of page data delta
+    utObjAdd,       // add new object
+    utObjRemove,    // remove object
+    utObjMove,      // move object r,c,z to r,c,z
+    utObjMerge,     // Merge object to page
+    utTyped         // typed data from keyboard
+    );
 
   // a single undo/redo item on undo 'stack'
   TUndoCells = packed record
     Row, Col :          UInt16;
     OldCell, NewCell :  TCell;
+  end;
+
+  TUndoBlock = record
+    UndoType :        TUndoTypes;
+    OldCell,
+    NewCell :         TCell;    // typed cell delta
+    CellData :        TRecList; // reclist of TUndoCells for type utCells
+    Obj :             TObj;     // copy of object merged/added/removed
+    OldRow, OldCol,
+    NewRow, NewCol,
+    OldNum, NewNum :  integer;  // location changes
   end;
 
   // copy / paste region selection info

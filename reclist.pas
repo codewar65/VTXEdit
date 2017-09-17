@@ -53,6 +53,7 @@ type
     procedure Put(rec : PBYTE; recnum : DWORD); inline;
     procedure Get(rec : PBYTE; recnum : DWORD); inline;
     procedure Clear;
+    function Copy : TRecList;
   end;
 
 implementation
@@ -131,6 +132,15 @@ begin
   self.Count := 0;
   self.Size := INIT_RECSIZE;
   self.Data := GetMemory(self.RecSize * Size);
+end;
+
+// create copy of TRecList
+// WARNING : CLEAR ANY DATA INSIDE THAT CONTAINS OTHER TRECLISTS
+function TRecList.Copy : TRecList;
+begin
+  result := self;
+  result.Data := Getmemory(self.Size * self.RecSize);
+  Move(self.Data[0], result.Data[0], self.Size * self.RecSize);
 end;
 
 end.

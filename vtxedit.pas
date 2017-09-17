@@ -409,6 +409,12 @@ type
     procedure NewFile;
     procedure DoBlink;
 
+    procedure RecordUndoCell(row, col : uint16; newcell : TCell);
+    procedure UndoTruncate(pos : integer);
+    procedure UndoAdd(undoblk : TUndoBlock);
+    procedure UndoPerform(pos : integer);
+    procedure RedoPerform(pos : integer);
+
   private
     { private declarations }
 
@@ -899,6 +905,9 @@ begin
 
   // clear undo stuff
   CurrUndoData.Create(sizeof(TUndoCells));
+  Undo.Create(sizeof(TUndoBlock));
+  UndoPos := 0;
+
   DebugStart;
 
 end;
@@ -1690,10 +1699,19 @@ begin
     KA_FILEEXIT:  Close;
 
     KA_EDITREDO:
-      ;
+      if UndoPos < Undo.Count then
+      begin
+        RedoPerform(UndoPos);
+        UndoPos += 1;
+      end;
 
     KA_EDITUNDO:
-      ;
+      if UndoPos > 0 then
+      begin
+        // only if there is some undo to be done.
+        UndoPerform(UndoPos - 1);
+        UndoPos -= 1;
+      end;
 
     KA_EDITCUT:
       // copy selection or object to clipboard, removing the thing
@@ -3849,6 +3867,8 @@ end;
 
 procedure TfMain.pbPageMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
+var
+  undoblk : TUndoBlock;
 begin
   case Button of
     mbLeft : MouseLeft := false;
@@ -3875,9 +3895,11 @@ begin
   else
   begin
     // save CurrUndoData to undolist
-    nop;
+    undoblk.UndoType := utCells;
+    undoblk.CellData := CurrUndoData.Copy;
+    UndoAdd(undoblk);
+    CurrUndoData.Clear;
   end;
-
 end;
 
 
@@ -3949,7 +3971,6 @@ procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
 var
   bcolor :        integer;
   dcell :         TCell;
-//  dattr, dchar :  integer;
   objnum :        integer;
   tmp :           integer;
 begin
@@ -6505,14 +6526,108 @@ begin
 end;
 
 
+// append a cell to an undo cell delta reclist
+procedure TfMain.RecordUndoCell(row, col : uint16; newcell : TCell);
+var
+  rec :   TUndoCells;
+  i, l :  integer;
+begin
+  // look for this cell in undo data
+  l := CurrUndoData.Count;
+  for i := 0 to l - 1 do
+  begin
+    CurrUndoData.Get(PBYTE(@rec), i);
+    if (rec.Row = row) and (rec.Col = col) then
+    begin
+      // if exists, update the new cell
+      rec.NewCell := newcell;
+      CurrUndoData.Put(PBYTE(@rec), i);
+      exit;
+    end;
+  end;
+  // new record
+  rec.Row := row;
+  rec.Col := col;
+  rec.NewCell := newcell;
+  rec.OldCell := Page.Rows[row].Cells[col];
+  CurrUndoData.Add(PBYTE(@rec));
+end;
 
+// clear all data from pos to end of list. move list count down.
+procedure TfMain.UndoTruncate(pos : integer);
+var
+  i : integer;
+  undoblk : TUndoBlock;
+begin
+  for i := pos to Undo.Count - 1 do
+  begin
+    Undo.Get(PBYTE(@undoblk), i);
+    case undoblk.UndoType of
+      utCells:
+        begin
+          undoblk.CellData.Free;
+        end;
+      //...
+    end;
+  end;
+  Undo.Count := pos;
+end;
 
+// truncate if needed. add undo block to undo list at undopos.
+procedure TfMain.UndoAdd(undoblk : TUndoBlock);
+begin
+  UndoTruncate(UndoPos);
+  Undo.Add(PBYTE(@undoblk));
+  UndoPos += 1;
+end;
+
+// undo stuff at this pos
+procedure TfMain.UndoPerform(pos : integer);
+var
+  undocell :  TUndoCells;
+  i :         integer;
+  undoblk :   TUndoBlock;
+begin
+  Undo.Get(PBYTE(@undoblk), pos);
+  case undoblk.UndoType of
+    utCells:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(PBYTE(@undocell), i);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
+          DrawCell(undocell.Row, undocell.Col, false);
+        end;
+        CurrFileChanged := true;
+      end;
+  end;
+end;
+
+// redo
+procedure TfMain.RedoPerform(pos : integer);
+var
+  undocell :  TUndoCells;
+  i :         integer;
+  undoblk :   TUndoBlock;
+begin
+  Undo.Get(PByte(@undoblk), pos);
+  case undoblk.UndoType of
+    utCells:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(PBYTE(@undocell), i);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
+          DrawCell(undocell.Row, undocell.Col, false);
+        end;
+        CurrFileChanged := true;
+      end;
+  end;
+end;
 
 procedure nop; begin end;
 
 procedure DebugStart;
-var
-  rec : TCell;
 begin
 
   nop;

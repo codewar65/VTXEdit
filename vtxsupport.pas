@@ -92,7 +92,6 @@ procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
 
 function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
 
-procedure RecordUndoCell(row, col : uint16; newcell : TCell);
 
 
 var
@@ -118,6 +117,10 @@ var
   // as cells are painted, updates get added to this. keep the original cell,
   // and update the new cell with the last cell painted.
   CurrUndoData :            TRecList;
+
+  // the undo/redo list
+  UndoPos :   integer;    // where are we on the undo list
+  Undo :      TRecList;   // the list
 
   // fonts. (CSI 10-19 / 80-85 <space> D
   Fonts :                   array [0..15] of TEncoding;
@@ -679,32 +682,6 @@ begin
   tmpbmp := bmp.Resample(r.Width, r.Height, rmSimpleStretch) as TBGRABitmap;
   cnv.Draw(r.Left, r.Top, tmpbmp.Bitmap);
   tmpbmp.free;
-end;
-
-procedure RecordUndoCell(row, col : uint16; newcell : TCell);
-var
-  rec :   TUndoCells;
-  i, l :  integer;
-begin
-  // look for this cell in undo data
-  l := CurrUndoData.Count;
-  for i := 0 to l - 1 do
-  begin
-    CurrUndoData.Get(PBYTE(@rec), i);
-    if (rec.Row = row) and (rec.Col = col) then
-    begin
-      // if exists, update the new cell
-      rec.NewCell := newcell;
-      CurrUndoData.Put(PBYTE(@rec), i);
-      exit;
-    end;
-  end;
-  // new record
-  rec.Row := row;
-  rec.Col := col;
-  rec.NewCell := newcell;
-  rec.OldCell := Page.Rows[row].Cells[col];
-  CurrUndoData.Add(PBYTE(@rec));
 end;
 
 end.
