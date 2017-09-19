@@ -31,6 +31,7 @@ unit VTXSupport;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$ASMMODE intel}
 
 interface
 
@@ -89,10 +90,8 @@ function iif(cond : boolean; trueval, falseval : uint32) : uint32; inline;
 function RectWidth(r : TRect) : integer; inline;
 function RectHeight(r : TRect) : integer; inline;
 procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
-
-function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
-
-
+function GetObjectCell(row, col : integer; var cell : TCell) : integer;
+function InRect(x, y, rx, ry, rw, rh : integer) : boolean; inline;
 
 var
   Version : string;
@@ -133,44 +132,35 @@ implementation
 
 { Support Functions }
 
-function GetObjectCell(row, col : integer; var cell : TCell; var neighbors : byte) : integer;
+function InRect(x, y, rx, ry, rw, rh : integer) : boolean; inline;
+begin
+  result := (x >= rx) and (x < rx + rw) and (y >= ry) and (y < ry + rh);
+end;
+
+function GetObjectCell(row, col : integer; var cell : TCell) : integer;
 var
   i :             integer;
-  po :            PObj;
   objr, objc, p : integer;
 begin
   for i := length(Objects) - 1 downto 0 do
   begin
-    po := @Objects[i];
-    if (row >= po^.Row) and (row < (po^.Row + po^.Height)) and (not po^.Hidden) then
+    if InRect(
+      col, row,
+      Objects[i].Col, Objects[i].Row,
+      Objects[i].Width, Objects[i].Height) then
     begin
-      // on the row
-      if (col >= po^.Col) and (col < (po^.Col + po^.Width)) then
+      objr := row - Objects[i].Row;
+      objc := col - Objects[i].Col;
+      p := objr * Objects[i].Width + objc;
+      if Objects[i].Data[p].Chr <> EMPTYCHAR then
       begin
-        // on the col
-        objr := row - po^.Row;
-        objc := col - po^.Col;
-        p := objr * po^.Width + objc;
-        if po^.Data[p].Chr <> EMPTYCHAR then
-        begin
-          neighbors := %0000;
-          if (objr > 0) and (po^.Data[p - po^.Width].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_NORTH;
-          if (objr < po^.Height - 1) and (po^.Data[p + po^.Width].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_SOUTH;
-          if (objc > 0) and (po^.Data[p - 1].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_WEST;
-          if (objc < po^.Width - 1) and (po^.Data[p + 1].Chr <> EMPTYCHAR) then
-            neighbors := neighbors or NEIGHBOR_EAST;
-          cell := po^.Data[objr * po^.Width + objc];
-          exit(i);
-        end;
+        cell := Objects[i].Data[objr * Objects[i].Width + objc];
+        exit(i);
       end;
     end;
   end;
   cell.Chr := EMPTYCHAR;
   cell.Attr := $0007;
-  neighbors := %1111;
   result := -1;
 end;
 
@@ -256,18 +246,23 @@ procedure GetGlyphBmp(
   blink : boolean       // if on, conceal text.
   );
 var
-  x, y : integer;
-  b : byte;
-  ptr : pbyte;
-  bptr : ^TBGRAPixel;
-  fg, bg, sc : TBGRAPixel;
-  italics, bold, shadow : boolean;
-  underline, strike, dstrike : boolean;
-  disp : integer;
-  adj : integer;
-  i, dl : integer;
-  s : pbgrapixel;
-  fi, bi : integer;
+  x, y :        Integer;
+  b :           Word;
+  ptr :         PBYTE;
+  bptr :        PBGRAPixel;
+  sptr :        PBGRAPixel;
+  fg, bg, sc :  TBGRAPixel;
+  italics,
+  bold,
+  shadow,
+  underline,
+  strike,
+  dstrike :     Boolean;
+  disp :        Integer;
+  adj :         Integer;
+  i, dl :       Integer;
+  s :           PBGRAPixel;
+  fi, bi :      Integer;
 begin
   ptr := @base[off];
 
@@ -299,49 +294,74 @@ begin
     bg := ANSIColor[bi];
   end;
 
+  // get faint foreground color
   if HasBits(attr, A_CELL_FAINT) then
     fg := Brighten(fg, -0.33);
 
+  // compute shadow color
   if shadow then
     sc := Brighten(bg, -0.33);
 
   // draw background.
-  bmp.FillRect(0,0,8,16,bg);
+  bmp.FillRect(0, 0, 8, 16, bg);
+
+  // draw the cell
   if not blink and (disp <> A_CELL_DISPLAY_CONCEAL) then
   begin
+
     for y := 0 to 15 do
     begin
-      bptr := bmp.ScanLine[y];
-      b := ptr^;
+      bptr := bmp.ScanLine[y];        // get ptr into bmp
+      if (y < 15) then
+      begin
+        sptr := bmp.ScanLine[y + 1];  // get ptr for shadow
+        sptr += 1;
+      end;
+
+      b := ptr^;                // get byte of character def
       inc(ptr);
 
+      // alter for underline, strikethrough, and doublestrike
       if underline and (y = 15) then              b := $ff;
       if strike    and (y = 7) then               b := $ff;
       if dstrike   and ((y = 3) or (y = 11)) then b := $ff;
 
+      // build bits
       for x := 0 to 7 do
       begin
-        if (b and $80) > 0 then
+        // if bit on at this x,y for this character
+        if (b and $80) <> 0 then
         begin
+          // shift top portion of bitmap 1 px right for italics
           adj := 0;
           if italics and (y < 8) then
             inc(adj);
 
+          // draw if on the bitmap
           if x + adj < 8 then
           begin
-            if shadow and (y > 0) and (x + adj < 7) then
-              bptr[adj - 7] := sc;
+            // draw shadow color bit first
+            if shadow and (x + adj < 7) and (y < 15) then
+              sptr[adj] := sc;
 
+//            if shadow and (y > 0) and (x + adj < 7) then
+//              bptr[adj - 7] := sc;
+
+            // draw character bit
             bptr[adj] := fg;
+
+            // repeat for bold
             if bold and (x + adj < 7) then
               bptr[adj + 1] := fg;
 
           end;
         end;
-        inc(bptr);
-        b := (b and $7F) << 1;
+        bptr += 1;
+        sptr += 1;
+        b := b << 1;
       end;
     end;
+
     // adjust for double height
     if disp = A_CELL_DISPLAY_TOP then
     begin
@@ -354,6 +374,7 @@ begin
         Move(s[0], bmp.ScanLine[dl + 1][0], 32);
       end;
     end
+
     else if disp = A_CELL_DISPLAY_BOTTOM then
     begin
       // stretch bottom half up over entire cell
@@ -365,6 +386,7 @@ begin
         Move(s[0], bmp.ScanLine[dl + 1][0], 32);
       end;
     end;
+
   end;
 end;
 

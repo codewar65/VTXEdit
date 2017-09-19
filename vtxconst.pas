@@ -51,6 +51,7 @@ type
   TCell = packed record
     Chr :               UInt16;     // unicode codepoint
     Attr :              UInt32;     // attributes
+    Neighbors :         Byte;
   end;
 
   PCell = ^TCell;
@@ -79,8 +80,8 @@ type
     utObjRemove,    // remove object
     utObjMove,      // move object r,c,z to r,c,z
     utObjMerge,     // Merge object to page
-    utTyped         // typed data from keyboard
-    );
+    utObjFlipHorz,
+    utObjFlipVert );
 
   // a single undo/redo item on undo 'stack'
   TUndoCells = packed record
@@ -236,7 +237,7 @@ const
   clPageBorder1 =       $00FF00;
   clPageBorder2 =       $008800;
 
-  BLANK : TCell = ( Chr: $20; Attr: $0007; );
+  BLANK : TCell = ( Chr: $20; Attr: $0007; Neighbors: %1111; );
 
   SauceID : array [1..5] of char = 'SAUCE';
 
@@ -7939,6 +7940,8 @@ const
   DRAG_NEW    = 0;
   DRAG_ADD    = 1;
   DRAG_REMOVE = 2;
+
+  UNDO_LEVELS = 50;
 
 implementation
 

@@ -35,13 +35,11 @@ UTF 8 nas no characters in the  128-191 range
 
   TODO :
 
-    save / load objects
-
-    save objects in vtx file
+    undo / redo
+      object manipulation (merge add remove)
+      page sizeing
 
     paste object to center of window
-
-    undo / redo painting and object manipulation
 
     row attributes
 
@@ -118,6 +116,7 @@ uses
   VTXSupport,
   VTXEncDetect,
   UnicodeHelper,
+  RecList,
   LazUTF8,
   Inifiles;
 
@@ -286,6 +285,10 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure SaveUndoKeys;
+    procedure ClearAllUndo;
+    procedure DoObjFlipHorz(objnum : integer);
+    procedure DoObjFlipVert(objnum : integer);
     procedure bObjHideOutlinesClick(Sender: TObject);
     procedure bObjMergeAllClick(Sender: TObject);
     function lvObjIndex(idx : integer) : integer;
@@ -298,6 +301,7 @@ type
     procedure miObjNextClick(Sender: TObject);
     procedure miObjPrevClick(Sender: TObject);
     procedure RemoveObject(objnum : integer);
+    procedure InsertObject(obj : TObj; pos : integer);
     procedure ObjFlipHorz;
     procedure ObjFlipVert;
     procedure ObjMoveBack;
@@ -338,7 +342,6 @@ type
     procedure SaveVTXFile(fname : string);
     procedure LoadVTXFile(fname : string);
     procedure pbCurrCellPaint(Sender: TObject);
-    procedure UpdatePreview;
     procedure DrawCellEx(
       cnv : TCanvas;
       x, y, row, col : integer;
@@ -426,11 +429,6 @@ type
   // save as native character. (not converted to unicode)
   TFKeySet = array [0..9] of byte;
 
-const
-  BlankCell : TCell = (
-    Chr:    _SPACE;
-    Attr:   7; );
-
 var
   fMain: TfMain;
 
@@ -504,8 +502,8 @@ var
   CopySelection :           TLocList;
   drag :                    boolean;    // in drag mode
   dragType :                integer;    // 0=select, 1=add, 2=remove
-  dragRow, dragCol :        integer;    // start of drag
-
+  dragRow, dragCol :        integer;    // drag delta
+  dragObjRow, dragObjCol :  integer;    // start pos of obj drag
 
   SkipScroll :              boolean;      // disable scroll to cursor
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
@@ -561,7 +559,6 @@ var
   cnv :         TCanvas;
   docell :      boolean;
   objnum :      integer;
-  neighbors :   byte;
   h1, h2,
   v1, v2 :      integer;
   i :           integer;
@@ -569,6 +566,7 @@ var
 begin
   if bmpPage <> nil then
   begin
+    cell := BLANK;
     BlinkFast := not BlinkFast;
     if BlinkFast then
     begin
@@ -592,7 +590,7 @@ begin
 
           docell := false;
 
-          objnum := GetObjectCell(r, c, cell, neighbors);
+          objnum := GetObjectCell(r, c, cell);
           if objnum = -1 then
             cell := Page.Rows[r].Cells[c];
 
@@ -605,7 +603,7 @@ begin
 
           if docell then
           begin
-            DrawCellEx(cnv, x, y, r, c, false, false, cell.chr, cell.attr);
+            DrawCellEx(cnv, x, y, r, c, true, false, cell.chr, cell.attr);
 
             // draw cursor over top if cursor location (if on page)
             if (CursorRow = r) and (CursorCol = c) and (objnum = -1) then
@@ -686,16 +684,16 @@ begin
                   cl2 := clUnselectedObject2;
                 end;
 
-                if not HasBits(neighbors, NEIGHBOR_NORTH) then
+                if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
                   DrawDashLine(cnv, x, y,
                     x + CellWidthZ - 1, y, cl1, cl2);
-                if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+                if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
                   DrawDashLine(cnv, x, y + CellHeightZ - 1,
                     x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
-                if not HasBits(neighbors, NEIGHBOR_WEST) then
+                if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
                   DrawDashLine(cnv, x, y,
                     x, y + CellHeightZ - 1, cl1, cl2);
-                if not HasBits(neighbors, NEIGHBOR_EAST) then
+                if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
                   DrawDashLine(cnv, x + CellWidthZ - 1, y,
                     x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
               end;
@@ -735,7 +733,7 @@ begin
     begin
       setlength(Page.Rows[i].Cells, NumCols);
       for j := c to NumCols - 1 do
-        Page.Rows[i].Cells[j] := BlankCell;
+        Page.Rows[i].Cells[j] := BLANK;
     end;
   end;
 end;
@@ -824,9 +822,6 @@ begin
   SubXSize := 1;
   SubYSize := 1;
 
-  LoadSettings;
-  NewFile;
-
   for cp := encCP437 to encUTF16 do
   begin
     // interigate for drawmodes
@@ -873,10 +868,15 @@ begin
 //  Fonts[11] := encTeletextBlock;
 //  Fonts[12] := encTeletextSeparated;
 
+  LoadSettings;
+  NewFile;
+
   CurrFont := 0;
   CurrCodePage := Fonts[CurrFont];
+  cbCodePage.enabled := false;
   cbCodePage.ItemIndex := ord(CurrCodePage);
-  CodePageChange;
+  //CodePageChange;
+  cbCodePage.enabled := true;
   tbFont0.Down := true;
   BuildCharacterPalette;
   seCharacter.Value := CurrChar;
@@ -928,9 +928,9 @@ procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   SaveSettings;
   fPreviewBox.Hide;
+  fPreviewBox.Free;
   bmpPage.Free;
   bmpPreview.Free;
-  fPreviewBox.Free;
   if bmpCharPalette <> nil then bmpCharPalette.Free;
   setlength(CopySelection, 0);
 end;
@@ -938,14 +938,18 @@ end;
 // create new bmpPage of page at zoom 1
 procedure TfMain.GenerateBmpPage;
 var
-  row, col, x, y : integer;
-  ch : integer;
-  cp : TEncoding;
-  attr : Uint32;
-  off : integer;
-  bmp : TBGRABitmap;
-  w, h : integer;
+  row, col,
+  x, y :    integer;
+  ch :      integer;
+  cp :      TEncoding;
+  attr :    Uint32;
+  off :     integer;
+  bmp :     TBGRABitmap;
+  w, h :    integer;
+  prevstat : boolean;
+  rt, rl, rw, rh : integer;
 begin
+
   // create new
   w := NumCols * CellWidth;
   h := NumRows * CellHeight;
@@ -955,19 +959,25 @@ begin
   begin
     if (bmpPage.Width <> w) or (bmpPage.Height <> h) then
     begin
+      // different size. create new
       bmpPage.Free;
       bmpPage := TBGRABitmap.Create(w, h);
     end
     else
+      // same size, just clear old.
       bmpPage.FillRect(0,0,w,h,clBlack);
   end
   else
+    // create
     bmpPage := TBGRABitmap.Create(w, h);
 
   if bmpPreview <> nil then
     bmpPreview.Free;
 
+  // create mini bmp for character cells
   bmp := TBGRABitmap.Create(CellWidth, CellHeight);
+
+  // draw it.
   y := 0;
   for row := 0 to NumRows - 1 do
   begin
@@ -978,7 +988,7 @@ begin
       ch := Page.Rows[row].Cells[col].Chr;
       attr := Page.Rows[row].Cells[col].Attr;
 
-      // get codepage for this ch
+      // get codepage / offset for this ch
       cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
       if cp in [ encUTF8, encUTF16 ] then
         off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
@@ -989,7 +999,8 @@ begin
       end;
 
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      bmpPage.Canvas.Draw(x, y, bmp.Bitmap);
+      bmp.Draw(bmpPage.Canvas, x, y);
+//      bmpPage.Canvas.Draw(x, y, bmp.Bitmap);
 
       x += CellWidth;
     end;
@@ -997,14 +1008,10 @@ begin
     y += CellHeight;
   end;
   bmp.free;
-{$ifdef WINDOWS}
   bmpPage.ResampleFilter := rfMitchell;
   bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2) as TBGRABitmap;
-{$else}
-  bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2, rmSimpleStretch) as TBGRABitmap;
-{$endif}
 
-  UpdatePreview;
+  fPreviewBox.Invalidate;
 
 end;
 
@@ -1472,7 +1479,7 @@ begin
   CellWidthZ := floor(CellWidth * PageZoom * XScale);
   CellHeightZ := floor(CellHeight * PageZoom);
   ResizeScrolls;
-  UpdatePreview;
+  fPreviewBox.Invalidate;
 end;
 
 procedure CopyObject(objin : TObj; var objout : TObj);
@@ -1602,8 +1609,17 @@ begin
       end;
 
     KA_CURSORNEWLINE:       CursorNewLine;
-    KA_CURSORFORWARDTAB:    CursorForwardTab;
-    KA_CURSORBACKWARDTAB:   CursorBackwardTab;
+    KA_CURSORFORWARDTAB:
+      begin
+        SaveUndoKeys;
+        CursorForwardTab;
+      end;
+
+    KA_CURSORBACKWARDTAB:
+      begin
+        SaveUndoKeys;
+        CursorBackwardTab;
+      end;
 
     KA_CURSORBACK:
       begin
@@ -1699,34 +1715,41 @@ begin
     KA_FILEEXIT:  Close;
 
     KA_EDITREDO:
-      if UndoPos < Undo.Count then
       begin
-        RedoPerform(UndoPos);
-        UndoPos += 1;
+        SaveUndoKeys;
+        if UndoPos < Undo.Count then
+        begin
+          RedoPerform(UndoPos);
+          UndoPos += 1;
+        end;
       end;
 
     KA_EDITUNDO:
-      if UndoPos > 0 then
       begin
-        // only if there is some undo to be done.
-        UndoPerform(UndoPos - 1);
-        UndoPos -= 1;
+        SaveUndoKeys;
+        if UndoPos > 0 then
+        begin
+          // only if there is some undo to be done.
+          UndoPerform(UndoPos - 1);
+          UndoPos -= 1;
+        end;
       end;
 
     KA_EDITCUT:
       // copy selection or object to clipboard, removing the thing
       begin
-      if SelectedObject >= 0 then
-      begin
-        setlength(ClipBoard.Data, 0);
-        CopyObject(Objects[SelectedObject], Clipboard);
-        RemoveObject(SelectedObject);
-        LoadlvObjects;
-        SelectedObject := -1;
-        lvObjects.ItemIndex := lvObjIndex(selectedObject);
-        pbPage.Invalidate;
-      end
-      else if length(CopySelection) > 0 then
+        SaveUndoKeys;
+        if SelectedObject >= 0 then
+        begin
+          setlength(ClipBoard.Data, 0);
+          CopyObject(Objects[SelectedObject], Clipboard);
+          RemoveObject(SelectedObject);
+          LoadlvObjects;
+          SelectedObject := -1;
+          lvObjects.ItemIndex := lvObjIndex(selectedObject);
+          pbPage.Invalidate;
+        end
+        else if length(CopySelection) > 0 then
         begin
           Clipboard := CopySelectionToObject;
           for i := 0 to length(CopySelection) - 1 do
@@ -1742,13 +1765,14 @@ begin
     KA_EDITCOPY:
       // copy selection or object to clipboard.
       begin
-      if SelectedObject >= 0 then
-      begin
-        // copy object to clipboard
-        setlength(ClipBoard.Data, 0);
-        CopyObject(Objects[SelectedObject], Clipboard);
-      end
-      else if length(CopySelection) > 0 then
+        SaveUndoKeys;
+        if SelectedObject >= 0 then
+        begin
+          // copy object to clipboard
+          setlength(ClipBoard.Data, 0);
+          CopyObject(Objects[SelectedObject], Clipboard);
+        end
+        else if length(CopySelection) > 0 then
         begin
           Clipboard := CopySelectionToObject;
         end;
@@ -1757,12 +1781,14 @@ begin
     KA_EDITPASTE:
       // paste clipboard contents as new object.
       begin
+        SaveUndoKeys;
         if (Clipboard.Width > 0) and (Clipboard.Height > 0) then
         begin
           // paste as new object.
           l := length(Objects);
           setlength(Objects, l + 1);
           CopyObject(Clipboard, Objects[l]);
+
           // drop it onto window. top left for now
           Objects[l].Row := PageTop;
           Objects[l].Col := PageLeft;
@@ -1770,6 +1796,7 @@ begin
           SelectedObject := l;
           lvObjects.ItemIndex := lvObjIndex(SelectedObject);
           pbPage.Invalidate;
+          fPreviewBox.Invalidate;
         end;
       end;
 
@@ -1786,6 +1813,7 @@ begin
 
     KA_DELETE:
       begin
+        SaveUndoKeys;
         if ToolMode = tmSelect then
         begin
           if SelectedObject >= 0 then
@@ -1807,7 +1835,7 @@ begin
             begin
               r := CopySelection[i].Row;
               c := CopySelection[i].Col;
-              Page.Rows[r].Cells[c] := BlankCell;
+              Page.Rows[r].Cells[c] := BLANK;
               DrawCell(r, c, false);
             end;
             setlength(CopySelection, 0);
@@ -1840,7 +1868,7 @@ begin
           '0':  fPreviewBox.Hide;
           '1':  fPreviewBox.Show;
           else
-            fPreviewBox.Visible:=not fPreviewBox.Visible;
+           fPreviewBox.Visible:=not fPreviewBox.Visible;
         end;
       end;
 
@@ -1863,6 +1891,10 @@ begin
 
   if Between(Key, ' ', '~') then
   begin
+    // break on spaces
+    if Key = ' ' then
+      SaveUndoKeys;
+
     PutChar(ord(Key));
     ScrollToCursor;
     Key := #0;
@@ -1879,7 +1911,7 @@ begin
   if CursorCol >= NumCols then
   begin
     CursorCol := 0;
-    Inc(CursorRow);
+    CursorRow += 1;
     if CursorRow >= NumRows then
     begin
       seRows.Value := CursorRow + 1;
@@ -1890,13 +1922,14 @@ begin
   UpdateTitles;
 end;
 
-
 procedure TfMain.PutCharEx(ch, cattr, row, col : integer);
 var
   attr, mask : UInt32;
 begin
 //  ScrollToCursor; // keep cursor on screen if typing
 
+  // tags on attribute buttons used to mark if attribute is to be
+  // ignored.
   if tbAttrCharacter.Tag = 0 then     Page.Rows[row].Cells[col].Chr := ch;
 
   // build attribute Mask
@@ -1918,22 +1951,31 @@ begin
   or (tbAttrTop.Tag = 0)
   or (tbAttrBottom.Tag = 0) then      mask := mask or A_CELL_DISPLAY_MASK;
 
-  attr := Page.Rows[row].Cells[col].Attr;
+//  attr := Page.Rows[row].Cells[col].Attr;
+  attr := cattr;
   attr := attr and (not mask);
   attr := attr or (cattr and mask);
   Page.Rows[row].Cells[col].Attr := attr;
   DrawCell(row, col, false);
+
   CurrFileChanged := true;
   UpdateTitles;
 end;
 
+// called from keypress or Print in keybinds
 procedure TfMain.PutChar(ch : integer);
 var
-  attr, mask : UInt32;
+  attr,
+  mask :    UInt32;
+  cell :    TCell;
 begin
 //  ScrollToCursor; // keep cursor on screen if typing
 
-  if tbAttrCharacter.Tag = 0 then     Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
+
+
+
+  if tbAttrCharacter.Tag <> 0 then
+    ch := Page.Rows[CursorRow].Cells[CursorCol].Chr;
 
   // build attribute Mask
   mask := $00000000;
@@ -1951,14 +1993,19 @@ begin
   if tbAttrShadow.Tag = 0 then        mask := mask or A_CELL_SHADOW;
 
   if (tbAttrConceal.Tag = 0)
-  or (tbAttrTop.Tag = 0)
-  or (tbAttrBottom.Tag = 0) then      mask := mask or A_CELL_DISPLAY_MASK;
+    or (tbAttrTop.Tag = 0)
+    or (tbAttrBottom.Tag = 0) then    mask := mask or A_CELL_DISPLAY_MASK;
 
   attr := Page.Rows[CursorRow].Cells[CursorCol].Attr;
   attr := attr and (not mask);
   attr := attr or (CurrAttr and mask);
+
+  cell.Chr := ch;
+  cell.Attr := attr;
+  RecordUndoCell(CursorRow, CursorCol, cell);
+
+  Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
   Page.Rows[CursorRow].Cells[CursorCol].Attr := attr;
-//  Page.Rows[CursorRow].Cells[CursorCol].Attr := CurrAttr;
 
   DrawCell(CursorRow, CursorCol, false);
   CursorRight;
@@ -2031,8 +2078,9 @@ begin
           end;
       end;
       Page.Rows[r].Cells[c].Attr := attr;
-      DrawCell(r, c, false);
+//      DrawCell(r, c, false);
     end;
+  GenerateBmpPage;
   pbPage.Invalidate;
 
   pbColors.Invalidate;
@@ -2171,7 +2219,7 @@ begin
     cnv.Draw(r.left, 4, bmp.Bitmap);
     r.left += 12;
   end;
-  bmp.Free();
+  bmp.Free;
 
 end;
 
@@ -2193,7 +2241,9 @@ end;
 
 procedure TfMain.NewFile;
 var
-  r, c : integer;
+  i :       integer;
+  r, c :    integer;
+  undoblk : TUndoBlock;
 begin
   // truncate page
   for r := 0 to length(Page.Rows) - 1 do
@@ -2214,7 +2264,7 @@ begin
   setlength(Page.Rows, NumRows);
   for r := 0 to NumRows - 1 do
     for c := 0 to NumCols - 1 do
-      Page.Rows[r].Cells[c] := BlankCell;
+      Page.Rows[r].Cells[c] := BLANK;
   FillByte(Page.Sauce, sizeof(TSauceHeader), 0);
   CurrFileName := 'Untitled.vtx';
   CurrFileChanged := false;
@@ -2226,8 +2276,19 @@ begin
   GenerateBmpPage;
   UpdateTitles;
 
+  // clear selection
   setlength(CopySelection, 0);
-  pbPage.Invalidate();
+
+  // clear any UndoData left over.
+  ClearAllUndo;
+
+  // delete objects
+  for i := 0 to length(Objects) - 1 do
+    setlength(Objects[i].Data, 0);
+  setlength(Objects, 0);
+  LoadlvObjects;
+  pbPage.Invalidate;
+  fPreviewBox.Invalidate;
 end;
 
 procedure TfMain.miFileNewClick(Sender: TObject);
@@ -3253,8 +3314,8 @@ var
     SkipScroll := true;
     CursorRow := 0;
     CursorCol := 0;
-    CurrAttr := BlankCell.Attr;
-    CurrChar := BlankCell.Chr;
+    CurrAttr := BLANK.Attr;
+    CurrChar := BLANK.Chr;
     state := 0;
 
     for i := bomskip to charslen - 1 do
@@ -3526,19 +3587,19 @@ var
                 0:  // end of screen
                   begin
                     for k := CursorCol to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BlankCell;
+                      Page.Rows[CursorRow].Cells[k] := BLANK;
                     for j := CursorRow + 1 to NumRows - 1 do
                       for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BlankCell;
+                        Page.Rows[j].Cells[k] := BLANK;
                   end;
 
                 1:  // start of screen
                   begin
                     for k := 0 to CursorCol do
-                      Page.Rows[CursorRow].Cells[k] := BlankCell;
+                      Page.Rows[CursorRow].Cells[k] := BLANK;
                     for j := 0 to CursorRow - 1 do
                       for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BlankCell;
+                        Page.Rows[j].Cells[k] := BLANK;
                   end;
 
                 2:  // all
@@ -3547,7 +3608,7 @@ var
                     CursorCol := 0;
                     for j := 0 to NumRows - 1 do
                       for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BlankCell;
+                        Page.Rows[j].Cells[k] := BLANK;
                   end;
               end;
             end;
@@ -3558,19 +3619,19 @@ var
                 0:  // end of line
                   begin
                     for k := CursorCol to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BlankCell;
+                      Page.Rows[CursorRow].Cells[k] := BLANK;
                   end;
 
                 1:  // start of line
                   begin
                     for k := 0 to CursorCol do
-                      Page.Rows[CursorRow].Cells[k] := BlankCell;
+                      Page.Rows[CursorRow].Cells[k] := BLANK;
                   end;
 
                 2:  // all
                   begin
                     for k := 0 to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BlankCell;
+                      Page.Rows[CursorRow].Cells[k] := BLANK;
                   end;
               end;
             end;
@@ -3770,7 +3831,6 @@ var
           '|':  ;
           '}':  ;
           '~':  ;
-
         end;
       end;
 
@@ -3889,6 +3949,17 @@ begin
   end
   else if dragObj then
   begin
+    // move object (dragrow/dragcol = initial pos)
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := dragObjRow;
+    undoblk.OldCol := dragObjCol;
+    undoblk.OldNum := SelectedObject;
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
     dragObj := false;
     fPreviewBox.Invalidate;
   end
@@ -3923,11 +3994,9 @@ begin
       if PageZoom > 16 then
         PageZoom := 16;
     end;
+    // don't allow 0's for cellwidthz
     if floor(CellWidth * PageZoom * XScale) = 0 then
-    begin
-      // don't allow 0's for cellwidthz
       PageZoom *= 2;
-    end;
 
     CellWidthZ := floor(CellWidth * PageZoom * XScale);
     CellHeightZ := floor(CellHeight * PageZoom);
@@ -3966,6 +4035,20 @@ begin
     DrawCell(LastDrawRow, LastDrawCol);
 end;
 
+procedure TfMain.SaveUndoKeys;
+var
+  undoblk : TUndoBlock;
+begin
+  if CurrUndoData.Count > 0 then
+  begin
+    // save key presses.
+    undoblk.UndoType := utCells;
+    undoblk.CellData := CurrUndoData.Copy;
+    UndoAdd(undoblk);
+    CurrUndoData.Clear;
+  end;
+end;
+
 procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
@@ -3996,6 +4079,9 @@ begin
   end
   else
   begin
+
+    SaveUndoKeys;
+
     case ToolMode of
       tmSelect:
         begin
@@ -4016,6 +4102,8 @@ begin
           begin
             if not Objects[SelectedObject].Locked then
             begin
+              dragObjRow := Objects[SelectedObject].Row;
+              dragObjCol := Objects[SelectedObject].Col;
               dragRow := MouseRow - Objects[SelectedObject].Row; // save delta
               dragCol := MouseCol - Objects[SelectedObject].Col;
               dragObj := true;
@@ -4087,8 +4175,8 @@ begin
                 begin
                   dcell.Chr := iif(Button = mbLeft, CurrChar, $20);
                   dcell.Attr := iif(Button = mbLeft, CurrAttr, $0007);
-                  CurrUndoData.Clear;
                   RecordUndoCell(MouseRow, MouseCol, dcell);
+
                   PutCharEx(dcell.Chr, dcell.Attr, MouseRow, MouseCol);
                 end;
 
@@ -4102,8 +4190,6 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 1, SubX, SubY);
-
-                  CurrUndoData.Clear;
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -4122,8 +4208,6 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     1, 2, SubX, SubY);
-
-                  CurrUndoData.Clear;
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -4142,8 +4226,6 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 2, SubX, SubY);
-
-                  CurrUndoData.Clear;
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -4227,7 +4309,7 @@ begin
     if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
       dragType := DRAG_ADD;
 
-    pbPage.Invalidate();
+    pbPage.Invalidate;
   end
   else if dragObj then
   begin
@@ -4254,9 +4336,7 @@ begin
                     LineCalcInit(LastDrawX, LastDrawY, DrawX, DrawY);
                     repeat
                       done := LineCalcNext(LastDrawX, LastDrawY);
-
                       RecordUndoCell(LastDrawY, LastDrawX, dcell);
-
                       PutCharEx(dcell.Chr, dcell.Attr, LastDrawY, LastDrawX);
                     until done;
                   end;
@@ -4280,7 +4360,6 @@ begin
                         2, 1, sx, sy);
 
                       RecordUndoCell(mr, mc, dcell);
-
                       Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
                       CurrFileChanged := true;
@@ -4307,7 +4386,6 @@ begin
                         1, 2, sx, sy);
 
                       RecordUndoCell(mr, mc, dcell);
-
                       Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
                       CurrFileChanged := true;
@@ -4334,7 +4412,6 @@ begin
                         2, 2, sx, sy);
 
                       RecordUndoCell(mr, mc, dcell);
-
                       Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc,false);
                       CurrFileChanged := true;
@@ -4390,14 +4467,14 @@ begin
   end;
 end;
 
-// draw a cell on screen from object or Page.Rows[].Cells[].
+// draw a cell on screen from object on Page.Rows[].Cells[].
+// THIS ROUTINE IS TOOOOOOOOO SLOW!
 procedure TfMain.DrawCell(row, col : integer; skipUpdate : boolean = true);
 var
   cnv :       TCanvas;
   x, y :      integer;
   cell :      TCell;
   objnum :    integer;
-  neighbors : byte;
   cl1, cl2 :  TColor;
   i : integer;
 begin
@@ -4408,7 +4485,7 @@ begin
   if Between(x, 0, pbPage.Width + CellWidthZ)
     and Between(y, 0, pbPage.Height + CellHeightZ) then
   begin
-    objnum := GetObjectCell(row, col, cell, neighbors);
+    objnum := GetObjectCell(row, col, cell);
     if (objnum = -1) then
     begin
       DrawCellEx(cnv, x, y, row, col, skipUpdate);
@@ -4446,6 +4523,7 @@ begin
     end
     else
     begin
+      // prevent stamping object onto bmp
       if not skipupdate then
         cell := Page.Rows[row].Cells[col];
 
@@ -4465,16 +4543,16 @@ begin
           cl2 := clUnselectedObject2;
         end;
 
-        if not HasBits(neighbors, NEIGHBOR_NORTH) then
+        if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
           DrawDashLine(cnv, x, y, x + CellWidthZ, y, cl1, cl2);
 
-        if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+        if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
           DrawDashLine(cnv, x, y + CellHeightZ - 1, x + CellWidthZ, y + CellHeightZ - 1, cl1, cl2);
 
-        if not HasBits(neighbors, NEIGHBOR_WEST) then
+        if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
           DrawDashLine(cnv, x, y, x, y + CellHeightZ, cl1, cl2);
 
-        if not HasBits(neighbors, NEIGHBOR_EAST) then
+        if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
           DrawDashLine(cnv, x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ, cl1, cl2);
       end;
     end;
@@ -4542,6 +4620,7 @@ var
   maxr, maxc,
   minr, minc :  integer;
   p :           integer;
+  n :           byte;
 begin
   // get bounding box of copy selection
   l := length(CopySelection);
@@ -4577,7 +4656,28 @@ begin
     r := CopySelection[i].Row;
     c := CopySelection[i].Col;
     p := ((r - minr) * w) + (c - minc);
-    result.Data[p] := Page.Rows[r].Cells[c];
+    result.Data[p].Chr := Page.Rows[r].Cells[c].Chr;
+    result.Data[p].Attr := Page.Rows[r].Cells[c].Attr;
+  end;
+
+  // populate the neighbors in cells
+  p := 0;
+  for r := 0 to h - 1 do
+  begin
+    for c := 0 to w - 1 do
+    begin
+      n := 0;
+      if (r > 0) and (result.Data[p - w].Chr <> EMPTYCHAR) then
+        n := n or NEIGHBOR_NORTH;
+      if (r < h - 1) and (result.Data[p + w].Chr <> EMPTYCHAR) then
+        n := n or NEIGHBOR_SOUTH;
+      if (c > 0) and (result.Data[p - 1].Chr <> EMPTYCHAR) then
+        n := n or NEIGHBOR_WEST;
+      if (c < w - 1) and (result.Data[p + 1].Chr <> EMPTYCHAR) then
+        n := n or NEIGHBOR_EAST;
+      result.Data[p].Neighbors:=n;
+      p += 1;
+    end;
   end;
 
   // normalize : make ul of bounding box 0,0 for object
@@ -4655,77 +4755,23 @@ var
   rr, cc : integer;
 begin
   if objnum >= 0 then
+  begin
+    rr := Objects[objnum].Row;
     for r := Objects[objnum].Height - 1 downto 0 do
+    begin
+      cc := Objects[objnum].Col;
       for c := Objects[objnum].Width - 1 downto 0 do
       begin
-        rr := Objects[objnum].Row + r;
-        cc := Objects[objnum].Col + c;
         if between(rr, 0, NumRows - 1) and between(cc, 0, NumCols - 1) then
           DrawCell(rr, cc);
+        cc += 1;
       end;
-end;
-
-procedure TfMain.ObjFlipHorz;
-var
-  po :            PObj;
-  i, j, r, c :    integer;
-  p1, p2 :        integer;
-  tmp :           TCell;
-  fnt :           integer;
-  cp :            TEncoding;
-  chr, flipchr :  integer;
-begin
-  if SelectedObject >= 0 then
-  begin
-    po := @Objects[SelectedObject];
-    for r := 0 to po^.Height - 1 do
-    begin
-      // flip this rows character positions
-      for c := 1 to po^.Width div 2 do
-      begin
-        p1 := (r * po^.Width) + (c - 1);
-        p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
-        tmp := po^.Data[p1];
-        po^.Data[p1] := po^.Data[p2];
-        po^.Data[p2] := tmp;
-      end;
-      //  flip the characters in the row if we can
-      for c := 0 to po^.Width - 1 do
-      begin
-        p1 := (r * po^.Width) + c;
-
-        // get encoding number for this character
-        fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
-        cp := Fonts[fnt];
-
-        chr := GetUnicode(po^.Data[p1]);
-        i := 0;
-        while i < CPages[cp].MirrorTableSize do
-        begin
-          if CPages[cp].MirrorTable[i] = chr then
-          begin
-            flipchr := CPages[cp].MirrorTable[i + 1];
-            // convert flip unicode back to this codepage
-            if CurrCodePage in [ encUTF8, encUTF16] then
-              po^.Data[p1].Chr := flipchr
-            else
-              for j := 0 to 255 do
-                if flipchr = CPages[cp].EncodingLUT[j] then
-                begin
-                  po^.Data[p1].Chr := j;
-                  break;
-                end;
-            break;
-          end;
-          i += 3;
-        end;
-      end;
+      rr += 1;
     end;
-    pbPage.Invalidate;
   end;
 end;
 
-procedure TfMain.ObjFlipVert;
+procedure TfMain.DoObjFlipHorz(objnum : integer);
 var
   po :            PObj;
   i, j, r, c :    integer;
@@ -4734,60 +4780,174 @@ var
   fnt :           integer;
   cp :            TEncoding;
   chr, flipchr :  integer;
+  n :             byte;
 begin
-  if SelectedObject >= 0 then
+  po := @Objects[objnum];
+
+  for r := 0 to po^.Height - 1 do
   begin
-    po := @Objects[SelectedObject];
+    // flip this rows character positions
+
+    for c := 1 to po^.Width div 2 do
+    begin
+      p1 := (r * po^.Width) + (c - 1);
+      p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
+      tmp := po^.Data[p1];
+      po^.Data[p1] := po^.Data[p2];
+      po^.Data[p2] := tmp;
+    end;
+
+    //  flip the characters in the row if we can, plus neighbors
+    p1 := (r * po^.Width);
     for c := 0 to po^.Width - 1 do
     begin
-      // flip this rows character positions
-      for r := 1 to po^.Height div 2 do
-      begin
-        p1 := ((r - 1) * po^.Width) + c;
-        p2 := ((po^.Height - r) * po^.Width) + c;
-        tmp := po^.Data[p1];
-        po^.Data[p1] := po^.Data[p2];
-        po^.Data[p2] := tmp;
-      end;
-      //  flip the characters in the row if we can
-      for r := 0 to po^.Height - 1 do
-      begin
-        p1 := (r * po^.Width) + c;
 
-        // get encoding number for this character
-        fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
-        cp := Fonts[fnt];
-
-        chr := GetUnicode(po^.Data[p1]);
-        i := 0;
-        while i < CPages[cp].MirrorTableSize do
+      // get encoding for this character
+      fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+      cp := Fonts[fnt];
+      chr := GetUnicode(po^.Data[p1]);
+      i := 0;
+      while i < CPages[cp].MirrorTableSize do
+      begin
+        if CPages[cp].MirrorTable[i] = chr then
         begin
-          if CPages[cp].MirrorTable[i] = chr then
-          begin
-            flipchr := CPages[cp].MirrorTable[i + 2];
-            // convert flip unicode back to this codepage
+          flipchr := CPages[cp].MirrorTable[i + 1];
+
+          // convert flip unicode back to this codepage
+          if CurrCodePage in [ encUTF8, encUTF16] then
+            po^.Data[p1].Chr := flipchr
+          else
             for j := 0 to 255 do
               if flipchr = CPages[cp].EncodingLUT[j] then
               begin
                 po^.Data[p1].Chr := j;
                 break;
               end;
-            break;
-          end;
-          i += 3;
+          break;
         end;
+        i += 3;
       end;
+
+      n := po^.Data[p1].Neighbors;
+      po^.Data[p1].Neighbors :=
+        (n and %0101) or ((n and %1000) >> 2) or ((n and %0010) << 2);
+
+      p1 += 1;
     end;
+
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.DoObjFlipVert(objnum : integer);
+var
+  po :            PObj;
+  i, j, r, c :    integer;
+  p1, p2 :        integer;
+  tmp :           TCell;
+  fnt :           integer;
+  cp :            TEncoding;
+  chr, flipchr :  integer;
+  n :             byte;
+begin
+  po := @Objects[objnum];
+  for c := 0 to po^.Width - 1 do
+  begin
+
+    // flip this rows character positions
+    for r := 1 to po^.Height div 2 do
+    begin
+      p1 := ((r - 1) * po^.Width) + c;
+      p2 := ((po^.Height - r) * po^.Width) + c;
+      tmp := po^.Data[p1];
+      po^.Data[p1] := po^.Data[p2];
+      po^.Data[p2] := tmp;
+    end;
+
+    //  flip the characters in the row if we can
+    p1 := c;
+    for r := 0 to po^.Height - 1 do
+    begin
+
+      // get encoding number for this character
+      fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+      cp := Fonts[fnt];
+        chr := GetUnicode(po^.Data[p1]);
+      i := 0;
+      while i < CPages[cp].MirrorTableSize do
+      begin
+        if CPages[cp].MirrorTable[i] = chr then
+        begin
+          flipchr := CPages[cp].MirrorTable[i + 2];
+
+          // convert flip unicode back to this codepage
+          for j := 0 to 255 do
+            if flipchr = CPages[cp].EncodingLUT[j] then
+            begin
+              po^.Data[p1].Chr := j;
+              break;
+            end;
+          break;
+        end;
+        i += 3;
+      end;
+
+      n := po^.Data[p1].Neighbors;
+      po^.Data[p1].Neighbors :=
+        (n and %1010) or ((n and %0100) >> 2) or ((n and %0001) << 2);
+
+      p1 += po^.Width;
+    end;
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjFlipHorz;
+var
+  undoblk : TUndoBlock;
+begin
+  if SelectedObject >= 0 then
+  begin
+    SaveUndoKeys;
+    DoObjFlipHorz(SelectedObject);
+    undoblk.UndoType:= utObjFlipHorz;
+    undoblk.OldNum := SelectedObject;
+    UndoAdd(undoblk);
+  end;
+end;
+
+procedure TfMain.ObjFlipVert;
+var
+  undoblk : TUndoBlock;
+begin
+  if SelectedObject >= 0 then
+  begin
+    SaveUndoKeys;
+    DoObjFlipVert(SelectedObject);
+    undoblk.UndoType:= utObjFlipHorz;
+    undoblk.OldNum := SelectedObject;
+    UndoAdd(undoblk);
   end;
 end;
 
 procedure TfMain.ObjMoveBack;
 var
-  tmp : TObj;
+  undoblk : TUndoBlock;
+  tmp :     TObj;
 begin
   if SelectedObject > 0 then
   begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
     // swap objects
     tmp := Objects[SelectedObject];
     Objects[SelectedObject] := Objects[SelectedObject - 1];
@@ -4795,16 +4955,31 @@ begin
     SelectedObject -= 1;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
 procedure TfMain.ObjMoveForward;
 var
-  tmp : TObj;
+  undoblk : TUndoBlock;
+  tmp :     TObj;
 begin
   if SelectedObject < length(Objects) - 1 then
   begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
     // swap objects
     tmp := Objects[SelectedObject];
     Objects[SelectedObject] := Objects[SelectedObject + 1];
@@ -4812,41 +4987,77 @@ begin
     SelectedObject += 1;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
 procedure TfMain.ObjMoveToBack;
 var
-  tmp : TObj;
+  undoblk : TUndoBlock;
+  tmp :     TObj;
 begin
   if SelectedObject > 0 then
   begin
-    tmp := Objects[0];
-    Objects[0] := Objects[SelectedObject];
-    Objects[SelectedObject] := tmp;
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    tmp := Objects[SelectedObject];
+    RemoveObject(SelectedObject);
+    InsertObject(tmp, 0);
     SelectedObject := 0;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
 procedure TfMain.ObjMoveToFront;
 var
-  l : integer;
-  tmp : TObj;
+  l :       integer;
+  tmp :     TObj;
+  undoblk : TUndoBlock;
 begin
   l := length(Objects);
   if SelectedObject < l - 1 then
   begin
-    tmp := Objects[l - 1];
-    Objects[l - 1] := Objects[SelectedObject];
-    Objects[SelectedObject] := tmp;
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    tmp := Objects[SelectedObject];
+    RemoveObject(SelectedObject);
+    InsertObject(tmp, l - 1);
     SelectedObject := l - 1;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
@@ -4857,6 +5068,17 @@ begin
   for i := objnum + 1 to length(Objects) - 1 do
     Objects[i - 1] := Objects[i];
   Setlength(Objects, length(Objects) - 1);
+end;
+
+procedure TfMain.InsertObject(obj : TObj; pos : integer);
+var
+  i, l : integer;
+begin
+  l := length(Objects);
+  Setlength(Objects, l + 1);
+  for i := l - 1 downto pos do
+    Objects[i + 1] := Objects[i];
+  Objects[pos] := obj;
 end;
 
 procedure TfMain.ObjMerge;
@@ -4886,6 +5108,7 @@ begin
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
@@ -4922,6 +5145,7 @@ begin
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     pbPage.Invalidate;
+    fPreviewBox.Invalidate;
   end;
 end;
 
@@ -5149,6 +5373,13 @@ begin
   nop;
 end;
 
+type
+  TRC = record
+    objnum :    integer;
+    neighbors : byte;
+    Row, Col :  integer;
+  end;
+
 // draw the document
 procedure TfMain.pbPagePaint(Sender: TObject);
 var
@@ -5158,13 +5389,21 @@ var
   pr :        TRect;
   tmp, tmp2 : TBGRABitmap;
   tmpreg :    TLocList;
-  i :         integer;
+  i, j :      integer;
   objonrow :  boolean;
   x, y :      integer;
   cell :      TCell;
   objnum :    integer;
   neighbors : byte;
   cl1, cl2 :  TColor;
+
+  Points :    TRecList; // of TRC
+  pt :        TRC;
+  p :         PCell;
+  r1, c1 :    integer;
+  pbot :      integer;
+  h, w :      integer;
+  hit : boolean;
 
 begin
   if bmpPage = nil then exit;
@@ -5205,11 +5444,7 @@ begin
     pr.Height := WindowRows * CellHeightZ;
 
   if PageZoom < 1 then
-{$ifdef WINDOWS}
     tmp2 := tmp.Resample(pr.Width, pr.Height, rmFineResample) as TBGRABitmap
-{$else}
-    tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap
-{$endif}
   else
     tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap;
 
@@ -5250,22 +5485,9 @@ begin
   setlength(tmpreg, 0);
 
   // draw objects over top
-  // from topmost to bottommost
   for r := PageTop to PageTop + WindowRows do
   begin
     if r >= NumRows then break;
-
-    // any objects on this row?
-    objonrow := false;
-    for i := length(Objects) - 1 downto 0 do
-      if (Objects[i].Row <= r) and (Objects[i].Row + Objects[i].Height > r) and (not Objects[i].Hidden) then
-      begin
-        objonrow := true;
-        break;
-      end;
-
-    if objonrow then
-    begin
 
       y := (r - PageTop) * CellHeightZ;
       for c := PageLeft to PageLeft + WindowCols do
@@ -5273,7 +5495,7 @@ begin
         if c >= NumCols then break;
 
         x := (c - PageLeft) * CellWidthZ;
-        objnum := GetObjectCell(r, c, cell, neighbors);
+        objnum := GetObjectCell(r, c, cell);
         if cell.Chr <> EMPTYCHAR then
         begin
           // object here.
@@ -5290,29 +5512,28 @@ begin
               cl1 := clUnselectedObject1;
               cl2 := clUnselectedObject2;
             end;
-            if not HasBits(neighbors, NEIGHBOR_NORTH) then
+            if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
               DrawDashLine(cnv,
                 x, y,
                 x + CellWidthZ, y,
                 cl1, cl2);
-            if not HasBits(neighbors, NEIGHBOR_SOUTH) then
+            if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
               DrawDashLine(cnv,
                 x, y + CellHeightZ - 1,
                 x + CellWidthZ, y + CellHeightZ - 1,
                 cl1, cl2);
-            if not HasBits(neighbors, NEIGHBOR_WEST) then
+            if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
               DrawDashLine(cnv,
                 x, y,
                 x, y + CellHeightZ,
                 cl1, cl2);
-            if not HasBits(neighbors, NEIGHBOR_EAST) then
+            if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
               DrawDashLine(cnv,
                 x + CellWidthZ - 1, y,
                 x + CellWidthZ - 1, y + CellHeightZ,
                 cl1, cl2);
           end;
         end;
-      end;
     end;
   end;
 
@@ -5322,14 +5543,6 @@ begin
   DrawDashLine(cnv, 0, r, pbPage.Width, r, clPageBorder1, clPageBorder2);
   DrawDashLine(cnv, c, 0, c, pbPage.Height, clPageBorder1, clPageBorder2);
 
-end;
-
-procedure TfMain.UpdatePreview;
-begin
-  // update the preview.
-  if Assigned(fPreviewBox) then
-    if fPreviewBox.Visible then
-      fPreviewBox.Invalidate;
 end;
 
 // draw the current cell preview
@@ -5618,7 +5831,7 @@ begin
       bmpPreview.Canvas.Draw(col * (CellWidth >> 2), row * (CellHeight >> 2), bmp2.Bitmap);
       bmp2.free;
 
-      UpdatePreview;
+      fPreviewBox.Invalidate;
 
       if bslow and not BlinkSlow then
       begin
@@ -6587,6 +6800,7 @@ var
   undocell :  TUndoCells;
   i :         integer;
   undoblk :   TUndoBlock;
+  tmpobj :    TObj;
 begin
   Undo.Get(PBYTE(@undoblk), pos);
   case undoblk.UndoType of
@@ -6596,11 +6810,50 @@ begin
         begin
           undoblk.CellData.Get(PBYTE(@undocell), i);
           Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
-          DrawCell(undocell.Row, undocell.Col, false);
         end;
+        GenerateBmpPage;
+        pbPage.Invalidate;
         CurrFileChanged := true;
       end;
+
+    utObjMove:
+      begin
+        // move from oldrow/col/num to newrow/col/num
+        if undoblk.OldNum <> undoblk.NewNum then
+        begin
+          // move forward / back
+          tmpobj := Objects[undoblk.NewNum];
+          RemoveObject(undoblk.NewNum);
+          InsertObject(tmpobj, undoblk.OldNum);
+        end;
+        if (undoblk.OldRow <> undoblk.NewRow)
+          or (undoblk.OldCol <> undoblk.NewCol) then
+        begin
+          Objects[undoblk.OldNum].Row := undoblk.OldRow;
+          Objects[undoblk.OldNum].Col := undoblk.OldCol;
+        end;
+        pbPage.Invalidate;
+      end;
+
+    utObjAdd:
+      ;
+    utObjRemove:
+      ;
+    utObjMerge:
+      ;
+
+    utObjFlipHorz:
+      begin
+        DoObjFlipHorz(undoblk.OldNum);
+      end;
+
+    utObjFlipVert:
+      begin
+        DoObjFlipVert(undoblk.OldNum);
+      end;
+
   end;
+  CurrFileChanged := true;
 end;
 
 // redo
@@ -6609,6 +6862,7 @@ var
   undocell :  TUndoCells;
   i :         integer;
   undoblk :   TUndoBlock;
+  tmpobj :    TObj;
 begin
   Undo.Get(PByte(@undoblk), pos);
   case undoblk.UndoType of
@@ -6618,10 +6872,76 @@ begin
         begin
           undoblk.CellData.Get(PBYTE(@undocell), i);
           Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
-          DrawCell(undocell.Row, undocell.Col, false);
         end;
+        GenerateBmpPage;
+        pbPage.Invalidate;
         CurrFileChanged := true;
       end;
+
+    utObjMove:
+      begin
+        // move from oldrow/col/num to newrow/col/num
+        if undoblk.OldNum <> undoblk.NewNum then
+        begin
+          // move forward / back
+          tmpobj := Objects[undoblk.OldNum];
+          RemoveObject(undoblk.OldNum);
+          InsertObject(tmpobj, undoblk.NewNum);
+        end;
+        if (undoblk.OldRow <> undoblk.NewRow)
+          or (undoblk.OldCol <> undoblk.NewCol) then
+        begin
+          Objects[undoblk.NewNum].Row := undoblk.NewRow;
+          Objects[undoblk.NewNum].Col := undoblk.NewCol;
+        end;
+        pbPage.Invalidate;
+      end;
+
+    utObjAdd:
+      ;
+
+    utObjRemove:
+      ;
+
+    utObjMerge:
+      ;
+
+    utObjFlipHorz:
+      begin
+        DoObjFlipHorz(undoblk.OldNum);
+      end;
+
+    utObjFlipVert:
+      begin
+        DoObjFlipVert(undoblk.OldNum);
+      end;
+
+  end;
+end;
+
+procedure TfMain.ClearAllUndo;
+var
+  i :       integer;
+  undoblk : TUndoBlock;
+begin
+  // clear any UndoData left over.
+  CurrUndoData.Clear;
+  for i := 0 to Undo.Count - 1 do
+  begin
+    Undo.Get(PBYTE(@undoblk), i);
+    case undoblk.UndoType of
+      utCells:
+        begin
+          undoblk.CellData.Free;
+        end;
+
+      utObjAdd,
+      utObjRemove,
+      utObjMerge:
+        begin
+          // zzzzzz these will have data needed to be freed
+        end;
+    end;
   end;
 end;
 

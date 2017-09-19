@@ -127,7 +127,7 @@ var
   objnum :          integer;
   neighbors :       byte;
 begin
-  if bmpPreview = nil then exit;
+  if (bmpPreview = nil) then exit;
 
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
@@ -139,21 +139,11 @@ begin
   for r := 0 to NumRows - 1do
   begin
     // any objects on this row?
-    objonrow := false;
-    for i := length(Objects) - 1 downto 0 do
-      if (Objects[i].Row <= r) and (Objects[i].Row + Objects[i].Height > r) and (not Objects[i].Hidden) then
-      begin
-        objonrow := true;
-        break;
-      end;
-
-    if objonrow then
-    begin
       y := (r << 2);
       for c := 0 to NumCols - 1 do
       begin
         x := floor((c << 1) * XScale);
-        objnum := GetObjectCell(r, c, cell, neighbors);
+        objnum := GetObjectCell(r, c, cell);
         if (objnum >= 0) and (not Objects[objnum].Hidden) then
           if cell.Chr <> EMPTYCHAR then
           begin
@@ -173,10 +163,8 @@ begin
             bmp2.free;
           end;
       end;
-    end;
   end;
   bmp.free;
-
 end;
 
 procedure TfPreview.FormShow(Sender: TObject);
