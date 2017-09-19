@@ -1520,6 +1520,8 @@ var
   unk :         boolean;
   found :       boolean;
   copyrec :     TLoc;
+  pagebottom,
+  pageright :   integer;
 begin
 
   // let system handle these controls
@@ -1800,8 +1802,12 @@ begin
           CopyObject(Clipboard, Objects[l]);
 
           // drop it onto window. top left for now
-          Objects[l].Row := PageTop;
-          Objects[l].Col := PageLeft;
+          pagebottom := min(PageTop + WindowRows, NumRows);
+          pageright := min(PageLeft + WindowCols, NumCols);
+
+          Objects[l].Row := ((pagebottom + PageTop) >> 1) - (Objects[l].Height >> 1);
+          Objects[l].Col := ((pageright + PageLeft) >> 1) - (Objects[l].Width >> 1);
+
           LoadlvObjects;
           SelectedObject := l;
           lvObjects.ItemIndex := lvObjIndex(SelectedObject);
@@ -3298,7 +3304,7 @@ var
       if length(buff) > 128 then
       begin
         MemCopy(@buff[length(buff)-128], @Sauce, 128);
-        ValidSauce := CompareMem(@Sauce.ID, @SauceID, 5);
+        ValidSauce := MemComp(@Sauce.ID, @SauceID, 5);
         if ValidSauce then
         begin
           Page.Sauce := Sauce;
@@ -3992,11 +3998,14 @@ end;
 procedure TfMain.pbPageMouseWheel(Sender: TObject; Shift: TShiftState;
   WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
 var
-  val : integer;
+  val :       integer;
+  PrevZoom :  double;
+  NewWindowCols, NewWindowRows : integer;
 begin
   // zoom
   if ssShift in Shift then
   begin
+    PrevZoom := PageZoom;
     if WheelDelta < 0 then
     begin
       PageZoom /= 2;
@@ -4009,12 +4018,24 @@ begin
       if PageZoom > 16 then
         PageZoom := 16;
     end;
+
     // don't allow 0's for cellwidthz
     if floor(CellWidth * PageZoom * XScale) = 0 then
       PageZoom *= 2;
 
+
     CellWidthZ := floor(CellWidth * PageZoom * XScale);
     CellHeightZ := floor(CellHeight * PageZoom);
+
+    NewWindowCols := (pbPage.Width div CellWidthZ) + 1;
+    NewWindowRows := (pbPage.Height div CellHeightZ) + 1;
+
+    // adjust pagetop / pageleft so centered on mousepos
+    PageLeft := MouseCol - (NewWindowCols >> 1);
+    PageTop := MouseRow - (NewWindowRows >> 1);
+    sbHorz.Position:=PageLeft;
+    sbVert.Position:=PageTop;
+
 
     ResizeScrolls;
   end
@@ -5276,7 +5297,7 @@ begin
 
     fin.Read(head, sizeof(TVTXObjHeader));
 
-    if CompareByte(ID, head.ID, 7) <> 0 then
+    if not MemComp(@ID[0], @head.ID, 7) then
     begin
       ShowMessage('Bad Header.');
       fin.Free;
