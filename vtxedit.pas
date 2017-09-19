@@ -6926,23 +6926,8 @@ var
 begin
   // clear any UndoData left over.
   CurrUndoData.Clear;
-  for i := 0 to Undo.Count - 1 do
-  begin
-    Undo.Get(PBYTE(@undoblk), i);
-    case undoblk.UndoType of
-      utCells:
-        begin
-          undoblk.CellData.Free;
-        end;
-
-      utObjAdd,
-      utObjRemove,
-      utObjMerge:
-        begin
-          // zzzzzz these will have data needed to be freed
-        end;
-    end;
-  end;
+  UndoTruncate(0);
+  UndoPos:=0;
 end;
 
 procedure nop; begin end;
