@@ -106,9 +106,6 @@ type
     Row, Col :          int16;
   end;
 
-  // copy selection area
-  TLocList = array of TLoc;
-
   // http://www.acid.org/info/sauce/sauce.htm
   TSauceHeader = packed record
     ID:             array [1..5] of char;   // "SAUCE"

@@ -118,6 +118,7 @@ uses
   UnicodeHelper,
   RecList,
   LazUTF8,
+  Memory,
   Inifiles;
 
 // used for version
@@ -324,7 +325,7 @@ type
     procedure LoadlvObjects;
     function CopySelectionToObject : TObj;
     procedure BuildCharacterPalette;
-    function BuildDisplayCopySelection : TLocList;
+    function BuildDisplayCopySelection : TRecList;
     procedure lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem; ARect: TRect; AState: TOwnerDrawState);
     procedure lvObjectsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -499,7 +500,7 @@ var
   Clipboard :               TObj;
 
   // region selection
-  CopySelection :           TLocList;
+  CopySelection :           TRecList;
   drag :                    boolean;    // in drag mode
   dragType :                integer;    // 0=select, 1=add, 2=remove
   dragRow, dragCol :        integer;    // drag delta
@@ -563,6 +564,7 @@ var
   v1, v2 :      integer;
   i :           integer;
   cl1, cl2 :    TColor;
+  copyrec :     TLoc;
 begin
   if bmpPage <> nil then
   begin
@@ -610,29 +612,30 @@ begin
             begin
 
               // draw selection border
-              for i := length(CopySelection)-1 downto 0 do
+              for i := CopySelection.Count - 1 downto 0 do
               begin
-                if (CopySelection[i].Row = r) and (CopySelection[i].Col = c) then
+                CopySelection.Get(@copyrec, i);
+                if (copyrec.Row = r) and (copyrec.Col = c) then
                 begin
-                  if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_NORTH) then
+                  if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
                     DrawDashLine(cnv,
                       x, y,
                       x + CellWidthZ, y,
                       clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_SOUTH) then
+                  if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
                     DrawDashLine(cnv,
                       x, y + CellHeightZ - 1,
                       x + CellWidthZ, y + CellHeightZ - 1,
                       clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_WEST) then
+                  if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
                     DrawDashLine(cnv,
                       x, y,
                       x, y + CellHeightZ,
                       clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_EAST) then
+                  if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
                     DrawDashLine(cnv,
                       x + CellWidthZ - 1, y,
                       x + CellWidthZ - 1, y + CellHeightZ,
@@ -868,6 +871,14 @@ begin
 //  Fonts[11] := encTeletextBlock;
 //  Fonts[12] := encTeletextSeparated;
 
+  // clear undo stuff
+  CurrUndoData.Create(sizeof(TUndoCells));
+  Undo.Create(sizeof(TUndoBlock));
+  UndoPos := 0;
+
+  // create copyselection
+  CopySelection.Create(sizeof(TLoc));
+
   LoadSettings;
   NewFile;
 
@@ -875,7 +886,6 @@ begin
   CurrCodePage := Fonts[CurrFont];
   cbCodePage.enabled := false;
   cbCodePage.ItemIndex := ord(CurrCodePage);
-  //CodePageChange;
   cbCodePage.enabled := true;
   tbFont0.Down := true;
   BuildCharacterPalette;
@@ -903,11 +913,6 @@ begin
   Clipboard.Height := 0;
   setlength(Clipboard.Data, 0);
 
-  // clear undo stuff
-  CurrUndoData.Create(sizeof(TUndoCells));
-  Undo.Create(sizeof(TUndoBlock));
-  UndoPos := 0;
-
   DebugStart;
 
 end;
@@ -932,7 +937,10 @@ begin
   bmpPage.Free;
   bmpPreview.Free;
   if bmpCharPalette <> nil then bmpCharPalette.Free;
-  setlength(CopySelection, 0);
+  CopySelection.Free;
+  CurrUndoData.Free;
+  ClearAllUndo;
+  Undo.Free;
 end;
 
 // create new bmpPage of page at zoom 1
@@ -1059,7 +1067,7 @@ begin
     if uni = Blocks2x1[i] then
       break;
 
-  FillByte(result, 2, bg);
+  MemFill(@result, 2, bg);
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1079,7 +1087,7 @@ begin
     if uni = Blocks1x2[i] then
       break;
 
-  FillByte(result, 2, bg);
+  MemFill(@result, 2, bg);
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1098,7 +1106,7 @@ begin
     if uni = Blocks2x2[i] then
       break;
 
-  FillByte(result, 4, bg);
+  MemFill(@result, 4, bg);
   if HasBits(i, %0001) then result[0] := fg;
   if HasBits(i, %0010) then result[1] := fg;
   if HasBits(i, %0100) then result[2] := fg;
@@ -1240,7 +1248,7 @@ begin
     // reduce other 3 blocks to 1 color + this color
     // get color count.
     setlength(count, 256);
-    FillByte(count[0], 256, 0);
+    MemZero(@count[0], 256);
     tot := 0;
     mval := 0;
     mclr := -1;     // other color with highest count
@@ -1511,6 +1519,7 @@ var
   tmp :         string;
   unk :         boolean;
   found :       boolean;
+  copyrec :     TLoc;
 begin
 
   // let system handle these controls
@@ -1749,15 +1758,16 @@ begin
           lvObjects.ItemIndex := lvObjIndex(selectedObject);
           pbPage.Invalidate;
         end
-        else if length(CopySelection) > 0 then
+        else if CopySelection.Count > 0 then
         begin
           Clipboard := CopySelectionToObject;
-          for i := 0 to length(CopySelection) - 1 do
+          for i := 0 to CopySelection.Count - 1 do
           begin
-            r := CopySelection[i].Row;
-            c := CopySelection[i].Col;
+            CopySelection.Get(@copyrec, i);
+            r := copyrec.Row;
+            c := copyrec.Col;
             Page.Rows[r].Cells[c] := BLANK;
-            DrawCell(CopySelection[i].Row, CopySelection[i].Col, false);
+            DrawCell(r, c, false);
           end;
         end;
       end;
@@ -1772,7 +1782,7 @@ begin
           setlength(ClipBoard.Data, 0);
           CopyObject(Objects[SelectedObject], Clipboard);
         end
-        else if length(CopySelection) > 0 then
+        else if CopySelection.Count > 0 then
         begin
           Clipboard := CopySelectionToObject;
         end;
@@ -1828,17 +1838,18 @@ begin
               pbPage.Invalidate;
             end;
           end
-          else if length(CopySelection) > 0 then
+          else if CopySelection.Count > 0 then
           begin
             // delete selected area
-            for i := length(CopySelection) - 1 downto 0 do
+            for i := CopySelection.Count - 1 downto 0 do
             begin
-              r := CopySelection[i].Row;
-              c := CopySelection[i].Col;
+              CopySelection.Get(@copyrec, i);
+              r := copyrec.Row;
+              c := copyrec.Col;
               Page.Rows[r].Cells[c] := BLANK;
               DrawCell(r, c, false);
             end;
-            setlength(CopySelection, 0);
+            CopySelection.Clear;
             pbPage.Invalidate;
           end;
         end;
@@ -1854,9 +1865,9 @@ begin
             lvObjects.ItemIndex := lvObjIndex(SelectedObject);
             pbPage.Invalidate;
           end
-          else if length(CopySelection) > 0 then
+          else if CopySelection.Count > 0 then
           begin
-            setlength(CopySelection, 0);
+            CopySelection.Clear;
             pbPage.Invalidate;
           end;
         end;
@@ -2265,7 +2276,7 @@ begin
   for r := 0 to NumRows - 1 do
     for c := 0 to NumCols - 1 do
       Page.Rows[r].Cells[c] := BLANK;
-  FillByte(Page.Sauce, sizeof(TSauceHeader), 0);
+  MemZero(@Page.Sauce, sizeof(TSauceHeader));
   CurrFileName := 'Untitled.vtx';
   CurrFileChanged := false;
   tbSauceAuthor.Text:='';
@@ -2276,12 +2287,6 @@ begin
   GenerateBmpPage;
   UpdateTitles;
 
-  // clear selection
-  setlength(CopySelection, 0);
-
-  // clear any UndoData left over.
-  ClearAllUndo;
-
   // delete objects
   for i := 0 to length(Objects) - 1 do
     setlength(Objects[i].Data, 0);
@@ -2289,6 +2294,13 @@ begin
   LoadlvObjects;
   pbPage.Invalidate;
   fPreviewBox.Invalidate;
+
+  // clear selection
+  CopySelection.Clear;
+
+  // clear any UndoData left over.
+  ClearAllUndo;
+
 end;
 
 procedure TfMain.miFileNewClick(Sender: TObject);
@@ -2310,7 +2322,7 @@ begin
   fin := TFileStream.Create(fname, fmOpenRead or fmShareDenyNone);
   fin.Read(head, sizeof(TVTXFileHeader));
 
-  if CompareByte(ID, head.ID, 7) <> 0 then
+  if not MemComp(@ID[0], @head.ID, 7) then
   begin
     ShowMessage('Bad Header.');
     NewFile;
@@ -2332,7 +2344,7 @@ begin
   XScale := head.XScale;
   Page.PageAttr := head.PageAttr;
   Page.CrsrAttr := head.CrsrAttr;
-  move(head.Sauce, Page.Sauce, sizeof(TSauceHeader));
+  MemCopy(@head.Sauce, @Page.Sauce, sizeof(TSauceHeader));
   numobj := head.NumObjects;
 
   if length(Page.Rows) < NumRows then
@@ -2382,7 +2394,7 @@ const
   ID = 'VTXEDIT';
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
-  move(ID, head.ID, 7);
+  MemCopy(@ID[0], @head.ID, 7);
   head.ID[7] := 0;
   head.Version := $0001;
   head.PageType := PageType;
@@ -2391,7 +2403,7 @@ begin
   head.Colors := ColorScheme;
   head.Height := NumRows;
   head.Width := NumCols;
-  FillByte(head.Name[0], 64, 0);
+  MemZero(@head.Name[0], 64);
   for i := 0 to length(fname) - 1 do
   begin
     if i >= 63 then break;
@@ -2401,7 +2413,7 @@ begin
   head.XScale := XScale;
   head.PageAttr := Page.PageAttr;
   head.CrsrAttr := Page.CrsrAttr;
-  move(Page.Sauce, head.Sauce, sizeof(TSauceHeader));
+  MemCopy(@Page.Sauce, @head.Sauce, sizeof(TSauceHeader));
   head.NumObjects := length(Objects);
   fout.Write(head, sizeof(TVTXFileHeader));
 
@@ -2424,7 +2436,7 @@ begin
     fout.WriteByte(iif(Objects[i].Locked, 1, 0));
     fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
 
-    FillByte(nameout[0], 64, 0);
+    MemZero(@nameout[0], 64);
     for j := 0 to length(Objects[i].Name) - 1 do
     begin
       if j >= 63 then break;
@@ -3285,7 +3297,7 @@ var
       ValidSauce := false;
       if length(buff) > 128 then
       begin
-        move(buff[length(buff)-128], Sauce, 128);
+        MemCopy(@buff[length(buff)-128], @Sauce, 128);
         ValidSauce := CompareMem(@Sauce.ID, @SauceID, 5);
         if ValidSauce then
         begin
@@ -3928,7 +3940,8 @@ end;
 procedure TfMain.pbPageMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  undoblk : TUndoBlock;
+  undoblk :   TUndoBlock;
+  tmp :       TRecList;
 begin
   case Button of
     mbLeft : MouseLeft := false;
@@ -3943,7 +3956,9 @@ begin
   if drag then
   begin
     // add / remove selection
-    CopySelection := BuildDisplayCopySelection;
+    tmp := BuildDisplayCopySelection;
+    CopySelection.Free;
+    CopySelection := tmp;
     drag := false;
     pbPage.invalidate;
   end
@@ -4145,7 +4160,7 @@ begin
                 CursorMove(MouseRow, MouseCol);
 
                 // clear previous selection.
-                setlength(CopySelection, 0);
+                CopySelection.Clear;
                 pbPage.invalidate;
 
                 // normal click / start selection
@@ -4476,7 +4491,8 @@ var
   cell :      TCell;
   objnum :    integer;
   cl1, cl2 :  TColor;
-  i : integer;
+  i :         integer;
+  copyrec :   TLoc;
 begin
   // compute x, y of row, col
   cnv := pbPage.Canvas;
@@ -4490,29 +4506,30 @@ begin
     begin
       DrawCellEx(cnv, x, y, row, col, skipUpdate);
       // draw selection borders
-      for i := length(CopySelection) - 1 downto 0 do
+      for i := CopySelection.Count - 1 downto 0 do
       begin
-        if (CopySelection[i].Row = row) and (CopySelection[i].Col = col) then
+        CopySelection.Get(@copyrec, i);
+        if (copyrec.Row = row) and (copyrec.Col = col) then
         begin
-          if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_NORTH) then
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
             DrawDashLine(cnv,
               x, y,
               x + CellWidthZ, y,
               clSelectionArea1, clSelectionArea2);
 
-          if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_SOUTH) then
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
             DrawDashLine(cnv,
               x, y + CellHeightZ - 1,
               x + CellWidthZ, y + CellHeightZ - 1,
               clSelectionArea1, clSelectionArea2);
 
-          if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_WEST) then
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
             DrawDashLine(cnv,
               x, y,
               x, y + CellHeightZ,
               clSelectionArea1, clSelectionArea2);
 
-          if not HasBits(CopySelection[i].Neighbors, NEIGHBOR_EAST) then
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
             DrawDashLine(cnv,
               x + CellWidthZ - 1, y,
               x + CellWidthZ - 1, y + CellHeightZ,
@@ -4573,42 +4590,54 @@ begin
 end;
 
 // add to selection. no dupes allowed
-procedure SelectionAdd(var selection : TLocList; r, c : integer);
+procedure SelectionAdd(var selection : TRecList; r, c : integer);
 var
-  neighbor : integer;
-  i, l : integer;
+  neighbor :  integer;
+  i, l :      integer;
+  copyrec :   TLoc;
 begin
   neighbor := 0;
-  l := length(selection);
+  l := selection.count;
   for i := 0 to l - 1 do
   begin
-    if (selection[i].Row = r) and (selection[i].Col = c) then
+    selection.Get(@copyrec, i);
+
+    // already exists
+    if (copyrec.Row = r) and (copyrec.Col = c) then
       exit;
-    if (selection[i].Row = r - 1) and (selection[i].Col = c) then
+
+    // build neighbors
+    if (copyrec.Row = r - 1) and (copyrec.Col = c) then
     begin
-      SetBit(selection[i].Neighbors, NEIGHBOR_SOUTH, true);
+      SetBit(copyrec.Neighbors, NEIGHBOR_SOUTH, true);
       SetBit(neighbor, NEIGHBOR_NORTH, true);
     end;
-    if (selection[i].Row = r + 1) and (selection[i].Col = c) then
+
+    if (copyrec.Row = r + 1) and (copyrec.Col = c) then
     begin
-      SetBit(selection[i].Neighbors, NEIGHBOR_NORTH, true);
+      SetBit(copyrec.Neighbors, NEIGHBOR_NORTH, true);
       SetBit(neighbor, NEIGHBOR_SOUTH, true);
     end;
-    if (selection[i].Row = r) and (selection[i].Col = c - 1) then
+
+    if (copyrec.Row = r) and (copyrec.Col = c - 1) then
     begin
-      SetBit(selection[i].Neighbors, NEIGHBOR_EAST, true);
+      SetBit(copyrec.Neighbors, NEIGHBOR_EAST, true);
       SetBit(neighbor, NEIGHBOR_WEST, true);
     end;
-    if (selection[i].Row = r) and (selection[i].Col = c + 1) then
+
+    if (copyrec.Row = r) and (copyrec.Col = c + 1) then
     begin
-      SetBit(selection[i].Neighbors, NEIGHBOR_WEST, true);
+      SetBit(copyrec.Neighbors, NEIGHBOR_WEST, true);
       SetBit(neighbor, NEIGHBOR_EAST, true);
     end;
+
+    selection.Put(@copyrec, i);
   end;
-  setlength(selection, l + 1);
-  selection[l].Neighbors := neighbor;
-  selection[l].Row := r;
-  selection[l].Col := c;
+
+  copyrec.Row := r;
+  copyrec.Col := c;
+  copyrec.Neighbors := neighbor;
+  selection.Add(@copyrec);
 end;
 
 // create an object from the CopySelection data.
@@ -4621,17 +4650,19 @@ var
   minr, minc :  integer;
   p :           integer;
   n :           byte;
+  copyrec :     TLoc;
 begin
   // get bounding box of copy selection
-  l := length(CopySelection);
+  l := CopySelection.Count;
   maxr := 0;
   maxc := 0;
   minr := 99999;
   minc := 99999;
   for i := 0 to l - 1 do
   begin
-    r := CopySelection[i].Row;
-    c := CopySelection[i].Col;
+    CopySelection.Get(@copyrec, i);
+    r := copyrec.Row;
+    c := copyrec.Col;
     minr := min(minr, r);
     minc := min(minc, c);
     maxr := max(maxr, r);
@@ -4653,14 +4684,16 @@ begin
   // copyselection moved in
   for i := 0 to l - 1 do
   begin
-    r := CopySelection[i].Row;
-    c := CopySelection[i].Col;
+    CopySelection.Get(@copyrec, i);
+    r := copyrec.Row;
+    c := copyrec.Col;
     p := ((r - minr) * w) + (c - minc);
     result.Data[p].Chr := Page.Rows[r].Cells[c].Chr;
     result.Data[p].Attr := Page.Rows[r].Cells[c].Attr;
   end;
 
   // populate the neighbors in cells
+  // copyrec has neighbors - copy it!
   p := 0;
   for r := 0 to h - 1 do
   begin
@@ -4689,11 +4722,15 @@ begin
   result.Name := '[Clipboard]';
 end;
 
-function TfMain.BuildDisplayCopySelection : TLocList;
+function TfMain.BuildDisplayCopySelection : TRecList;
 var
-  i, l, r, c, r1, c1, r2, c2 : integer;
+  i, l,
+  r, c,
+  r1, c1,
+  r2, c2 :  integer;
+  copyrec : TLoc;
 begin
-  setlength(result, 0);
+  result.Create(sizeof(TLoc));
   if drag then
   begin
     r1 := MouseRow;
@@ -4708,18 +4745,19 @@ begin
         for c := c1 to c2 do
           SelectionAdd(result, r, c);
   end;
-  l := length(CopySelection);
+  l := CopySelection.Count;
   for i := 0 to l - 1 do
   begin
+    CopySelection.Get(@copyrec, i);
     // add if not already in selection and not inside a remove drag
     if drag and (dragType = DRAG_REMOVE) then
     begin
-      if not between(CopySelection[i].Row, r1, r2)
-        or not between(CopySelection[i].Col, c1, c2) then
-        SelectionAdd(result, CopySelection[i].Row, CopySelection[i].Col);
+      if not between(copyrec.Row, r1, r2)
+        or not between(copyrec.Col, c1, c2) then
+        SelectionAdd(result, copyrec.Row, copyrec.Col);
     end
     else
-      SelectionAdd(result, CopySelection[i].Row, CopySelection[i].Col);
+      SelectionAdd(result, copyrec.Row, copyrec.Col);
   end;
 end;
 
@@ -5297,13 +5335,13 @@ begin
     if sdObject.Execute then
     begin
       fout := TFileStream.Create(sdObject.FileName, fmCreate or fmShareExclusive);
-      move(ID, head.ID, 7);
+      MemCopy(@ID[0], @head.ID, 7);
       head.ID[7] := 0;
       head.Version := $0001;
       head.PageType := 3;
       head.Width := Objects[SelectedObject].Width;
       head.Height := Objects[SelectedObject].Height;
-      FillByte(head.Name[0], 64, 0);
+      MemZero(@head.Name[0], 64);
       fname := ExtractFileNameOnly(sdObject.FileName);
       for i := 0 to length(sdObject.Filename) - 1 do
       begin
@@ -5388,7 +5426,7 @@ var
   r, c :      integer;
   pr :        TRect;
   tmp, tmp2 : TBGRABitmap;
-  tmpreg :    TLocList;
+  tmpreg :    TRecList;
   i, j :      integer;
   objonrow :  boolean;
   x, y :      integer;
@@ -5403,7 +5441,8 @@ var
   r1, c1 :    integer;
   pbot :      integer;
   h, w :      integer;
-  hit : boolean;
+  hit :       boolean;
+  copyrec :   TLoc;
 
 begin
   if bmpPage = nil then exit;
@@ -5455,34 +5494,35 @@ begin
 
   // draw selection information
   tmpreg := BuildDisplayCopySelection;
-  for i := length(tmpreg) - 1 downto 0 do
+  for i := tmpreg.Count - 1 downto 0 do
   begin
-    pr.Top := (tmpreg[i].Row - PageTop) * CellHeightZ;
-    pr.Left := (tmpreg[i].Col - PageLeft) * CellWidthZ;
+    tmpreg.Get(@copyrec, i);
+    pr.Top := (copyrec.Row - PageTop) * CellHeightZ;
+    pr.Left := (copyrec.Col - PageLeft) * CellWidthZ;
     pr.Width := CellWidthZ;
     pr.Height := CellHeightZ;
-    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_NORTH) then
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
       DrawDashLine(cnv,
         pr.Left, pr.Top,
         pr.Left + CellWidthZ, pr.Top,
         clSelectionArea1, clSelectionArea2);
-    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_SOUTH) then
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
       DrawDashLine(cnv,
         pr.Left, pr.Top + CellHeightZ - 1,
         pr.Left + CellWidthZ, pr.Top + CellHeightZ - 1,
         clSelectionArea1, clSelectionArea2);
-    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_WEST) then
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
       DrawDashLine(cnv,
         pr.Left, pr.Top,
         pr.Left, pr.Top + CellHeightZ - 1,
         clSelectionArea1, clSelectionArea2);
-    if not HasBits(tmpreg[i].Neighbors, NEIGHBOR_EAST) then
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
       DrawDashLine(cnv,
         pr.Left + CellWidthZ - 1, pr.Top,
         pr.Left + CellWidthZ - 1, pr.Top + CellHeightZ,
         clSelectionArea1, clSelectionArea2);
   end;
-  setlength(tmpreg, 0);
+  tmpreg.Free;
 
   // draw objects over top
   for r := PageTop to PageTop + WindowRows do
@@ -6749,12 +6789,12 @@ begin
   l := CurrUndoData.Count;
   for i := 0 to l - 1 do
   begin
-    CurrUndoData.Get(PBYTE(@rec), i);
+    CurrUndoData.Get(@rec, i);
     if (rec.Row = row) and (rec.Col = col) then
     begin
       // if exists, update the new cell
       rec.NewCell := newcell;
-      CurrUndoData.Put(PBYTE(@rec), i);
+      CurrUndoData.Put(@rec, i);
       exit;
     end;
   end;
@@ -6763,7 +6803,7 @@ begin
   rec.Col := col;
   rec.NewCell := newcell;
   rec.OldCell := Page.Rows[row].Cells[col];
-  CurrUndoData.Add(PBYTE(@rec));
+  CurrUndoData.Add(@rec);
 end;
 
 // clear all data from pos to end of list. move list count down.
@@ -6774,13 +6814,12 @@ var
 begin
   for i := pos to Undo.Count - 1 do
   begin
-    Undo.Get(PBYTE(@undoblk), i);
+    Undo.Get(@undoblk, i);
     case undoblk.UndoType of
       utCells:
         begin
           undoblk.CellData.Free;
         end;
-      //...
     end;
   end;
   Undo.Count := pos;
@@ -6790,7 +6829,7 @@ end;
 procedure TfMain.UndoAdd(undoblk : TUndoBlock);
 begin
   UndoTruncate(UndoPos);
-  Undo.Add(PBYTE(@undoblk));
+  Undo.Add(@undoblk);
   UndoPos += 1;
 end;
 
@@ -6802,13 +6841,13 @@ var
   undoblk :   TUndoBlock;
   tmpobj :    TObj;
 begin
-  Undo.Get(PBYTE(@undoblk), pos);
+  Undo.Get(@undoblk, pos);
   case undoblk.UndoType of
     utCells:
       begin
         for i := 0 to undoblk.CellData.Count - 1 do
         begin
-          undoblk.CellData.Get(PBYTE(@undocell), i);
+          undoblk.CellData.Get(@undocell, i);
           Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
         end;
         GenerateBmpPage;
@@ -6864,13 +6903,13 @@ var
   undoblk :   TUndoBlock;
   tmpobj :    TObj;
 begin
-  Undo.Get(PByte(@undoblk), pos);
+  Undo.Get(@undoblk, pos);
   case undoblk.UndoType of
     utCells:
       begin
         for i := 0 to undoblk.CellData.Count - 1 do
         begin
-          undoblk.CellData.Get(PBYTE(@undocell), i);
+          undoblk.CellData.Get(@undocell, i);
           Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
         end;
         GenerateBmpPage;
@@ -6925,7 +6964,6 @@ var
   undoblk : TUndoBlock;
 begin
   // clear any UndoData left over.
-  CurrUndoData.Clear;
   UndoTruncate(0);
   UndoPos:=0;
 end;

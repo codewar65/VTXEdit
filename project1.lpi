@@ -39,7 +39,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="9">
+    <Units Count="10">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -89,6 +89,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="RecList"/>
       </Unit8>
+      <Unit9>
+        <Filename Value="memory.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Memory"/>
+      </Unit9>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -118,9 +123,6 @@
     <Linking>
       <Debugging>
         <UseHeaptrc Value="True"/>
-        <TrashVariables Value="True"/>
-        <UseValgrind Value="True"/>
-        <UseExternalDbgSyms Value="True"/>
       </Debugging>
       <Options>
         <Win32>

@@ -34,11 +34,12 @@ unit RecList;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$asmmode intel}
 
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, Memory;
 
 type
   TRecList = record
@@ -48,10 +49,10 @@ type
     RecSize : DWORD;
     procedure Create(recsz : DWORD);
     procedure Free;
-    procedure Add(rec : PBYTE);  // add new record
+    procedure Add(rec : Pointer);  // add new record
     procedure Remove(recnum : DWORD);
-    procedure Put(rec : PBYTE; recnum : DWORD); inline;
-    procedure Get(rec : PBYTE; recnum : DWORD); inline;
+    procedure Put(rec : Pointer; recnum : DWORD); inline;
+    procedure Get(rec : Pointer; recnum : DWORD); inline;
     procedure Clear;
     function Copy : TRecList;
   end;
@@ -78,7 +79,7 @@ begin
   self.Count := 0;
 end;
 
-procedure TRecList.Add(rec : PBYTE);
+procedure TRecList.Add(rec : Pointer);
 var
   newsz : DWORD;
   newdata : PBYTE;
@@ -89,13 +90,13 @@ begin
     newsz := self.Size << 1;
     newdata := getmemory(newsz * self.RecSize);
     FillByte(newdata[0], newsz * self.RecSize, $00);
-    Move(self.Data[0], newdata[0], self.Size * self.RecSize);
+    MemCopy(self.Data, newdata, self.Size * self.RecSize);
     FreeMemory(self.Data);
     self.Data := newdata;
     self.Size := newsz;
   end;
 
-  Move(rec[0], self.Data[self.Count * self.RecSize], self.RecSize);
+  MemCopy(rec, @self.Data[self.Count * self.RecSize], self.RecSize);
   self.Count += 1;
 end;
 
@@ -116,14 +117,14 @@ begin
   self.Count -= 1;
 end;
 
-procedure TRecList.Put(rec : PBYTE; recnum : DWORD); inline;
+procedure TRecList.Put(rec : Pointer; recnum : DWORD); inline;
 begin
-  move(rec[0], self.Data[recnum * self.RecSize], self.RecSize);
+  MemCopy(rec, @self.Data[recnum * self.RecSize], self.RecSize);
 end;
 
-procedure TRecList.Get(rec : PBYTE; recnum : DWORD); inline;
+procedure TRecList.Get(rec : Pointer; recnum : DWORD); inline;
 begin
-  move(self.Data[recnum * self.RecSize], rec[0], self.RecSize);
+  MemCopy(@self.Data[recnum * self.RecSize], rec, self.RecSize);
 end;
 
 procedure TRecList.Clear;
@@ -137,11 +138,93 @@ end;
 // create copy of TRecList
 // WARNING : CLEAR ANY DATA INSIDE THAT CONTAINS OTHER TRECLISTS
 function TRecList.Copy : TRecList;
+var
+  memsize : longint;
 begin
-  result := self;
-  result.Data := Getmemory(self.Size * self.RecSize);
-  Move(self.Data[0], result.Data[0], self.Size * self.RecSize);
+  result.Count :=   self.Count;
+  result.RecSize := self.RecSize;
+  result.Size :=    self.Size;
+  memsize := self.RecSize * self.Size;
+  result.Data :=    Getmemory(memsize);
+  MemCopy(self.Data, result.Data, memsize);
 end;
 
+
 end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

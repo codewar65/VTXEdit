@@ -27,25 +27,69 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 }
 
-program project1;
+unit Memory;
 
 {$mode objfpc}{$H+}
+{$modeswitch advancedrecords}
+{$ASMMODE intel}
+
+interface
 
 uses
-  {$IFDEF UNIX}{$IFDEF UseCThreads}
-  cthreads,
-  {$ENDIF}{$ENDIF}
-  Interfaces, // this includes the LCL widgetset
-  Forms, VTXEdit;
+  Classes, SysUtils;
 
-{$R *.res}
+procedure MemZero(dst : Pointer; size : longint); inline;
+procedure MemFill(dst : Pointer; size : longint; val : byte); inline;
+procedure MemCopy(src, dst : Pointer; size : longint); inline;
+function  MemComp(src, dst : Pointer; size : longint) : boolean; inline;
 
+implementation
+
+procedure MemZero(dst : Pointer; size : longint); inline;
 begin
-  Application.Title:='VTXEdit';
-  RequireDerivedFormResource:=True;
-  Application.Initialize;
-  Application.CreateForm(TfMain, fMain);
-  Application.Run;
-end.
+  asm
+        MOV   EDI, dst
+        MOV   ECX, size
+        XOR   AL, AL
+        REP   STOSB
+  end ['AL', 'EDI', 'ECX'];
+end;
 
+procedure MemFill(dst : Pointer; size : longint; val : byte); inline;
+begin
+  asm
+        MOV   EDI, dst
+        MOV   ECX, size
+        MOV   AL, val
+        REP   STOSB
+  end ['AL', 'EDI', 'ECX'];
+end;
+
+procedure MemCopy(src, dst : Pointer; size : longint); inline;
+begin
+  asm
+        MOV   ESI, src
+        MOV   EDI, dst
+        MOV   ECX, size
+        REP   MOVSB
+  end ['ESI', 'EDI', 'ECX'];
+end;
+
+function MemComp(src, dst : Pointer; size : longint) : boolean; inline;
+label
+  done;
+begin
+  asm
+        MOV   result, $00
+        MOV   ESI, src
+        MOV   EDI, dst
+        MOV   ECX, size
+        REPE  CMPSB
+        JZ    DONE
+        INC   result
+DONE:
+  end;
+end;
+
+end.
 
