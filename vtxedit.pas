@@ -533,21 +533,22 @@ var
   i :             integer;
   po :            PObj;
   objr, objc, p : integer;
+  cellrec :       TCell;
 begin
   for i := length(Objects) - 1 downto 0 do
   begin
     po := @Objects[i];
-    if (row >= po^.Row) and (row < (po^.Row + po^.Height)) and (not po^.Hidden) then
-      // on the row
-      if (col >= po^.Col) and (col < (po^.Col + po^.Width)) then
-      begin
-        // on the col
-        objr := row - po^.Row;
-        objc := col - po^.Col;
-        p := objr * po^.Width + objc;
-        if po^.Data[p].Chr <> EMPTYCHAR then
-          exit(i);
-      end;
+
+    if InRect(col, row, po^.Col, po^.Row, po^.Width, po^.Height) then
+    begin
+      // on the col
+      objr := row - po^.Row;
+      objc := col - po^.Col;
+      p := objr * po^.Width + objc;
+      po^.Data.Get(@cellrec, p);
+      if cellrec.Chr <> EMPTYCHAR then
+        exit(i);
+    end;
   end;
   result := -1;
 end;
@@ -911,7 +912,7 @@ begin
   // clear the clipboard
   Clipboard.Width := 0;
   Clipboard.Height := 0;
-  setlength(Clipboard.Data, 0);
+  Clipboard.Data.Create(sizeof(TCell));
 
   DebugStart;
 
@@ -930,13 +931,26 @@ begin
 end;
 
 procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
+var
+  i : integer;
 begin
   SaveSettings;
   fPreviewBox.Hide;
   fPreviewBox.Free;
+
+  // free bitmaps
   bmpPage.Free;
   bmpPreview.Free;
-  if bmpCharPalette <> nil then bmpCharPalette.Free;
+  if bmpCharPalette <> nil then
+    bmpCharPalette.Free;
+
+  // free up document objects
+  for i := 0 to length(Objects) - 1 do
+    Objects[i].Data.free;
+  setlength(Objects, 0);
+
+  // free TRecLists
+  Clipboard.Data.Free;
   CopySelection.Free;
   CurrUndoData.Free;
   ClearAllUndo;
@@ -954,8 +968,6 @@ var
   off :     integer;
   bmp :     TBGRABitmap;
   w, h :    integer;
-  prevstat : boolean;
-  rt, rl, rw, rh : integer;
 begin
 
   // create new
@@ -1491,21 +1503,9 @@ begin
 end;
 
 procedure CopyObject(objin : TObj; var objout : TObj);
-var
-  i, l : integer;
 begin
-  objout.Name:= objin.Name;
-  objout.Row := objin.Row;
-  objout.Col := objin.Col;
-  objout.Width := objin.Width;
-  objout.Height := objin.Height;
-  objout.Page := objin.Page;
-  objout.Locked := objin.Locked;
-  objout.Hidden:= objin.Hidden;
-  l := length(objin.Data);
-  setlength(objout.Data, l);
-  for i := 0 to l - 1 do
-    objout.Data[i] := objin.Data[i];
+  objout := objin;
+  objout.Data := objin.Data.Copy;
 end;
 
 // for special keys
@@ -1522,6 +1522,7 @@ var
   copyrec :     TLoc;
   pagebottom,
   pageright :   integer;
+  undoblk :     TUndoBlock;
 begin
 
   // let system handle these controls
@@ -1752,7 +1753,7 @@ begin
         SaveUndoKeys;
         if SelectedObject >= 0 then
         begin
-          setlength(ClipBoard.Data, 0);
+          Clipboard.Data.Free;
           CopyObject(Objects[SelectedObject], Clipboard);
           RemoveObject(SelectedObject);
           LoadlvObjects;
@@ -1762,6 +1763,7 @@ begin
         end
         else if CopySelection.Count > 0 then
         begin
+          Clipboard.Data.Free;
           Clipboard := CopySelectionToObject;
           for i := 0 to CopySelection.Count - 1 do
           begin
@@ -1781,11 +1783,12 @@ begin
         if SelectedObject >= 0 then
         begin
           // copy object to clipboard
-          setlength(ClipBoard.Data, 0);
+          Clipboard.Data.Free;
           CopyObject(Objects[SelectedObject], Clipboard);
         end
         else if CopySelection.Count > 0 then
         begin
+          Clipboard.Data.Free;
           Clipboard := CopySelectionToObject;
         end;
       end;
@@ -1804,9 +1807,14 @@ begin
           // drop it onto window. top left for now
           pagebottom := min(PageTop + WindowRows, NumRows);
           pageright := min(PageLeft + WindowCols, NumCols);
-
           Objects[l].Row := ((pagebottom + PageTop) >> 1) - (Objects[l].Height >> 1);
           Objects[l].Col := ((pageright + PageLeft) >> 1) - (Objects[l].Width >> 1);
+
+          undoblk.UndoType := utObjAdd;
+          undoblk.OldRow := Objects[l].Row;
+          undoblk.OldCol := Objects[l].Col;
+          CopyObject(Objects[l], undoblk.Obj);
+          UndoAdd(undoblk);
 
           LoadlvObjects;
           SelectedObject := l;
@@ -1832,15 +1840,23 @@ begin
         SaveUndoKeys;
         if ToolMode = tmSelect then
         begin
+          SaveUndoKeys;
           if SelectedObject >= 0 then
           begin
             // delete object
             if not Objects[SelectedObject].Locked then
             begin
+
+              undoblk.UndoType := utObjRemove;
+              undoblk.OldRow := Objects[SelectedObject].Row;
+              undoblk.OldCol := Objects[SelectedObject].Col;
+              undoblk.OldNum := SelectedObject;
+              CopyObject(Objects[SelectedObject], undoblk.Obj);
+              UndoAdd(undoblk);
+
               RemoveObject(SelectedObject);
-              LoadlvObjects;
               SelectedObject := -1;
-              lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+              LoadlvObjects;
               pbPage.Invalidate;
             end;
           end
@@ -1852,9 +1868,17 @@ begin
               CopySelection.Get(@copyrec, i);
               r := copyrec.Row;
               c := copyrec.Col;
+
+              RecordUndoCell(r, c, BLANK);
+
               Page.Rows[r].Cells[c] := BLANK;
-              DrawCell(r, c, false);
             end;
+
+            undoblk.UndoType := utCells;
+            undoblk.CellData := CurrUndoData.Copy;
+            UndoAdd(undoblk);
+
+            GenerateBmpPage;
             CopySelection.Clear;
             pbPage.Invalidate;
           end;
@@ -2295,7 +2319,7 @@ begin
 
   // delete objects
   for i := 0 to length(Objects) - 1 do
-    setlength(Objects[i].Data, 0);
+    Objects[i].Data.Free;
   setlength(Objects, 0);
   LoadlvObjects;
   pbPage.Invalidate;
@@ -2322,6 +2346,7 @@ var
   numobj :      integer;
   b :           byte;
   namein :      packed array [0..63] of char;
+  cellrec :     TCell;
 const
   ID = 'VTXEDIT';
 begin
@@ -2382,9 +2407,12 @@ begin
     // get name
     fin.Read(namein, 64);
     Objects[i].Name := namein;
-    setlength(Objects[i].Data, Objects[i].Width * Objects[i].Height);
+    Objects[i].Data.Create(sizeof(TCell));
     for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
-      fin.Read(Objects[i].Data[j], sizeof(TCell));
+    begin
+      fin.ReadBuffer(cellrec, sizeof(TCell));
+      Objects[i].Data.Add(@cellrec);
+    end;
   end;
 
   fin.free;
@@ -2396,6 +2424,7 @@ var
   head : TVTXFileHeader;
   i, j, r, c : integer;
   nameout : packed array [0..63] of char;
+  cellrec : TCell;
 const
   ID = 'VTXEDIT';
 begin
@@ -2451,7 +2480,10 @@ begin
     fout.Write(nameout[0], 64);
 
     for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
-      fout.Write(Objects[i].Data[j], sizeof(TCell));
+    begin
+      Objects[i].Data.Get(@cellrec, j);
+      fout.Write(cellrec, sizeof(TCell));
+    end;
   end;
 
   fout.free;
@@ -4023,7 +4055,6 @@ begin
     if floor(CellWidth * PageZoom * XScale) = 0 then
       PageZoom *= 2;
 
-
     CellWidthZ := floor(CellWidth * PageZoom * XScale);
     CellHeightZ := floor(CellHeight * PageZoom);
 
@@ -4035,7 +4066,6 @@ begin
     PageTop := MouseRow - (NewWindowRows >> 1);
     sbHorz.Position:=PageLeft;
     sbVert.Position:=PageTop;
-
 
     ResizeScrolls;
   end
@@ -4672,6 +4702,7 @@ var
   p :           integer;
   n :           byte;
   copyrec :     TLoc;
+  cellrec :     TCell;
 begin
   // get bounding box of copy selection
   l := CopySelection.Count;
@@ -4695,11 +4726,12 @@ begin
   result.Height := h;
 
   // allocate space for data and clear
-  setlength(result.Data, w * h);
+  result.Data.Create(sizeof(TCell));
   for i := 0 to (w * h) - 1 do
   begin
-    result.Data[i].Attr := $0007;
-    result.Data[i].Chr :=  EMPTYCHAR;  // empty cell
+    cellrec.Attr := $0007;
+    cellrec.Chr := EMPTYCHAR;
+    result.Data.Add(@cellrec);
   end;
 
   // copyselection moved in
@@ -4709,8 +4741,10 @@ begin
     r := copyrec.Row;
     c := copyrec.Col;
     p := ((r - minr) * w) + (c - minc);
-    result.Data[p].Chr := Page.Rows[r].Cells[c].Chr;
-    result.Data[p].Attr := Page.Rows[r].Cells[c].Attr;
+    result.Data.Get(@cellrec, p);
+    cellrec.Chr := Page.Rows[r].Cells[c].Chr;
+    cellrec.Attr := Page.Rows[r].Cells[c].Attr;
+    result.Data.Put(@cellrec, p);
   end;
 
   // populate the neighbors in cells
@@ -4721,15 +4755,39 @@ begin
     for c := 0 to w - 1 do
     begin
       n := 0;
-      if (r > 0) and (result.Data[p - w].Chr <> EMPTYCHAR) then
-        n := n or NEIGHBOR_NORTH;
-      if (r < h - 1) and (result.Data[p + w].Chr <> EMPTYCHAR) then
-        n := n or NEIGHBOR_SOUTH;
-      if (c > 0) and (result.Data[p - 1].Chr <> EMPTYCHAR) then
-        n := n or NEIGHBOR_WEST;
-      if (c < w - 1) and (result.Data[p + 1].Chr <> EMPTYCHAR) then
-        n := n or NEIGHBOR_EAST;
-      result.Data[p].Neighbors:=n;
+
+      if r > 0 then
+      begin
+        result.Data.Get(@cellrec, p - w);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_NORTH;
+      end;
+
+      if r < h - 1 then
+      begin
+        result.Data.Get(@cellrec, p + w);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_SOUTH;
+      end;
+
+      if c > 0 then
+      begin
+        result.Data.Get(@cellrec, p - 1);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_WEST;
+      end;
+
+      if c < w - 1 then
+      begin
+        result.Data.Get(@cellrec, p + 1);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_EAST;
+      end;
+
+      result.Data.Get(@cellrec, p);
+      cellrec.Neighbors:=n;
+      result.Data.Put(@cellrec, p);
+
       p += 1;
     end;
   end;
@@ -4786,13 +4844,9 @@ procedure TfMain.lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   lv :  TListView;
-  itm : TListItem;
-  cv :  char;
-  te :  TEdit;
 begin
   // click on lock/unlock hide/shown
   lv := TListView(Sender);
-  itm := lv.GetItemAt(X, Y);
   SelectedObject := lvObjIndex(lv.ItemIndex);
   if between(X, 6, 6 + 16) then
   begin
@@ -4835,11 +4889,11 @@ var
   po :            PObj;
   i, j, r, c :    integer;
   p1, p2 :        integer;
-  tmp :           TCell;
   fnt :           integer;
   cp :            TEncoding;
   chr, flipchr :  integer;
   n :             byte;
+  cellrec : TCell;
 begin
   po := @Objects[objnum];
 
@@ -4851,20 +4905,19 @@ begin
     begin
       p1 := (r * po^.Width) + (c - 1);
       p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
-      tmp := po^.Data[p1];
-      po^.Data[p1] := po^.Data[p2];
-      po^.Data[p2] := tmp;
+      po^.Data.Swap(p1, p2);
     end;
 
     //  flip the characters in the row if we can, plus neighbors
     p1 := (r * po^.Width);
     for c := 0 to po^.Width - 1 do
     begin
+      po^.Data.Get(@cellrec, p1);
 
       // get encoding for this character
-      fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
       cp := Fonts[fnt];
-      chr := GetUnicode(po^.Data[p1]);
+      chr := GetUnicode(cellrec);
       i := 0;
       while i < CPages[cp].MirrorTableSize do
       begin
@@ -4874,12 +4927,12 @@ begin
 
           // convert flip unicode back to this codepage
           if CurrCodePage in [ encUTF8, encUTF16] then
-            po^.Data[p1].Chr := flipchr
+            cellrec.Chr := flipchr
           else
             for j := 0 to 255 do
               if flipchr = CPages[cp].EncodingLUT[j] then
               begin
-                po^.Data[p1].Chr := j;
+                cellrec.Chr := j;
                 break;
               end;
           break;
@@ -4887,10 +4940,11 @@ begin
         i += 3;
       end;
 
-      n := po^.Data[p1].Neighbors;
-      po^.Data[p1].Neighbors :=
+      n := cellrec.Neighbors;
+      cellrec.Neighbors :=
         (n and %0101) or ((n and %1000) >> 2) or ((n and %0010) << 2);
 
+      po^.Data.Put(@cellrec, p1);
       p1 += 1;
     end;
 
@@ -4904,11 +4958,11 @@ var
   po :            PObj;
   i, j, r, c :    integer;
   p1, p2 :        integer;
-  tmp :           TCell;
   fnt :           integer;
   cp :            TEncoding;
   chr, flipchr :  integer;
   n :             byte;
+  cellrec :       TCell;
 begin
   po := @Objects[objnum];
   for c := 0 to po^.Width - 1 do
@@ -4919,20 +4973,19 @@ begin
     begin
       p1 := ((r - 1) * po^.Width) + c;
       p2 := ((po^.Height - r) * po^.Width) + c;
-      tmp := po^.Data[p1];
-      po^.Data[p1] := po^.Data[p2];
-      po^.Data[p2] := tmp;
+      po^.Data.Swap(p1, p2);
     end;
 
     //  flip the characters in the row if we can
     p1 := c;
     for r := 0 to po^.Height - 1 do
     begin
+      po^.Data.Get(@cellrec, p1);
 
       // get encoding number for this character
-      fnt := GetBits(po^.Data[p1].Attr, A_CELL_FONT_MASK, 28);
+      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
       cp := Fonts[fnt];
-        chr := GetUnicode(po^.Data[p1]);
+        chr := GetUnicode(cellrec);
       i := 0;
       while i < CPages[cp].MirrorTableSize do
       begin
@@ -4944,7 +4997,7 @@ begin
           for j := 0 to 255 do
             if flipchr = CPages[cp].EncodingLUT[j] then
             begin
-              po^.Data[p1].Chr := j;
+              cellrec.Chr := j;
               break;
             end;
           break;
@@ -4952,10 +5005,11 @@ begin
         i += 3;
       end;
 
-      n := po^.Data[p1].Neighbors;
-      po^.Data[p1].Neighbors :=
+      n := cellrec.Neighbors;
+      cellrec.Neighbors :=
         (n and %1010) or ((n and %0100) >> 2) or ((n and %0001) << 2);
 
+      po^.Data.Put(@cellrec, p1);
       p1 += po^.Width;
     end;
 
@@ -5142,30 +5196,32 @@ end;
 
 procedure TfMain.ObjMerge;
 var
-  po : PObj;
-  pd : PCell;
-  r, c : integer;
+  po :      PObj;
+  p :       integer;
+  r, c :    integer;
+  cellrec : TCell;
 begin
   // merge this object to page. and remove object
   if SelectedObject >= 0 then
   begin
     po := @Objects[SelectedObject];
-    pd := @po^.Data[0];
+    p := 0;
     for r := po^.Row to po^.Row + po^.Height - 1 do
       for c := po^.Col to po^.Col + po^.Width - 1 do
       begin
+        po^.Data.Get(@cellrec, p);
         if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-          if pd^.Chr <> EMPTYCHAR then
+          if cellrec.Chr <> EMPTYCHAR then
           begin
-            Page.Rows[r].Cells[c] := pd^;
-            DrawCell(r, c, false);
+            Page.Rows[r].Cells[c] := cellrec;
           end;
-        pd += 1;
+        p += 1;
       end;
     RemoveObject(SelectedObject);
     SelectedObject := -1;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    GenerateBmpPage;
     pbPage.Invalidate;
     fPreviewBox.Invalidate;
   end;
@@ -5173,10 +5229,11 @@ end;
 
 procedure TfMain.ObjMergeAll;
 var
-  po : PObj;
-  pd : PCell;
-  r, c : integer;
-  objnum : integer;
+  po :      PObj;
+  p :       integer;
+  r, c :    integer;
+  objnum :  integer;
+  cellrec : TCell;
 begin
   // merge this object to page. and remove object
   if length(Objects) > 0 then
@@ -5184,25 +5241,26 @@ begin
     for objnum := length(Objects) - 1 downto 0 do
     begin
       po := @Objects[objnum];
-      pd := @po^.Data[0];
+      p := 0;
       for r := po^.Row to po^.Row + po^.Height - 1 do
         for c := po^.Col to po^.Col + po^.Width - 1 do
         begin
+          po^.Data.Get(@cellrec, p);
           if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-            if pd^.Chr <> EMPTYCHAR then
+            if cellrec.Chr <> EMPTYCHAR then
             begin
-              Page.Rows[r].Cells[c] := pd^;
-              DrawCell(r, c, false);
+              Page.Rows[r].Cells[c] := cellrec;
             end;
-          pd += 1;
+          p += 1;
         end;
     end;
     for objnum := length(Objects) - 1 downto 0 do
-      setlength(Objects[objnum].Data, 0);
+      Objects[objnum].Data.Free;
     setlength(Objects, 0);
     SelectedObject := -1;
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    GenerateBmpPage;
     pbPage.Invalidate;
     fPreviewBox.Invalidate;
   end;
@@ -5288,6 +5346,7 @@ var
   head : TVTXObjHeader;
   i, l : integer;
   obj : TObj;
+  cellrec : TCell;
 const
   ID = 'VTXEDIT';
 begin
@@ -5323,15 +5382,20 @@ begin
     obj.Locked := false;
     obj.Hidden := false;
     obj.Page := false;
-    setlength(obj.Data, head.Width * head.Height);
+
+    obj.Data.Create(sizeof(TCell));
     for i := 0 to head.Width * head.Height - 1 do
-      fin.Read(obj.Data[i], sizeof(TCell));
+    begin
+      fin.Read(cellrec, sizeof(TCell));
+      obj.Data.Add(@cellrec);
+    end;
     fin.free;
 
     l := length(Objects);
     setlength(Objects, l + 1);
     CopyObject(Obj, Objects[l]);
-    setlength(obj.Data, 0);
+    obj.Data.Free;
+
     // drop it onto window. top left for now
     Objects[l].Row := PageTop;
     Objects[l].Col := PageLeft;
@@ -5343,10 +5407,11 @@ end;
 // save selected object to file
 procedure TfMain.bObjSaveClick(Sender: TObject);
 var
-  fout : TFileStream;
-  head : TVTXObjHeader;
-  i : integer;
-  fname : string;
+  fout :    TFileStream;
+  head :    TVTXObjHeader;
+  i :       integer;
+  fname :   string;
+  cellrec : TCell;
 const
   ID = 'VTXEDIT';
 begin
@@ -5371,7 +5436,10 @@ begin
       end;
       fout.Write(head, sizeof(TVTXObjHeader));
       for i := 0 to head.Height * head.Width - 1 do
-        fout.Write(Objects[SelectedObject].Data[i], sizeof(TCell));
+      begin
+        Objects[SelectedObject].Data.Get(@cellrec, i);
+        fout.Write(cellrec, sizeof(TCell));
+      end;
       fout.free;
     end;
   end;
@@ -5432,13 +5500,6 @@ begin
   nop;
 end;
 
-type
-  TRC = record
-    objnum :    integer;
-    neighbors : byte;
-    Row, Col :  integer;
-  end;
-
 // draw the document
 procedure TfMain.pbPagePaint(Sender: TObject);
 var
@@ -5448,21 +5509,11 @@ var
   pr :        TRect;
   tmp, tmp2 : TBGRABitmap;
   tmpreg :    TRecList;
-  i, j :      integer;
-  objonrow :  boolean;
+  i :         integer;
   x, y :      integer;
   cell :      TCell;
   objnum :    integer;
-  neighbors : byte;
   cl1, cl2 :  TColor;
-
-  Points :    TRecList; // of TRC
-  pt :        TRC;
-  p :         PCell;
-  r1, c1 :    integer;
-  pbot :      integer;
-  h, w :      integer;
-  hit :       boolean;
   copyrec :   TLoc;
 
 begin
@@ -6813,18 +6864,26 @@ begin
     CurrUndoData.Get(@rec, i);
     if (rec.Row = row) and (rec.Col = col) then
     begin
-      // if exists, update the new cell
-      rec.NewCell := newcell;
-      CurrUndoData.Put(@rec, i);
+      // if exists, update the new cell - if different
+      if (newcell.Chr <> rec.NewCell.Chr)
+        or (newcell.Attr <> rec.NewCell.Attr) then
+      begin
+        rec.NewCell := newcell;
+        CurrUndoData.Put(@rec, i);
+      end;
       exit;
     end;
   end;
-  // new record
-  rec.Row := row;
-  rec.Col := col;
-  rec.NewCell := newcell;
-  rec.OldCell := Page.Rows[row].Cells[col];
-  CurrUndoData.Add(@rec);
+  // new record - if different
+  if (newcell.Chr <> Page.Rows[row].Cells[col].Chr)
+    or (newcell.Attr <> Page.Rows[row].Cells[col].Attr) then
+  begin
+    rec.Row := row;
+    rec.Col := col;
+    rec.NewCell := newcell;
+    rec.OldCell := Page.Rows[row].Cells[col];
+    CurrUndoData.Add(@rec);
+  end;
 end;
 
 // clear all data from pos to end of list. move list count down.
@@ -6837,10 +6896,14 @@ begin
   begin
     Undo.Get(@undoblk, i);
     case undoblk.UndoType of
-      utCells:
-        begin
-          undoblk.CellData.Free;
-        end;
+
+      utCells:      undoblk.CellData.Free;
+
+      utObjAdd:     undoblk.Obj.Data.Free;
+      utObjRemove:  undoblk.Obj.Data.Free;
+
+      utObjMerge:   undoblk.Obj.Data.Free;
+
     end;
   end;
   Undo.Count := pos;
@@ -6849,6 +6912,9 @@ end;
 // truncate if needed. add undo block to undo list at undopos.
 procedure TfMain.UndoAdd(undoblk : TUndoBlock);
 begin
+  // don't add empty cell deltas
+  if (undoblk.UndoType = utCells) and (undoblk.CellData.Count = 0) then exit;
+
   UndoTruncate(UndoPos);
   Undo.Add(@undoblk);
   UndoPos += 1;
@@ -6896,9 +6962,23 @@ begin
       end;
 
     utObjAdd:
-      ;
+      begin
+        // an added object on top. remove it.
+        SelectedObject := -1;
+        RemoveObject(length(Objects) - 1);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
     utObjRemove:
-      ;
+      begin
+        // readd at oldnum
+        SelectedObject := -1;
+        InsertObject(undoblk.Obj, undoblk.OldNum);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
     utObjMerge:
       ;
 
@@ -6920,7 +7000,7 @@ end;
 procedure TfMain.RedoPerform(pos : integer);
 var
   undocell :  TUndoCells;
-  i :         integer;
+  i, l :      integer;
   undoblk :   TUndoBlock;
   tmpobj :    TObj;
 begin
@@ -6958,10 +7038,26 @@ begin
       end;
 
     utObjAdd:
-      ;
+      // readd object
+      begin
+        SelectedObject := -1;
+        l := length(Objects);
+        setlength(Objects, l + 1);
+        CopyObject(undoblk.Obj, Objects[l]);
+        Objects[l].Row := undoblk.OldRow;
+        Objects[l].Col := undoblk.OldCol;
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
 
     utObjRemove:
-      ;
+      begin
+        // reremove object
+        SelectedObject := -1;
+        RemoveObject(undoblk.OldNum);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
 
     utObjMerge:
       ;
@@ -6980,9 +7076,6 @@ begin
 end;
 
 procedure TfMain.ClearAllUndo;
-var
-  i :       integer;
-  undoblk : TUndoBlock;
 begin
   // clear any UndoData left over.
   UndoTruncate(0);

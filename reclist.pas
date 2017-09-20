@@ -54,7 +54,8 @@ type
     procedure Put(rec : Pointer; recnum : DWORD); inline;
     procedure Get(rec : Pointer; recnum : DWORD); inline;
     procedure Clear;
-    function Copy : TRecList;
+    function  Copy : TRecList;
+    procedure Swap(rec1, rec2 : DWORD);
   end;
 
 implementation
@@ -149,6 +150,21 @@ begin
   MemCopy(self.Data, result.Data, memsize);
 end;
 
+// swap contents of two recors.
+procedure TRecList.Swap(rec1, rec2 : DWORD);
+var
+  idx1, idx2 : DWORD;
+  tmp : PBYTE;
+begin
+  tmp := GetMemory(self.RecSize);
+  idx1 := rec1 * self.RecSize;
+  idx2 := rec2 * self.RecSize;
+
+  MemCopy(@self.Data[idx1], tmp, self.RecSize);
+  MemCopy(@self.Data[idx2], @self.Data[idx1], self.RecSize);
+  MemCopy(tmp, @self.Data[idx2], self.RecSize);
+  FreeMemory(tmp);
+end;
 
 end.
 

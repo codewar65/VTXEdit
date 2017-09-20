@@ -141,6 +141,7 @@ function GetObjectCell(row, col : integer; var cell : TCell) : integer;
 var
   i :             integer;
   objr, objc, p : integer;
+  cellrec : TCell;
 begin
   for i := length(Objects) - 1 downto 0 do
   begin
@@ -152,9 +153,11 @@ begin
       objr := row - Objects[i].Row;
       objc := col - Objects[i].Col;
       p := objr * Objects[i].Width + objc;
-      if Objects[i].Data[p].Chr <> EMPTYCHAR then
+
+      Objects[i].Data.Get(@cellrec, p);
+      if cellrec.Chr <> EMPTYCHAR then
       begin
-        cell := Objects[i].Data[objr * Objects[i].Width + objc];
+        cell := cellrec;
         exit(i);
       end;
     end;

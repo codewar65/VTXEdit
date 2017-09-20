@@ -56,7 +56,7 @@ type
 
   PCell = ^TCell;
 
-  TCellList = array of TCell;
+//  TCellList = array of TCell;
 
   // ANSI art objects / pasted object from clipboard.
   TObj = record
@@ -66,7 +66,8 @@ type
     Page,
     Locked,
     Hidden :            boolean;
-    Data :              TCellList;
+//    Data :              TCellList;
+    Data :              TRecList; // of TCell
   end;
 
   PObj = ^TObj;
