@@ -3988,10 +3988,8 @@ begin
   end;
 
   if Button = mbMiddle then
-    MousePan := false;
-
-  // stop any dragging
-  if drag then
+    MousePan := false
+  else if drag then
   begin
     // add / remove selection
     tmp := BuildDisplayCopySelection;
