@@ -47,48 +47,52 @@ implementation
 
 procedure MemZero(dst : Pointer; size : longint); inline;
 begin
-  asm
-        MOV   EDI, dst
-        MOV   ECX, size
-        XOR   AL, AL
-        REP   STOSB
-  end ['AL', 'EDI', 'ECX'];
+  FillByte(dst^, size, $00);
+//  asm
+//        MOV   EDI, dst
+//        MOV   ECX, size
+//        XOR   AL, AL
+//        REP   STOSB
+//  end ['AL', 'EDI', 'ECX'];
 end;
 
 procedure MemFill(dst : Pointer; size : longint; val : byte); inline;
 begin
-  asm
-        MOV   EDI, dst
-        MOV   ECX, size
-        MOV   AL, val
-        REP   STOSB
-  end ['AL', 'EDI', 'ECX'];
+  FillByte(dst^, size, val);
+//  asm
+//        MOV   EDI, dst
+//        MOV   ECX, size
+//        MOV   AL, val
+//        REP   STOSB
+//  end ['AL', 'EDI', 'ECX'];
 end;
 
 procedure MemCopy(src, dst : Pointer; size : longint); inline;
 begin
-  asm
-        MOV   ESI, src
-        MOV   EDI, dst
-        MOV   ECX, size
-        REP   MOVSB
-  end ['ESI', 'EDI', 'ECX'];
+  Move(src^, dst^, size);
+//  asm
+//        MOV   ESI, src
+//        MOV   EDI, dst
+//        MOV   ECX, size
+//        REP   MOVSB
+//  end ['ESI', 'EDI', 'ECX'];
 end;
 
 function MemComp(src, dst : Pointer; size : longint) : boolean; inline;
-label
-  done;
+//label
+//  done;
 begin
-  asm
-        MOV   result, $01
-        MOV   ESI, src
-        MOV   EDI, dst
-        MOV   ECX, size
-        REPE  CMPSB
-        JZ    DONE
-        DEC   result
-DONE:
-  end;
+  result := CompareMem(src,dst,size);
+//  asm
+//        MOV   result, $01
+//        MOV   ESI, src
+//        MOV   EDI, dst
+//        MOV   ECX, size
+//        REPE  CMPSB
+//        JZ    DONE
+//        DEC   result
+//DONE:
+//  end;
 end;
 
 end.
