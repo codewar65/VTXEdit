@@ -18,7 +18,6 @@ fp.dsk
 *.dll
 *.so
 *.dylib
-*.lrs
 *.res
 *.dbg
 *.o
