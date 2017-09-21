@@ -120,7 +120,6 @@ object fMain: TfMain
         Hint = 'Fill'
         Top = 0
         Caption = 'tbToolFill'
-        Enabled = False
         Grouped = True
         ImageIndex = 17
         OnClick = tbToolClick
@@ -132,7 +131,6 @@ object fMain: TfMain
         Hint = 'Eyedropper'
         Top = 0
         Caption = 'tbToolEyedropper'
-        Enabled = False
         Grouped = True
         ImageIndex = 28
         OnClick = tbToolClick
@@ -144,7 +142,6 @@ object fMain: TfMain
         Hint = 'Line'
         Top = 0
         Caption = 'tbToolLine'
-        Enabled = False
         Grouped = True
         ImageIndex = 18
         OnClick = tbToolClick
@@ -156,7 +153,6 @@ object fMain: TfMain
         Hint = 'Rectangle'
         Top = 0
         Caption = 'tbToolRect'
-        Enabled = False
         Grouped = True
         ImageIndex = 19
         OnClick = tbToolClick
@@ -168,7 +164,6 @@ object fMain: TfMain
         Hint = 'Ellipse'
         Top = 0
         Caption = 'tbToolEllipse'
-        Enabled = False
         Grouped = True
         ImageIndex = 20
         OnClick = tbToolClick

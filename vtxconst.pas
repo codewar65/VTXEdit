@@ -194,7 +194,8 @@ type
     encWIN1255, encWIN1256, encWIN1257,
     encUTF8, encUTF16 );
 
-  TToolModes = ( tmSelect, tmDraw, tmFill, tmLine, tmRect, tmEllipse );
+  TToolModes = ( tmSelect, tmDraw, tmFill, tmLine, tmRect, tmEllipse, tmEyedropper );
+
   TDrawModes = ( dmChars, dmLeftRights, dmTopBottoms, dmQuarters, dmSixels );
 
   TCodePageRec = packed record

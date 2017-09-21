@@ -796,7 +796,12 @@ begin
   Screen.Cursors[CURSOR_ARROWMINUS] := LoadCursorFromLazarusResource('C2');
   Screen.Cursors[CURSOR_DRAW] := LoadCursorFromLazarusResource('C3');
   Screen.Cursors[CURSOR_FILL] := LoadCursorFromLazarusResource('C4');
+  Screen.Cursors[CURSOR_LINE] := LoadCursorFromLazarusResource('C5');
+  Screen.Cursors[CURSOR_RECT] := LoadCursorFromLazarusResource('C6');
+  Screen.Cursors[CURSOR_ELLIPSE] := LoadCursorFromLazarusResource('C7');
+  Screen.Cursors[CURSOR_EYEDROPPER] := LoadCursorFromLazarusResource('C8');
   pbPage.Cursor := CURSOR_ARROW;
+  Application.ProcessMessages;
 
   seRows.MaxValue := MaxRows;
   seCols.MaxValue := MaxCols;
@@ -1551,13 +1556,11 @@ begin
   begin
     pbPage.Cursor := CURSOR_ARROW;
     Application.ProcessMessages;
-    sleep(250);
   end
   else if (Key = VK_CONTROL) and (ToolMode = tmSelect) then
   begin
     pbPage.Cursor := CURSOR_ARROW;
     Application.ProcessMessages;
-    sleep(250);
   end;
 end;
 
@@ -1590,13 +1593,11 @@ begin
   begin
     pbPage.Cursor := CURSOR_ARROWPLUS;
     Application.ProcessMessages;
-    sleep(250);
   end
   else if (Key = VK_CONTROL) and (ToolMode = tmSelect) then
   begin
     pbPage.Cursor := CURSOR_ARROWMINUS;
     Application.ProcessMessages;
-    sleep(250);
   end;
 
   if (Key = VK_SHIFT) or (Key = VK_CONTROL) or (Key = VK_MENU) then exit;
@@ -3136,13 +3137,54 @@ begin
   tb := TToolButton(Sender);
 
   case tb.Name of
-    'tbToolSelect':     ToolMode := tmSelect;
-    'tbToolDraw':       ToolMode := tmDraw;
-//    'tbToolEyedropper': ToolMode := tmEy;
-    'tbToolFill':       ToolMode := tmFill;
-    'tbToolLine':       ToolMode := tmLine;
-    'tbToolRect':       ToolMode := tmRect;
-    'tbToolEllipse':    ToolMode := tmEllipse;
+    'tbToolSelect':
+      begin
+        ToolMode := tmSelect;
+        pbPage.Cursor := CURSOR_ARROW;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolDraw':
+      begin
+        ToolMode := tmDraw;
+        pbPage.Cursor := CURSOR_DRAW;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolEyedropper':
+      begin
+        ToolMode := tmEyedropper;
+        pbPage.Cursor := CURSOR_EYEDROPPER;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolFill':
+      begin
+        ToolMode := tmFill;
+        pbPage.Cursor := CURSOR_FILL;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolLine':
+      begin
+        ToolMode := tmLine;
+        pbPage.Cursor := CURSOR_LINE;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolRect':
+      begin
+        ToolMode := tmRect;
+        pbPage.Cursor := CURSOR_RECT;
+        Application.ProcessMessages;
+      end;
+
+    'tbToolEllipse':
+      begin
+        ToolMode := tmEllipse;
+        pbPage.Cursor := CURSOR_ELLIPSE;
+        Application.ProcessMessages;
+      end;
   end;
 
   tbToolSelect.Down := (tb.Name = 'tbToolSelect');

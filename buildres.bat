@@ -10,6 +10,11 @@ echo work\c1.cur >> lrs.tmp
 echo work\c2.cur >> lrs.tmp
 echo work\c3.cur >> lrs.tmp
 echo work\c4.cur >> lrs.tmp
+echo work\c5.cur >> lrs.tmp
+echo work\c6.cur >> lrs.tmp
+echo work\c7.cur >> lrs.tmp
+echo work\c8.cur >> lrs.tmp
+rem echo work\c4.cur >> lrs.tmp
 
 lazres vtxcursors.lrs @lrs.tmp
 
