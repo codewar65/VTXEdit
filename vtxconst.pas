@@ -92,8 +92,6 @@ type
 
   TUndoBlock = record
     UndoType :        TUndoTypes;
-    OldCell,
-    NewCell :         TCell;    // typed cell delta
     CellData :        TRecList; // reclist of TUndoCells for type utCells
     Obj :             TObj;     // copy of object merged/added/removed
     OldRow, OldCol,
@@ -103,8 +101,8 @@ type
 
   // copy / paste region selection info
   TLoc = packed record
-    Neighbors :         byte;       // 1=n,2=e,4=s,8=w
-    Row, Col :          int16;
+    Neighbors :         Byte;       // 1=n,2=e,4=s,8=w
+    Row, Col :          Int16;
   end;
 
   // http://www.acid.org/info/sauce/sauce.htm
@@ -223,6 +221,9 @@ type
   end;
 
 const
+
+  MaxRows = 2048;
+  MaxCols = 512;
 
   clSelectedObject1 =   $FFFF00;
   clSelectedObject2 =   $888800;

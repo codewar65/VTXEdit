@@ -80,13 +80,13 @@ label
   done;
 begin
   asm
-        MOV   result, $00
+        MOV   result, $01
         MOV   ESI, src
         MOV   EDI, dst
         MOV   ECX, size
         REPE  CMPSB
         JZ    DONE
-        INC   result
+        DEC   result
 DONE:
   end;
 end;

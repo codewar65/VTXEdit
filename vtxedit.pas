@@ -765,6 +765,9 @@ var
   enc : integer;
 begin
 
+  seRows.MaxValue := MaxRows;
+  seCols.MaxValue := MaxCols;
+
   CurrFileName := 'Untitled.vtx';
   CurrFileChanged := false;
 
@@ -873,12 +876,12 @@ begin
 //  Fonts[12] := encTeletextSeparated;
 
   // clear undo stuff
-  CurrUndoData.Create(sizeof(TUndoCells));
-  Undo.Create(sizeof(TUndoBlock));
+  CurrUndoData.Create(sizeof(TUndoCells), rleDoubles);
+  Undo.Create(sizeof(TUndoBlock), rleDoubles);
   UndoPos := 0;
 
   // create copyselection
-  CopySelection.Create(sizeof(TLoc));
+  CopySelection.Create(sizeof(TLoc), rleDoubles);
 
   LoadSettings;
   NewFile;
@@ -912,7 +915,7 @@ begin
   // clear the clipboard
   Clipboard.Width := 0;
   Clipboard.Height := 0;
-  Clipboard.Data.Create(sizeof(TCell));
+  Clipboard.Data.Create(sizeof(TCell), rleDoubles);
 
   DebugStart;
 
@@ -1876,6 +1879,7 @@ begin
 
             undoblk.UndoType := utCells;
             undoblk.CellData := CurrUndoData.Copy;
+            undoblk.CellData.Trim;
             UndoAdd(undoblk);
 
             GenerateBmpPage;
@@ -2331,6 +2335,13 @@ begin
   // clear any UndoData left over.
   ClearAllUndo;
 
+  seRows.Value := 24;
+  seCols.Value := 80;
+  PageZoom := 1.0;
+  PageTop := 0;
+  PageLeft := 0;
+  ResizeScrolls;
+  pbPage.Invalidate;
 end;
 
 procedure TfMain.miFileNewClick(Sender: TObject);
@@ -2407,7 +2418,7 @@ begin
     // get name
     fin.Read(namein, 64);
     Objects[i].Name := namein;
-    Objects[i].Data.Create(sizeof(TCell));
+    Objects[i].Data.Create(sizeof(TCell), rleDoubles);
     for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
     begin
       fin.ReadBuffer(cellrec, sizeof(TCell));
@@ -4019,6 +4030,7 @@ begin
     // save CurrUndoData to undolist
     undoblk.UndoType := utCells;
     undoblk.CellData := CurrUndoData.Copy;
+    undoblk.CellData.Trim;
     UndoAdd(undoblk);
     CurrUndoData.Clear;
   end;
@@ -4108,6 +4120,7 @@ begin
     // save key presses.
     undoblk.UndoType := utCells;
     undoblk.CellData := CurrUndoData.Copy;
+    undoblk.CellData.Trim;
     UndoAdd(undoblk);
     CurrUndoData.Clear;
   end;
@@ -4724,7 +4737,7 @@ begin
   result.Height := h;
 
   // allocate space for data and clear
-  result.Data.Create(sizeof(TCell));
+  result.Data.Create(sizeof(TCell), rleDoubles);
   for i := 0 to (w * h) - 1 do
   begin
     cellrec.Attr := $0007;
@@ -4796,6 +4809,7 @@ begin
   result.Locked:=false;
   result.Hidden:=false;
   result.Page:=false;
+  result.Data.Trim;
   result.Name := '[Clipboard]';
 end;
 
@@ -4807,7 +4821,7 @@ var
   r2, c2 :  integer;
   copyrec : TLoc;
 begin
-  result.Create(sizeof(TLoc));
+  result.Create(sizeof(TLoc), rleDoubles);
   if drag then
   begin
     r1 := MouseRow;
@@ -5176,6 +5190,7 @@ procedure TfMain.RemoveObject(objnum : integer);
 var
   i : integer;
 begin
+  Objects[objnum].Data.Free;
   for i := objnum + 1 to length(Objects) - 1 do
     Objects[i - 1] := Objects[i];
   Setlength(Objects, length(Objects) - 1);
@@ -5189,7 +5204,8 @@ begin
   Setlength(Objects, l + 1);
   for i := l - 1 downto pos do
     Objects[i + 1] := Objects[i];
-  Objects[pos] := obj;
+  CopyObject(obj, Objects[pos]);
+//  Objects[pos] := obj;
 end;
 
 procedure TfMain.ObjMerge;
@@ -5198,10 +5214,13 @@ var
   p :       integer;
   r, c :    integer;
   cellrec : TCell;
+  undoblk : TUndoBlock;
 begin
   // merge this object to page. and remove object
   if SelectedObject >= 0 then
   begin
+    SaveUndoKeys;
+
     po := @Objects[SelectedObject];
     p := 0;
     for r := po^.Row to po^.Row + po^.Height - 1 do
@@ -5211,12 +5230,26 @@ begin
         if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
           if cellrec.Chr <> EMPTYCHAR then
           begin
+            RecordUndoCell(r, c, cellrec);
             Page.Rows[r].Cells[c] := cellrec;
           end;
         p += 1;
       end;
+
+    undoblk.UndoType := utObjMerge;
+    undoblk.CellData := CurrUndoData.Copy;
+    CurrUndoData.Clear;
+    undoblk.CellData.Trim;
+    undoblk.OldRow := Objects[SelectedObject].Row;
+    undoblk.OldCol := Objects[SelectedObject].Col;
+    undoblk.OldNum := SelectedObject;
+    CopyObject(Objects[SelectedObject], undoblk.Obj);
+    UndoAdd(undoblk);
+
     RemoveObject(SelectedObject);
     SelectedObject := -1;
+
+
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     GenerateBmpPage;
@@ -5232,12 +5265,16 @@ var
   r, c :    integer;
   objnum :  integer;
   cellrec : TCell;
+  undoblk : TUndoBlock;
 begin
   // merge this object to page. and remove object
   if length(Objects) > 0 then
   begin
+    SaveUndoKeys;
+
     for objnum := length(Objects) - 1 downto 0 do
     begin
+
       po := @Objects[objnum];
       p := 0;
       for r := po^.Row to po^.Row + po^.Height - 1 do
@@ -5247,13 +5284,25 @@ begin
           if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
             if cellrec.Chr <> EMPTYCHAR then
             begin
+              RecordUndoCell(r, c, cellrec);
               Page.Rows[r].Cells[c] := cellrec;
             end;
           p += 1;
         end;
-    end;
-    for objnum := length(Objects) - 1 downto 0 do
+
+      undoblk.UndoType := utObjMerge;
+      undoblk.CellData := CurrUndoData.Copy;
+      CurrUndoData.Clear;
+      undoblk.CellData.Trim;
+      undoblk.OldRow := Objects[objnum].Row;
+      undoblk.OldCol := Objects[objnum].Col;
+      undoblk.OldNum := objnum;
+      CopyObject(Objects[objnum], undoblk.Obj);
+      UndoAdd(undoblk);
+
       Objects[objnum].Data.Free;
+    end;
+
     setlength(Objects, 0);
     SelectedObject := -1;
     LoadlvObjects;
@@ -5381,7 +5430,7 @@ begin
     obj.Hidden := false;
     obj.Page := false;
 
-    obj.Data.Create(sizeof(TCell));
+    obj.Data.Create(sizeof(TCell), rleDoubles);
     for i := 0 to head.Width * head.Height - 1 do
     begin
       fin.Read(cellrec, sizeof(TCell));
@@ -6900,8 +6949,11 @@ begin
       utObjAdd:     undoblk.Obj.Data.Free;
       utObjRemove:  undoblk.Obj.Data.Free;
 
-      utObjMerge:   undoblk.Obj.Data.Free;
-
+      utObjMerge:
+        begin
+          undoblk.Obj.Data.Free;
+          undoblk.CellData.Free;
+        end;
     end;
   end;
   Undo.Count := pos;
@@ -6978,7 +7030,19 @@ begin
       end;
 
     utObjMerge:
-      ;
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
+        end;
+        SelectedObject := -1;
+        InsertObject(undoblk.Obj, undoblk.OldNum);
+        LoadlvObjects;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
 
     utObjFlipHorz:
       begin
@@ -7058,7 +7122,19 @@ begin
       end;
 
     utObjMerge:
-      ;
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
+        end;
+        SelectedObject := -1;
+        RemoveObject(undoblk.OldNum);
+        LoadlvObjects;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
 
     utObjFlipHorz:
       begin

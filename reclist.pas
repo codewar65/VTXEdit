@@ -42,12 +42,15 @@ uses
   Classes, SysUtils, Memory;
 
 type
+  TRecListExpansion = ( rleDoubles, rleAdds );
+
   TRecList = record
     Data :    PBYTE;  // pointer to data records
     Count :   DWORD;  // current number of records in Data.
     Size :    DWORD;  // current allocated space
     RecSize : DWORD;
-    procedure Create(recsz : DWORD);
+    Flags :   BYTE;
+    procedure Create(recsz : DWORD; expansion : TRecListExpansion);
     procedure Free;
     procedure Add(rec : Pointer);  // add new record
     procedure Remove(recnum : DWORD);
@@ -56,20 +59,32 @@ type
     procedure Clear;
     function  Copy : TRecList;
     procedure Swap(rec1, rec2 : DWORD);
+    procedure Trim;
+    function Locked : boolean; inline;
   end;
 
 implementation
 
 const
-  INIT_RECSIZE = 16;
+  TRECLIST_INITSIZE =   16;           // initial number of records allocated on create
+  TRECLIST_LOCKED =     %00000001;    // object size is locked. no additions or removals allowed.
+  TRECLIST_ADDEXPAND =  %00000010;    // of set, size increases by recsize instead of doubles.
 
-procedure TRecList.Create(recsz : DWORD);
+procedure TRecList.Create(recsz : DWORD; expansion : TRecListExpansion);
 begin
   self.RecSize := recsz;
   self.Count := 0;
-  self.Size := INIT_RECSIZE;
+  self.Size := TRECLIST_INITSIZE;
   self.Data := GetMemory(self.RecSize * Size);
   FillByte(self.Data[0], self.RecSize * Size, $00);
+  self.Flags := %00000000;
+  if expansion = rleAdds then
+    self.Flags := (self.Flags or TRECLIST_ADDEXPAND);
+end;
+
+function TRecList.Locked : boolean; inline;
+begin
+  result := ((self.Flags and TRECLIST_LOCKED) <> 0);
 end;
 
 procedure TRecList.Free;
@@ -85,12 +100,20 @@ var
   newsz : DWORD;
   newdata : PBYTE;
 begin
+
+  if (self.Flags and TRECLIST_LOCKED) <> 0 then
+    raise Exception.Create('TRecList Locked.');
+
   if Count >= Size then
   begin
     // grow the data
-    newsz := self.Size << 1;
+    if (self.Flags and TRECLIST_ADDEXPAND) <> 0 then
+      newsz := self.Size + (TRECLIST_INITSIZE * self.RecSize)
+    else
+      newsz := self.Size << 1;
+
     newdata := getmemory(newsz * self.RecSize);
-    FillByte(newdata[0], newsz * self.RecSize, $00);
+    MemFill(newdata, newsz * self.RecSize, $00);
     MemCopy(self.Data, newdata, self.Size * self.RecSize);
     FreeMemory(self.Data);
     self.Data := newdata;
@@ -106,8 +129,12 @@ var
   totsz : DWORD;
   endsz : DWORD;
 begin
+
+  if (self.Flags and TRECLIST_LOCKED) <> 0 then
+    raise Exception.Create('TRecList Locked.');
+
   if recnum >= self.Count then
-    exit;
+    raise Exception.Create('TRecList Out of Bounds.');
 
   totsz := (self.RecSize * self.Size);
   endsz := totsz - ((recnum + 1) * self.RecSize);
@@ -120,11 +147,17 @@ end;
 
 procedure TRecList.Put(rec : Pointer; recnum : DWORD); inline;
 begin
+  if recnum >= self.Count then
+    raise Exception.Create('TRecList Out of Bounds.');
+
   MemCopy(rec, @self.Data[recnum * self.RecSize], self.RecSize);
 end;
 
 procedure TRecList.Get(rec : Pointer; recnum : DWORD); inline;
 begin
+  if recnum >= self.Count then
+    raise Exception.Create('TRecList Out of Bounds.');
+
   MemCopy(@self.Data[recnum * self.RecSize], rec, self.RecSize);
 end;
 
@@ -132,7 +165,7 @@ procedure TRecList.Clear;
 begin
   FreeMemory(self.Data);
   self.Count := 0;
-  self.Size := INIT_RECSIZE;
+  self.Size := TRECLIST_LOCKED;
   self.Data := GetMemory(self.RecSize * Size);
 end;
 
@@ -156,6 +189,9 @@ var
   idx1, idx2 : DWORD;
   tmp : PBYTE;
 begin
+  if (rec1 >= self.Count) or (rec2 >= self.Count) then
+    raise Exception.Create('TRecList Out of Bounds.');
+
   tmp := GetMemory(self.RecSize);
   idx1 := rec1 * self.RecSize;
   idx2 := rec2 * self.RecSize;
@@ -166,81 +202,19 @@ begin
   FreeMemory(tmp);
 end;
 
+// trim memory/ used when rec is not expecet to grow any more.
+procedure TRecList.Trim;
+var
+  tmp : PBYTE;
+  l : DWORD;
+begin
+  l := self.Count * self.RecSize;
+  tmp := GetMemory(l);
+  MemCopy(self.Data, tmp, l);
+  Freememory(self.Data);
+  self.Data := tmp;
+  self.Flags := self.Flags or TRECLIST_LOCKED;
+end;
+
 end.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
