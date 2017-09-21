@@ -106,7 +106,7 @@ uses
   StdCtrls,
   Buttons,
   Graphics,
-  Spin, ComCtrls, Arrow,
+  Spin, ComCtrls,
   Math,
   BGRABitmap,
   BGRABitmapTypes,
@@ -118,6 +118,7 @@ uses
   UnicodeHelper,
   RecList,
   LazUTF8,
+  LResources,
   Memory,
   Inifiles;
 
@@ -428,6 +429,7 @@ type
 
   public
     { public declarations }
+
 
   end;
 
@@ -789,11 +791,11 @@ begin
 
   // create custom cursors from imagelist
 
-  Screen.Cursors[CURSOR_ARROW] := LoadCursorA(HINSTANCE, 'C0');
-  Screen.Cursors[CURSOR_ARROWPLUS] := LoadCursorA(HINSTANCE, 'C1');
-  Screen.Cursors[CURSOR_ARROWMINUS] := LoadCursorA(HINSTANCE, 'C2');
-  Screen.Cursors[CURSOR_DRAW] := LoadCursorA(HINSTANCE, 'C3');
-  Screen.Cursors[CURSOR_FILL] := LoadCursorA(HINSTANCE, 'C4');
+  Screen.Cursors[CURSOR_ARROW] := LoadCursorFromLazarusResource('C0');
+  Screen.Cursors[CURSOR_ARROWPLUS] := LoadCursorFromLazarusResource('C1');
+  Screen.Cursors[CURSOR_ARROWMINUS] := LoadCursorFromLazarusResource('C2');
+  Screen.Cursors[CURSOR_DRAW] := LoadCursorFromLazarusResource('C3');
+  Screen.Cursors[CURSOR_FILL] := LoadCursorFromLazarusResource('C4');
   pbPage.Cursor := CURSOR_ARROW;
 
   seRows.MaxValue := MaxRows;
@@ -7225,6 +7227,9 @@ begin
   nop;
 
 end;
+
+initialization
+{$I vtxcursors.lrs}
 
 end.
 

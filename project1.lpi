@@ -47,7 +47,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="10">
+    <Units Count="12">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -102,6 +102,14 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="Memory"/>
       </Unit9>
+      <Unit10>
+        <Filename Value="vtxcursors.lrs"/>
+        <IsPartOfProject Value="True"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="buildres.bat"/>
+        <IsPartOfProject Value="True"/>
+      </Unit11>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
