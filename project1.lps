@@ -4,11 +4,11 @@
     <PathDelim Value="\"/>
     <Version Value="10"/>
     <BuildModes Active="Default"/>
-    <Units Count="59">
+    <Units Count="61">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="6"/>
         <CursorPos X="17" Y="39"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
@@ -21,8 +21,8 @@
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXEdit"/>
         <IsVisibleTab Value="True"/>
-        <TopLine Value="3273"/>
-        <CursorPos Y="3346"/>
+        <TopLine Value="1495"/>
+        <CursorPos X="35" Y="1550"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
@@ -31,7 +31,7 @@
         <Filename Value="vtxconst.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXConst"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="5"/>
         <TopLine Value="208"/>
         <CursorPos X="17" Y="226"/>
         <UsageCount Value="200"/>
@@ -44,7 +44,7 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXPreviewBox"/>
-        <EditorIndex Value="10"/>
+        <EditorIndex Value="9"/>
         <TopLine Value="87"/>
         <CursorPos X="6" Y="159"/>
         <UsageCount Value="200"/>
@@ -55,9 +55,9 @@
         <Filename Value="vtxsupport.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXSupport"/>
-        <EditorIndex Value="3"/>
-        <TopLine Value="99"/>
-        <CursorPos Y="161"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="141"/>
+        <CursorPos Y="245"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
       </Unit4>
@@ -73,7 +73,7 @@
         <Filename Value="vtxencdetect.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXEncDetect"/>
-        <EditorIndex Value="9"/>
+        <EditorIndex Value="8"/>
         <TopLine Value="162"/>
         <CursorPos Y="243"/>
         <UsageCount Value="202"/>
@@ -83,7 +83,7 @@
         <Filename Value="unicodehelper.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="UnicodeHelper"/>
-        <EditorIndex Value="11"/>
+        <EditorIndex Value="10"/>
         <TopLine Value="380"/>
         <CursorPos Y="441"/>
         <UsageCount Value="200"/>
@@ -93,19 +93,19 @@
         <Filename Value="reclist.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="RecList"/>
-        <EditorIndex Value="4"/>
-        <TopLine Value="56"/>
-        <CursorPos X="30" Y="126"/>
-        <UsageCount Value="72"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="73"/>
+        <CursorPos X="56" Y="156"/>
+        <UsageCount Value="78"/>
         <Loaded Value="True"/>
       </Unit8>
       <Unit9>
         <Filename Value="memory.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="Memory"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="4"/>
         <CursorPos X="12" Y="89"/>
-        <UsageCount Value="39"/>
+        <UsageCount Value="45"/>
         <Loaded Value="True"/>
       </Unit9>
       <Unit10>
@@ -117,7 +117,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="123"/>
         <CursorPos Y="74"/>
-        <UsageCount Value="190"/>
+        <UsageCount Value="189"/>
       </Unit10>
       <Unit11>
         <Filename Value="vtxcharbox.pas"/>
@@ -128,7 +128,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="240"/>
         <CursorPos Y="335"/>
-        <UsageCount Value="190"/>
+        <UsageCount Value="189"/>
       </Unit11>
       <Unit12>
         <Filename Value="vtxfonts.pas"/>
@@ -139,12 +139,12 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="247"/>
         <CursorPos X="33" Y="308"/>
-        <UsageCount Value="41"/>
+        <UsageCount Value="40"/>
       </Unit12>
       <Unit13>
         <Filename Value="vtxedit.inc"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="192"/>
+        <UsageCount Value="191"/>
       </Unit13>
       <Unit14>
         <Filename Value="vtxattrbox.pas"/>
@@ -155,48 +155,48 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="325"/>
         <CursorPos Y="436"/>
-        <UsageCount Value="190"/>
+        <UsageCount Value="189"/>
       </Unit14>
       <Unit15>
         <Filename Value="C:\lazarus\lcl\include\application.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1525"/>
         <CursorPos Y="1583"/>
-        <UsageCount Value="7"/>
+        <UsageCount Value="6"/>
       </Unit15>
       <Unit16>
         <Filename Value="C:\lazarus\lcl\graphics.pp"/>
         <UnitName Value="Graphics"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="274"/>
-        <CursorPos X="3" Y="331"/>
-        <UsageCount Value="7"/>
+        <TopLine Value="1744"/>
+        <CursorPos X="3" Y="1800"/>
+        <UsageCount Value="12"/>
       </Unit16>
       <Unit17>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\win32\system.pp"/>
         <UnitName Value="System"/>
         <EditorIndex Value="-1"/>
         <CursorPos Y="16"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit17>
       <Unit18>
         <Filename Value="C:\lazarus\lcl\include\customform.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="606"/>
         <CursorPos Y="663"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit18>
       <Unit19>
         <Filename Value="C:\lazarus\lcl\include\control.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="4142"/>
         <CursorPos Y="4198"/>
-        <UsageCount Value="20"/>
+        <UsageCount Value="19"/>
       </Unit19>
       <Unit20>
         <Filename Value="attrbox.lfm"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="26"/>
+        <UsageCount Value="25"/>
         <DefaultSyntaxHighlighter Value="LFM"/>
       </Unit20>
       <Unit21>
@@ -204,7 +204,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="7307"/>
         <CursorPos Y="7364"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
       </Unit21>
       <Unit22>
         <Filename Value="colorbox.lfm"/>
@@ -212,29 +212,28 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="26"/>
+        <UsageCount Value="25"/>
         <DefaultSyntaxHighlighter Value="LFM"/>
       </Unit22>
       <Unit23>
         <Filename Value="project1.lpi"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="60" Y="48"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="9"/>
         <DefaultSyntaxHighlighter Value="XML"/>
       </Unit23>
       <Unit24>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\typshrdh.inc"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="52"/>
         <CursorPos X="3" Y="101"/>
-        <UsageCount Value="18"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="20"/>
       </Unit24>
       <Unit25>
         <Filename Value="C:\lazarus\lcl\include\graphiccontrol.inc"/>
         <EditorIndex Value="-1"/>
         <CursorPos Y="91"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit25>
       <Unit26>
         <Filename Value="C:\lazarus\lcl\lclmessageglue.pas"/>
@@ -242,21 +241,21 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="63"/>
         <CursorPos Y="120"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="8"/>
       </Unit26>
       <Unit27>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32callback.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="29"/>
         <CursorPos X="36" Y="110"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="7"/>
       </Unit27>
       <Unit28>
         <Filename Value="C:\lazarus\lcl\include\winapi.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="870"/>
         <CursorPos Y="933"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit28>
       <Unit29>
         <Filename Value="C:\lazarus\lcl\imglist.pp"/>
@@ -264,21 +263,21 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="119"/>
         <CursorPos Y="187"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit29>
       <Unit30>
         <Filename Value="C:\lazarus\lcl\include\imglist.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="311"/>
         <CursorPos Y="367"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit30>
       <Unit31>
         <Filename Value="C:\lazarus\components\bgrabitmap\bgrapixel.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="111"/>
         <CursorPos X="14" Y="170"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
       </Unit31>
       <Unit32>
         <Filename Value="C:\lazarus\lcl\forms.pp"/>
@@ -286,14 +285,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1795"/>
         <CursorPos Y="1851"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit32>
       <Unit33>
         <Filename Value="C:\lazarus\lcl\include\menuitem.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="231"/>
         <CursorPos Y="287"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="7"/>
       </Unit33>
       <Unit34>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32wsforms.pp"/>
@@ -301,69 +300,69 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="328"/>
         <CursorPos Y="383"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="7"/>
       </Unit34>
       <Unit35>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32object.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="396"/>
         <CursorPos Y="453"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="7"/>
       </Unit35>
       <Unit36>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32winapi.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="3117"/>
         <CursorPos Y="3174"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit36>
       <Unit37>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\ustringh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="46"/>
         <CursorPos Y="157"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="8"/>
       </Unit37>
       <Unit38>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\sysstrh.inc"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="10" Y="78"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
       </Unit38>
       <Unit39>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\win\wininc\defines.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="4764"/>
         <CursorPos X="58" Y="4868"/>
-        <UsageCount Value="1"/>
+        <UsageCount Value="0"/>
       </Unit39>
       <Unit40>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\fgl.pp"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="220"/>
         <CursorPos Y="276"/>
-        <UsageCount Value="3"/>
+        <UsageCount Value="2"/>
       </Unit40>
       <Unit41>
         <Filename Value="C:\lazarus\lcl\include\screen.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="140"/>
         <CursorPos Y="177"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit41>
       <Unit42>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\classes\classesh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="895"/>
         <CursorPos X="17" Y="951"/>
-        <UsageCount Value="4"/>
+        <UsageCount Value="3"/>
       </Unit42>
       <Unit43>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\systemh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="292"/>
         <CursorPos X="3" Y="348"/>
-        <UsageCount Value="11"/>
+        <UsageCount Value="10"/>
       </Unit43>
       <Unit44>
         <Filename Value="..\..\Pascal\VTXEdit\vtxedit.pas"/>
@@ -371,7 +370,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="476"/>
         <CursorPos X="61" Y="568"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="7"/>
       </Unit44>
       <Unit45>
         <Filename Value="C:\lazarus\lcl\comctrls.pp"/>
@@ -379,7 +378,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1269"/>
         <CursorPos Y="1374"/>
-        <UsageCount Value="6"/>
+        <UsageCount Value="5"/>
       </Unit45>
       <Unit46>
         <Filename Value="C:\lazarus\lcl\lmessages.pp"/>
@@ -387,7 +386,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="502"/>
         <CursorPos X="23" Y="606"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit46>
       <Unit47>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32themes.pas"/>
@@ -395,12 +394,12 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="263"/>
         <CursorPos Y="319"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="4"/>
       </Unit47>
       <Unit48>
         <Filename Value="vtxcharbox.lfm"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
         <DefaultSyntaxHighlighter Value="LFM"/>
       </Unit48>
       <Unit49>
@@ -408,15 +407,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="140"/>
         <CursorPos Y="218"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
       </Unit49>
       <Unit50>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\types.pp"/>
         <UnitName Value="Types"/>
-        <EditorIndex Value="1"/>
+        <EditorIndex Value="-1"/>
         <CursorPos X="3" Y="83"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="13"/>
       </Unit50>
       <Unit51>
         <Filename Value="C:\lazarus\components\bgrabitmap\bgradefaultbitmap.pas"/>
@@ -424,14 +422,14 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="744"/>
         <CursorPos X="15" Y="798"/>
-        <UsageCount Value="0"/>
+        <UsageCount Value="9"/>
       </Unit51>
       <Unit52>
         <Filename Value="C:\lazarus\lcl\include\customlistview.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="324"/>
         <CursorPos Y="380"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit52>
       <Unit53>
         <Filename Value="C:\lazarus\lcl\stdctrls.pp"/>
@@ -439,27 +437,27 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="195"/>
         <CursorPos X="36" Y="251"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit53>
       <Unit54>
         <Filename Value="C:\lazarus\lcl\lcltype.pp"/>
         <UnitName Value="LCLType"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="2"/>
+        <UsageCount Value="1"/>
       </Unit54>
       <Unit55>
         <Filename Value="C:\lazarus\lcl\include\listitem.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="592"/>
         <CursorPos Y="649"/>
-        <UsageCount Value="17"/>
+        <UsageCount Value="16"/>
       </Unit55>
       <Unit56>
         <Filename Value="C:\lazarus\lcl\include\rasterimage.inc"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="7"/>
         <TopLine Value="408"/>
         <CursorPos Y="464"/>
-        <UsageCount Value="40"/>
+        <UsageCount Value="43"/>
         <Loaded Value="True"/>
       </Unit56>
       <Unit57>
@@ -467,134 +465,148 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="295"/>
         <CursorPos X="6" Y="351"/>
-        <UsageCount Value="6"/>
+        <UsageCount Value="5"/>
       </Unit57>
       <Unit58>
         <Filename Value="C:\lazarus\components\bgrabitmap\bgraresample.pas"/>
         <UnitName Value="BGRAResample"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="7"/>
+        <UsageCount Value="6"/>
       </Unit58>
+      <Unit59>
+        <Filename Value="C:\lazarus\lcl\controls.pp"/>
+        <UnitName Value="Controls"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="114"/>
+        <CursorPos X="3" Y="170"/>
+        <UsageCount Value="12"/>
+      </Unit59>
+      <Unit60>
+        <Filename Value="C:\lazarus\lcl\lresources.pp"/>
+        <UnitName Value="LResources"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="5258"/>
+        <CursorPos Y="5314"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit60>
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3424" TopLine="3330"/>
+        <Caret Line="1450" Column="24" TopLine="1345"/>
       </Position1>
       <Position2>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3427" TopLine="3330"/>
+        <Caret Line="1464" Column="24" TopLine="1359"/>
       </Position2>
       <Position3>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3430" TopLine="3330"/>
+        <Caret Line="1479" Column="24" TopLine="1374"/>
       </Position3>
       <Position4>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3431" TopLine="3330"/>
+        <Caret Line="1493" Column="24" TopLine="1388"/>
       </Position4>
       <Position5>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3391" TopLine="3330"/>
+        <Caret Line="1507" Column="24" TopLine="1402"/>
       </Position5>
       <Position6>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3901" Column="10" TopLine="3797"/>
+        <Caret Line="1524" Column="24" TopLine="1419"/>
       </Position6>
       <Position7>
         <Filename Value="vtxedit.pas"/>
+        <Caret Line="1573" Column="18" TopLine="1469"/>
       </Position7>
       <Position8>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="413" Column="22" TopLine="310"/>
+        <Caret Line="1574" Column="45" TopLine="1470"/>
       </Position8>
       <Position9>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="887" Column="10" TopLine="784"/>
+        <Caret Line="1580" Column="11" TopLine="1475"/>
       </Position9>
       <Position10>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="1727" Column="26" TopLine="1624"/>
+        <Caret Line="1534" Column="51" TopLine="1491"/>
       </Position10>
       <Position11>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="2344" Column="21" TopLine="2242"/>
       </Position11>
       <Position12>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3346" TopLine="3273"/>
+        <Caret Line="4172" TopLine="4113"/>
       </Position12>
       <Position13>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3347" TopLine="3273"/>
       </Position13>
       <Position14>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3349" TopLine="3273"/>
+        <Caret Line="364" Column="26" TopLine="260"/>
       </Position14>
       <Position15>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3350" TopLine="3273"/>
+        <Caret Line="1557" TopLine="1484"/>
       </Position15>
       <Position16>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3351" TopLine="3273"/>
       </Position16>
       <Position17>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3353" TopLine="3273"/>
+        <Caret Line="797" Column="13" TopLine="688"/>
       </Position17>
       <Position18>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3354" TopLine="3273"/>
+        <Caret Line="1555" TopLine="1446"/>
       </Position18>
       <Position19>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3355" TopLine="3273"/>
       </Position19>
       <Position20>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3356" TopLine="3273"/>
+        <Caret Line="792" Column="13" TopLine="688"/>
       </Position20>
       <Position21>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3357" TopLine="3273"/>
+        <Caret Line="793" Column="13" TopLine="689"/>
       </Position21>
       <Position22>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3358" TopLine="3273"/>
+        <Caret Line="794" Column="13" TopLine="690"/>
       </Position22>
       <Position23>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3365" TopLine="3273"/>
+        <Caret Line="795" Column="13" TopLine="691"/>
       </Position23>
       <Position24>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3369" TopLine="3273"/>
+        <Caret Line="796" Column="13" TopLine="692"/>
       </Position24>
       <Position25>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3346" TopLine="3273"/>
+        <Caret Line="797" Column="13" TopLine="693"/>
       </Position25>
       <Position26>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3347" TopLine="3273"/>
+        <Caret Line="1550" Column="15" TopLine="1446"/>
       </Position26>
       <Position27>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3349" TopLine="3273"/>
+        <Caret Line="1554" Column="15" TopLine="1450"/>
       </Position27>
       <Position28>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3350" TopLine="3273"/>
+        <Caret Line="1594" TopLine="1494"/>
       </Position28>
       <Position29>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3351" TopLine="3273"/>
+        <Caret Line="1592" Column="11" TopLine="1495"/>
       </Position29>
       <Position30>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3369" TopLine="3273"/>
+        <Caret Line="1551" Column="33" TopLine="1495"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>

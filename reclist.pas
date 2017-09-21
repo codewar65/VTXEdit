@@ -54,13 +54,13 @@ type
     procedure Free;
     procedure Add(rec : Pointer);  // add new record
     procedure Remove(recnum : DWORD);
-    procedure Put(rec : Pointer; recnum : DWORD); inline;
-    procedure Get(rec : Pointer; recnum : DWORD); inline;
+    procedure Put(rec : Pointer; recnum : DWORD);
+    procedure Get(rec : Pointer; recnum : DWORD);
     procedure Clear;
     function  Copy : TRecList;
     procedure Swap(rec1, rec2 : DWORD);
     procedure Trim;
-    function Locked : boolean; inline;
+    function Locked : Boolean;
   end;
 
 implementation
@@ -82,7 +82,7 @@ begin
     self.Flags := (self.Flags or TRECLIST_ADDEXPAND);
 end;
 
-function TRecList.Locked : boolean; inline;
+function TRecList.Locked : boolean;
 begin
   result := ((self.Flags and TRECLIST_LOCKED) <> 0);
 end;
@@ -145,7 +145,7 @@ begin
   self.Count -= 1;
 end;
 
-procedure TRecList.Put(rec : Pointer; recnum : DWORD); inline;
+procedure TRecList.Put(rec : Pointer; recnum : DWORD);
 begin
   if recnum >= self.Count then
     raise Exception.Create('TRecList Out of Bounds.');
@@ -153,7 +153,7 @@ begin
   MemCopy(rec, @self.Data[recnum * self.RecSize], self.RecSize);
 end;
 
-procedure TRecList.Get(rec : Pointer; recnum : DWORD); inline;
+procedure TRecList.Get(rec : Pointer; recnum : DWORD);
 begin
   if recnum >= self.Count then
     raise Exception.Create('TRecList Out of Bounds.');
@@ -165,7 +165,7 @@ procedure TRecList.Clear;
 begin
   FreeMemory(self.Data);
   self.Count := 0;
-  self.Size := TRECLIST_LOCKED;
+  self.Size := TRECLIST_INITSIZE;
   self.Data := GetMemory(self.RecSize * Size);
 end;
 

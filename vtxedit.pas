@@ -106,7 +106,7 @@ uses
   StdCtrls,
   Buttons,
   Graphics,
-  Spin, ComCtrls,
+  Spin, ComCtrls, Arrow,
   Math,
   BGRABitmap,
   BGRABitmapTypes,
@@ -138,6 +138,7 @@ type
     CoolBar1: TCoolBar;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
+    ilCursors: TImageList;
     Label1: TLabel;
     Label10: TLabel;
     Label11: TLabel;
@@ -189,6 +190,7 @@ type
     miViewPreview: TMenuItem;
     miView: TMenuItem;
     odAnsi: TOpenDialog;
+    Panel2: TPanel;
     pbChars: TPaintBox;
     pbColors: TPaintBox;
     pRightBar: TPanel;
@@ -242,6 +244,7 @@ type
     bObjSave: TToolButton;
     bObjLoad: TToolButton;
     bObjHideOutlines: TToolButton;
+    ToolBar2: TToolBar;
     ToolButton1: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
@@ -286,6 +289,7 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure SaveUndoKeys;
     procedure ClearAllUndo;
     procedure DoObjFlipHorz(objnum : integer);
@@ -510,6 +514,8 @@ var
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
 
   bmpCharPalette : TBGRABitmap = nil;
+
+  TestCursor : TCursorImage;
 
 {*****************************************************************************}
 
@@ -756,6 +762,20 @@ begin
   Application.Title := Format('VTXEdit - %s%s', [ altered, CurrFileName ]);
 end;
 
+const
+  CURSOR_ARROW =      2;
+  CURSOR_ARROWPLUS =  3;
+  CURSOR_ARROWMINUS = 4;
+  CURSOR_DRAW =       5;
+  CURSOR_FILL =       6;
+  CURSOR_LINE =       7;
+  CURSOR_RECT =       8;
+  CURSOR_ELLIPSE =    9;
+  CURSOR_EYEDROPPER = 10;
+
+var
+  CustomCursors : array [ CURSOR_ARROW .. CURSOR_EYEDROPPER ] of TCursorImage;
+
 procedure TfMain.FormCreate(Sender: TObject);
 var
   cp :  TEncoding;
@@ -763,7 +783,18 @@ var
   gt :  pbyte;
   gts : integer;
   enc : integer;
+  bmp : TBitmap;
+  str : string;
 begin
+
+  // create custom cursors from imagelist
+
+  Screen.Cursors[CURSOR_ARROW] := LoadCursorA(HINSTANCE, 'C0');
+  Screen.Cursors[CURSOR_ARROWPLUS] := LoadCursorA(HINSTANCE, 'C1');
+  Screen.Cursors[CURSOR_ARROWMINUS] := LoadCursorA(HINSTANCE, 'C2');
+  Screen.Cursors[CURSOR_DRAW] := LoadCursorA(HINSTANCE, 'C3');
+  Screen.Cursors[CURSOR_FILL] := LoadCursorA(HINSTANCE, 'C4');
+  pbPage.Cursor := CURSOR_ARROW;
 
   seRows.MaxValue := MaxRows;
   seCols.MaxValue := MaxCols;
@@ -958,6 +989,7 @@ begin
   CurrUndoData.Free;
   ClearAllUndo;
   Undo.Free;
+
 end;
 
 // create new bmpPage of page at zoom 1
@@ -1511,6 +1543,22 @@ begin
   objout.Data := objin.Data.Copy;
 end;
 
+procedure TfMain.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if (Key = VK_SHIFT) and (ToolMode = tmSelect) then
+  begin
+    pbPage.Cursor := CURSOR_ARROW;
+    Application.ProcessMessages;
+    sleep(250);
+  end
+  else if (Key = VK_CONTROL) and (ToolMode = tmSelect) then
+  begin
+    pbPage.Cursor := CURSOR_ARROW;
+    Application.ProcessMessages;
+    sleep(250);
+  end;
+end;
+
 // for special keys
 procedure TfMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
@@ -1535,6 +1583,19 @@ begin
     or seCharacter.Focused
     or ObjectRename then
     exit;
+
+  if (Key = VK_SHIFT) and (ToolMode = tmSelect) then
+  begin
+    pbPage.Cursor := CURSOR_ARROWPLUS;
+    Application.ProcessMessages;
+    sleep(250);
+  end
+  else if (Key = VK_CONTROL) and (ToolMode = tmSelect) then
+  begin
+    pbPage.Cursor := CURSOR_ARROWMINUS;
+    Application.ProcessMessages;
+    sleep(250);
+  end;
 
   if (Key = VK_SHIFT) or (Key = VK_CONTROL) or (Key = VK_MENU) then exit;
 

@@ -13,6 +13,13 @@
       <ResourceType Value="res"/>
       <UseXPManifest Value="True"/>
       <Icon Value="0"/>
+      <Resources Count="5">
+        <Resource_0 FileName="work\c0.cur" Type="CURSOR" ResourceName="C0"/>
+        <Resource_1 FileName="work\c1.cur" Type="CURSOR" ResourceName="C1"/>
+        <Resource_2 FileName="work\c2.cur" Type="CURSOR" ResourceName="C2"/>
+        <Resource_3 FileName="work\c3.cur" Type="CURSOR" ResourceName="C3"/>
+        <Resource_4 FileName="work\c4.cur" Type="CURSOR" ResourceName="C4"/>
+      </Resources>
     </General>
     <i18n>
       <EnableI18N LFM="False"/>
