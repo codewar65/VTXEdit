@@ -56,11 +56,6 @@ UTF 8 nas no characters in the  128-191 range
 
     Terminate ANSI @ $1A
 
-    Perferences:
-      [■] Save Sauce
-      [■] Save BOM
-      (●) LE  ( ) BE  on UTF16 save
-
     Font Palette.
       Font 0-15 selectable (0=default codepage)
       Fonts 1-9 are programmable.
@@ -288,6 +283,7 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
@@ -301,7 +297,7 @@ type
     procedure SaveVTXFile(fname : string);
     procedure SaveAsVTXFile;
     procedure ImportANSIFile(fname : string);
-    procedure ExportANSIFile(fname : string; maxlen : integer; usesauce, staticobjects: boolean);
+    procedure ExportANSIFile(fname : string; maxlen : integer; usebom, usesauce, staticobjects: boolean);
     procedure CheckToSave;
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure SaveUndoKeys;
@@ -6562,6 +6558,7 @@ var
   linelen :     integer;
   uselinelen,
   staticobjects,
+  usebom,
   usesauce :    boolean;
 begin
   // need to ask if
@@ -6574,17 +6571,24 @@ begin
 
   if xo.ShowModal = mrOK then
   begin
+    usebom := xo.cbUseBOM.Checked;
     usesauce := xo.cbUseSauce.Checked;
     uselinelen := xo.cbUseLineLen.Checked;
     linelen := xo.seLineLen.Value;
     staticobjects := xo.cbStaticObjects.Checked;
 
-    sdAnsi.Filter:=     'ANSI File (*.ans)|*.ans';
+    sdAnsi.Filter:=     'ANSI File (*.ans)|*.ans|Text File (*.txt,*.nfo,*.asc)|*.txt;*.nfo;*.asc';
     sdAnsi.Title:=      'Export File';
     sdAnsi.Filename :=  '';
     if sdAnsi.Execute then
     begin
-      ExportANSIFile(sdAnsi.Filename, iif(uselinelen, linelen, -1), usesauce, staticobjects);
+      case sdAnsi.FilterIndex of
+        1:
+          ExportANSIFile(sdAnsi.Filename, iif(uselinelen, linelen, -1), usebom, usesauce, staticobjects);
+
+        2:
+          ExportTextFile(sdAnsi.Filename, usebom, usesauce);
+      end;
     end;
   end;
   xo.Free;
@@ -6803,12 +6807,8 @@ end;
 // append sauce if usesauce
 // if staticobjects, use topmost object cell for page cell,
 // else draw objects bottom to top after page
-
-procedure TfMain.ExportANSIFile(
-  fname : string;
-  maxlen : integer;
-  usesauce,
-  staticobjects: boolean);
+procedure TfMain.ExportANSIFile(fname : string; maxlen : integer;
+  useBOM, usesauce, staticobjects: boolean);
 var
   fout :        TFileStream;
   po :          PObj;
@@ -6829,6 +6829,22 @@ var
   p :           longint;
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
+
+  if useBOM then
+    case CurrCodePage of
+      encUTF16:
+        begin   // little endian
+          fout.writebyte($FF);
+          fout.writebyte($FE);
+        end;
+
+      encUTF8:
+        begin
+          fout.writebyte($EF);
+          fout.writebyte($BB);
+          fout.writebyte($BF);
+        end;
+    end;
 
   // initial reset
   cell := BLANK;
@@ -7072,6 +7088,140 @@ begin
 
   fout.Free;
 end;
+
+
+
+procedure TfMain.ExportTextFile(fname : string; useBOM, usesauce : boolean);
+var
+  fout :        TFileStream;
+  po :          PObj;
+  ansi,
+  sgr,
+  rowansi:      unicodestring;
+  cell :        TCell;
+  i :           integer;
+  r, c :        integer;
+  ro, co,
+  wo, ho :      integer;
+  objr, objc :  integer;
+  cattr :       DWORD;
+  pt :          TRowCol;
+  delta :       integer;
+  fg, bg :      integer;
+  tmp :         TObj;
+  p :           longint;
+begin
+  fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
+
+  if useBOM then
+    case CurrCodePage of
+      encUTF16:
+        begin   // little endian
+          fout.writebyte($FF);
+          fout.writebyte($FE);
+        end;
+
+      encUTF8:
+        begin
+          fout.writebyte($EF);
+          fout.writebyte($BB);
+          fout.writebyte($BF);
+        end;
+    end;
+
+  // initial reset
+  r := 0;
+  c := 0;
+  // do page first
+  while r < NumRows do
+  begin
+    // find next cell
+    pt := GetNextCell(r, c, true, cell);
+
+    if pt.row >= NumRows then
+    begin
+      break;
+    end;
+
+    if pt.row = r then
+    begin
+      // on the same row. advance
+      delta := pt.col - c;
+      if delta > 0 then
+      begin
+        ansi := Space(delta);
+        c := pt.col;
+        WriteANSI(fout, ansi);
+      end
+      else
+      begin
+        // at character. adjust attributes
+        // adjust bold/FG - blink/BG
+        fg := GetBits(cell.attr, A_CELL_FG_MASK);
+        bg := GetBits(cell.attr, A_CELL_BG_MASK, 8);
+        if ColorScheme <> COLORSCHEME_256 then
+        begin
+          if fg > 7 then
+          begin
+            fg -= 8;
+            SetBit(cell.attr, A_CELL_BOLD, true);
+          end;
+          if bg > 7 then
+          begin
+            bg -= 8;
+            SetBit(cell.attr, A_CELL_BLINKFAST, true);
+          end;
+        end;
+
+        // check block characters for reverse, etc
+//        if cattr <> cell.attr then
+//        begin
+//          sgr := ComputeSGR(cattr, cell.attr);
+//          ansi := sgr;
+//          WriteANSI(fout, ansi);
+//          cattr := cell.attr;
+//        end;
+
+        ansi := WideChar(cell.chr);
+        WriteANSI(fout, ansi);
+
+        c += 1;
+        if c >= NumCols then
+        begin
+          c := 0;
+          r += 1;
+          WriteANSI(fout, #13#10);
+        end;
+      end;
+    end
+    else
+    begin
+      // on a different row
+      // another row.
+      WriteANSI(fout, #13#10);
+      c := 0;
+      r += 1;
+    end;
+  end;
+
+  // append sauce
+  if usesauce then
+  begin
+    StrToChars(unicodestring('SAUCE'), @Page.Sauce.ID[0], 5);
+    StrToChars(unicodestring('00'), @Page.Sauce.Version[0], 2);
+    Page.Sauce.DataFileType := SAUCE_CHR_ASCII;
+    if ColorScheme = COLORSCHEME_ICE then
+      Page.Sauce.TFlags := SAUCE_FLAG_ICE;
+    Page.Sauce.TInfo1 := NumRows;
+    Page.Sauce.TInfo2 := NumCols;
+    // skip the font info for now.
+    fout.WriteByte(_CPMEOF);
+    fout.write(Page.Sauce, sizeof(TSauceHeader));
+  end;
+
+  fout.Free;
+end;
+
 
 {
 procedure TfMain.miFileOpenClick(Sender: TObject);
