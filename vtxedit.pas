@@ -6138,6 +6138,7 @@ begin
         end;
     end;
     Undo.Remove(0);
+    UndoPos -= 1;
   end;
 
   UndoPos += 1;
