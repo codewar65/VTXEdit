@@ -39,11 +39,6 @@ UTF 8 nas no characters in the  128-191 range
 
   TODO :
 
-    max undo
-
-    Save/Open/Export/Import
-      Import = Load ANSI
-
     row attributes
 
     page / border / cursor attributes
@@ -54,15 +49,11 @@ UTF 8 nas no characters in the  128-191 range
 
     paint / line / rectangle / ellipse / fill tools
 
-    Terminate ANSI @ $1A
-
     Font Palette.
       Font 0-15 selectable (0=default codepage)
       Fonts 1-9 are programmable.
 
     Mode Char / Block (sixels in Teletext font)
-
-    ESC cancels tool to default on editor
 
 }
 
@@ -296,7 +287,7 @@ type
     procedure OpenVTXFile(fname : string);
     procedure SaveVTXFile(fname : string);
     procedure SaveAsVTXFile;
-    procedure ImportANSIFile(fname : string);
+    procedure ImportANSIFile(fname : string; force8bit : boolean);
     procedure ExportANSIFile(fname : string; maxlen : integer; usebom, usesauce, staticobjects: boolean);
     procedure CheckToSave;
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -6120,12 +6111,35 @@ end;
 
 // truncate if needed. add undo block to undo list at undopos.
 procedure TfMain.UndoAdd(undoblk : TUndoBlock);
+var
+  tmpblk : TUndoBlock;
 begin
   // don't add empty cell deltas
   if (undoblk.UndoType = utCells) and (undoblk.CellData.Count = 0) then exit;
 
   UndoTruncate(UndoPos);
   Undo.Add(@undoblk);
+
+  // remove top if beyond UNDO_LEVELS
+  if Undo.Count > UNDO_LEVELS then
+  begin
+    Undo.Get(@tmpblk, 0);
+    case tmpblk.UndoType of
+
+      utCells:      tmpblk.CellData.Free;
+
+      utObjAdd:     tmpblk.Obj.Data.Free;
+      utObjRemove:  tmpblk.Obj.Data.Free;
+
+      utObjMerge:
+        begin
+          tmpblk.Obj.Data.Free;
+          tmpblk.CellData.Free;
+        end;
+    end;
+    Undo.Remove(0);
+  end;
+
   UndoPos += 1;
 end;
 
@@ -6662,16 +6676,6 @@ begin
   result.col := c1;
 end;
 
-procedure TfMain.miFileImportClick(Sender: TObject);
-begin
-
-end;
-
-procedure TfMain.ImportANSIFile(fname : string);
-begin
-
-end;
-
 procedure TfMain.WriteANSI(fs : TFileStream; str : unicodestring);
 var
   buff :  TBytes;
@@ -7089,8 +7093,6 @@ begin
   fout.Free;
 end;
 
-
-
 procedure TfMain.ExportTextFile(fname : string; useBOM, usesauce : boolean);
 var
   fout :        TFileStream;
@@ -7222,33 +7224,54 @@ begin
   fout.Free;
 end;
 
+// may need Import Options for
+procedure TfMain.miFileImportClick(Sender: TObject);
+begin
+  CheckToSave;
 
-{
-procedure TfMain.miFileOpenClick(Sender: TObject);
+  odAnsi.Filter:=     'ANSI File (*.ans)|*.ans|Text File (*.txt,*.nfo,*.asc)|*.txt;*.nfo;*.asc';
+  odAnsi.Title:=      'Import File';
+  odAnsi.Filename :=  '';
+  if odAnsi.Execute then
+  begin
+    ImportANSIFile(odAnsi.Filename, false);
+    GenerateBmpPage;
+    pbPage.Invalidate;
+    CurrFileName := ExtractFileNameWithoutExt(odAnsi.FileName) + '.vtx';
+    CurrFileChanged := true;
+    UpdateTitles;
+  end;
+end;
+
+
+
+procedure TfMain.ImportANSIFile(fname : string; force8bit : boolean);
 var
-  fin :               TFileStream;
-
-  buff : TBytes;
-
-  len :               integer;
-  SaveRow, SaveCol :  integer;
-  SaveAttr :          Uint32;
-  chr :               integer;
-  state :             integer;
-  dochar, docsi :     boolean;
-  doeof :             boolean;  // premature EOF (SAUSE for now);
-  parms, inter :      string;
+  fin :       TFileStream;
+  buff :      TBytes;
+  len :       longint;
+  FileEnc :   TEncoding;
+  checkenc :  TDetectEnc;
+  bomskip :   integer;
+  ansi :      unicodestring;
+  ValidSauce : boolean;
+  Sauce :     TSauceHeader;
+  chars :     TWords;
+  chr : WORD;
+  charslen : longint;
+  i, j, k,
+  state : integer;
+  docsi,
+  dochar,
+  doeof : boolean;
+  SaveAttr : DWord;
+  fg, bg : integer;
+  bold,
+  blink : boolean;
+  parms,
+  inter: string;
   pvals :             TStringArray;
-  fg, bg :            integer;
-  bold, blink :       boolean;
-  FileEnc :           TEncoding;
-  bomskip :           integer;
-  checkenc :          TDetectEnc;
-  charslen :          integer;
-  ansi :              UnicodeString;
-  chars :             array of UInt16;
-  Sauce :             TSauceHeader;
-  ValidSauce :        Boolean;
+  SaveRow, SaveCol : integer;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
@@ -7276,305 +7299,157 @@ var
       result := defval;
   end;
 
-  procedure LoadANSIFile(fname : string; force8bit : boolean = false);
-  var
-    i, j, k : integer;
+begin
+  NewFile;
+
+  // read entire file in
+  fin := TFileStream.Create(fname, fmOpenRead or fmShareDenyNone);
+  len := fin.Size;
+  setlength(buff, len);
+  fin.Read(buff[0], len);
+  fin.free;
+
+  // convert to string
+  // CODEPAGE - no way of knowing unless from sauce
+  FileEnc := encCP437;
+  if not force8bit then
   begin
-    // load file
-    fin := TFileStream.Create(fname, fmOpenRead or fmShareDenyNone);
-    len := fin.Size;
-
-    //getmemory(buff, len);
-    setlength(buff, len);
-    fin.ReadBuffer(buff[0], len);
-    fin.free;
-
-    // detect data - move to UnicodeHelper
-// CODEPAGE - no way of knowing unless from sauce
-    FileEnc := encCP437;
-    if not force8bit then
-    begin
-      bomskip := 0;
-      checkenc := CheckBom(buff);
-      if checkenc = deNone then
-        checkenc := DetectEncoding(buff);
-      case checkenc of
-        deUtf16LeBom:
-          begin
-            FileEnc := encUtf16;
-            bomskip := 2;
-          end;
-
-        deUtf16LeNoBom:
+    bomskip := 0;
+    checkenc := CheckBom(buff);
+    if checkenc = deNone then
+      checkenc := DetectEncoding(buff);
+    case checkenc of
+      deUtf16LeBom:
+        begin
           FileEnc := encUtf16;
+          bomskip := 2;
+        end;
 
-        deUtf16BeBom, deUtf16BeNoBom:
-          exit;
+      deUtf16LeNoBom:
+        FileEnc := encUtf16;
 
-        deUtf8Bom:
-          begin
-            FileEnc := encUTF8;
-            bomskip := 3;
-          end;
+      deUtf16BeBom, deUtf16BeNoBom:
+        // don't support big endian yet
+        exit;
 
-        deUtf8NoBom:
+      deUtf8Bom:
+        begin
           FileEnc := encUTF8;
+          bomskip := 3;
+        end;
+
+      deUtf8NoBom:
+        FileEnc := encUTF8;
+    end;
+  end;
+
+  if FileEnc = encUTF8 then
+  begin
+    // UTF8
+    if CurrCodePage <> encUTF8 then
+    begin
+      CurrCodePage := encUTF8;
+      cbCodePage.ItemIndex := ord(CurrCodePage);
+      cbCodePageChange(cbCodePage);
+      BuildCharacterPalette;
+    end;
+    ansi := ansi.fromUTF8Bytes(buff);
+  end
+  else if FileEnc = encUTF16 then
+  begin
+    // UTF16
+    if CurrCodePage <> encUTF16 then
+    begin
+      CurrCodePage := encUTF16;
+      cbCodePage.ItemIndex := ord(CurrCodePage);
+      cbCodePageChange(cbCodePage);
+      BuildCharacterPalette;
+    end;
+    ansi := ansi.fromUTF16Bytes(buff);
+  end
+  else
+  begin
+    // only use sauce in 8bit CodePaged files.
+    ValidSauce := false;
+    if length(buff) > 128 then
+    begin
+      MemCopy(@buff[length(buff)-128], @Sauce, 128);
+      ValidSauce := MemComp(@Sauce.ID, @SauceID, 5);
+      if ValidSauce then
+      begin
+        Page.Sauce := Sauce;
+        if Sauce.TInfo1 > 0 then
+          NumCols := Sauce.TInfo1;
+        if Sauce.TInfo2 > 0 then
+          NumRows := Sauce.TInfo2;
+        if HasBits(Sauce.TFlags, SAUCE_FLAG_ICE) then
+        begin
+          PageType := PAGETYPE_CTERM;
+          cbPageType.ItemIndex := PAGETYPE_CTERM;
+          ColorScheme := COLORSCHEME_ICE;
+          cbColorScheme.ItemIndex := COLORSCHEME_ICE;
+        end;
+        ResizePage;
+        //    TInfoS = Font name (from SauceFonts pattern)
       end;
     end;
 
-    if FileEnc = encUTF8 then
+    // assume CP437 if not UTF8/16
+    if CurrCodePage <> encCP437 then
     begin
-      // UTF8
-      if CurrCodePage <> encUTF8 then
-      begin
-        CurrCodePage := encUTF8;
-        cbCodePage.ItemIndex := ord(CurrCodePage);
-        cbCodePageChange(cbCodePage);
-        BuildCharacterPalette;
-      end;
-      ansi := ansi.fromUTF8Bytes(buff);
-    end
-
-    else if FileEnc = encUTF16 then
-    begin
-      // UTF16
-      if CurrCodePage <> encUTF16 then
-      begin
-        CurrCodePage := encUTF16;
-        cbCodePage.ItemIndex := ord(CurrCodePage);
-        cbCodePageChange(cbCodePage);
-        BuildCharacterPalette;
-      end;
-      ansi := ansi.fromUTF16Bytes(buff);
-    end
-
-    else
-    begin
-// CODEPAGE - check sauce
-      // assume CP437 if not UTF8/16
-      if CurrCodePage in [ encUTF8, encUTF16 ] then
-      begin
-        CurrCodePage := encCP437;
-        cbCodePage.ItemIndex := ord(CurrCodePage);
-        cbCodePageChange(cbCodePage);
-        BuildCharacterPalette;
-      end;
-
-      // only use sause in 8bit CodePaged files.
-      ValidSauce := false;
-      if length(buff) > 128 then
-      begin
-        MemCopy(@buff[length(buff)-128], @Sauce, 128);
-        ValidSauce := MemComp(@Sauce.ID, @SauceID, 5);
-        if ValidSauce then
-        begin
-          Page.Sauce := Sauce;
-          if Sauce.TInfo1 > 0 then
-            NumCols := Sauce.TInfo1;
-          if Sauce.TInfo2 > 0 then
-            NumRows := Sauce.TInfo2;
-          if HasBits(Sauce.TFlags, SAUCE_FLAG_ICE) then
-          begin
-            PageType := PAGETYPE_CTERM;
-            cbPageType.ItemIndex := PAGETYPE_CTERM;
-            ColorScheme := COLORSCHEME_ICE;
-            cbColorScheme.ItemIndex := COLORSCHEME_ICE;
-          end;
-          ResizePage;
-          //    TInfoS = Font name (from SauceFonts pattern)
-        end;
-      end;
-      ansi := ansi.fromCPBytes(buff);
+      // detect from SAUCE
+      CurrCodePage := encCP437;
+      cbCodePage.ItemIndex := ord(CurrCodePage);
+      cbCodePageChange(cbCodePage);
+      BuildCharacterPalette;
     end;
-    chars := ansi.toWordArray;
-    charslen := length(chars);
+    ansi := ansi.fromCPBytes(buff);
+  end;
+  setlength(buff, 0);
 
-    // populate page.
-    SkipScroll := true;
-    CursorRow := 0;
-    CursorCol := 0;
-    CurrAttr := BLANK.Attr;
-    CurrChar := BLANK.Chr;
-    state := 0;
+  // remove bom
+  // convert to word array
+  ansi := ansi.substring(bomskip);
+  chars := ansi.toWordArray;
+  charslen := length(chars);
+  ansi := '';
 
-    for i := bomskip to charslen - 1 do
-    begin
 
-      docsi := false;
-      dochar := false;
-      doeof := false;
 
-      chr := chars[i];
+  // populate page.
+  SkipScroll := true;
+  CursorRow := 0;
+  CursorCol := 0;
+  CurrAttr := BLANK.Attr;
+  CurrChar := BLANK.Chr;
+  state := 0;
 
-      // do main C0 first
-      case chr of
-        8: // BS
-          begin
-            if CursorCol > 0 then
-              CursorCol -= 1;
-          end;
+  for i := 0 to charslen - 1 do
+  begin
 
-        9: // HT
-          begin
-            CursorCol := (CursorCol and $7) + 8;
-            if CursorCol >= NumCols then
-              CursorCol := NumCols - 1;
-          end;
+    docsi := false;
+    dochar := false;
+    doeof := false;
 
-        10: // LF
-          begin
-            CursorRow += 1;
-            if CursorRow >= NumRows then
-            begin
-              NumRows := CursorRow + 1;
-              skipResize := true;
-              seRows.Value := NumRows;
-              skipResize := false;
-              ResizePage;
-            end;
-          end;
+    chr := chars[i];
 
-        13: // CR
-          begin
-            CursorCol := 0;
-          end;
-
-        26: // SAUSE RECORD.
-          begin
-            doeof := true;
-          end;
-
-        else
-          begin
-            if between(chr, 0, 26) or between(chr, 28, 31) then
-              nop;
-
-            case state of
-              0:  // no state yet
-                begin
-                  if chr = 27 then
-                    state := 1
-                  else
-                  begin
-                    // add to doc
-                    CurrChar := ord(chr);
-
-                    // adjust attr for page type / colors
-                    SaveAttr := CurrAttr;
-                    fg := GetBits(CurrAttr, A_CELL_FG_MASK);
-                    bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
-                    bold := HasBits(CurrAttr, A_CELL_BOLD);
-                    blink := HasBits(CurrAttr, A_CELL_BLINKFAST or A_CELL_BLINKSLOW);
-                    if PageType <> PAGETYPE_VTX then
-                    begin
-                      if bold and between(fg, 0, 7) then
-                      begin
-                        // adj FG
-                        SetBit(CurrAttr, A_CELL_BOLD, false);
-                        SetBits(CurrAttr, A_CELL_FG_MASK, fg + 8);
-                      end;
-                    end;
-
-                    if ColorScheme = COLORSCHEME_ICE then
-                    begin
-                      if blink then
-                      begin
-                        if between(bg, 0, 7) then
-                        begin
-                          // adj FG
-                          SetBits(CurrAttr, A_CELL_BLINKFAST or A_CELL_BLINKSLOW, 0);
-                          SetBits(CurrAttr, A_CELL_BG_MASK, bg + 8, 8);
-                        end;
-                      end;
-                    end;
-                    dochar := true;
-                  end;
-                end;
-
-              1: // got esc / awaiting [
-                begin
-                  case chr of
-                    91:   // [
-                      begin
-                        state := 2;
-                        parms := '';    // for collecting parameter bytes
-                      end;
-
-                    // other codes here (ESC A, ESC # n, etc)
-                    // ,,,
-
-                    else
-                      begin
-                        // unknown
-                        dochar := true;
-                        state := 0;
-                      end;
-                  end;
-                end;
-
-              2:  // CSI
-                begin
-                  if between(chr, $30, $3F) then
-                    // parameter bytes
-                    parms += WideChar(chr)
-                  else if between(chr, $20, $2F) then
-                  begin
-                    // itermediate bytes
-                    inter := WideChar(chr);
-                    state := 3;
-                  end
-                  else if between(chr, $40, $7E) then
-                  begin
-                    // final byte
-                    docsi := true;
-                    state := 0;
-                  end
-                  else
-                  begin
-                    // unknown
-                    dochar := true;
-                    state := 0;
-                  end;
-                end;
-
-              3:  // collect intermediate
-                begin
-                  if between(chr, $20, $2F) then
-                    // intermediate bytes
-                    inter += WideChar(chr)
-                  else if between(chr, $40, $7E) then
-                  begin
-                    // final byte
-                    docsi := true;
-                    state := 0;
-                  end
-                  else
-                  begin
-                    // unknown
-                    dochar := true;
-                    state := 0;
-                  end;
-                end;
-            end;
-        end;
-      end;
-
-      if dochar then
-      begin
-        if CursorRow >= NumRows then
+    // do main C0 first
+    case chr of
+      8: // BS
         begin
-          NumRows := CursorRow + 1;
-          skipResize := true;
-          seRows.Value := NumRows;
-          skipResize := false;
-          ResizePage;
+          if CursorCol > 0 then
+            CursorCol -= 1;
         end;
-        Page.Rows[CursorRow].Cells[CursorCol].Chr := ord(chr);
-        Page.Rows[CursorRow].Cells[CursorCol].Attr := CurrAttr;
-        CursorCol += 1;
-        if CursorCol >= NumCols then
+
+      9: // HT
         begin
-          CursorCol := 0;
+          CursorCol := (CursorCol and $7) + 8;
+          if CursorCol >= NumCols then
+            CursorCol := NumCols - 1;
+        end;
+
+      10: // LF
+        begin
           CursorRow += 1;
           if CursorRow >= NumRows then
           begin
@@ -7585,399 +7460,490 @@ var
             ResizePage;
           end;
         end;
-        CurrAttr := SaveAttr;
-      end;
 
-      if docsi then
-      begin
-        pvals := parms.Split([';']);
-        case WideChar(chr) of
-          '@':  // insert n chars
-            ;
-
-          'A':  // CUU - up n
-            begin
-              CursorRow -= GetIntCSIVal(0, 1);
-              if CursorRow < 0 then
-                CursorRow := 0;
-            end;
-
-          'B':  // CUD - down n
-            begin
-              CursorRow += GetIntCSIVal(0, 1);
-              if CursorRow >= NumRows then
-                CursorRow := NumRows - 1;
-            end;
-
-          'C':  // CUF - forward n
-            begin
-              CursorCol += GetIntCSIVal(0, 1);
-              if CursorCol > NumCols then
-                CursorCol := NumCols - 1;
-            end;
-
-          'D':  // CUB - back n
-            begin
-              CursorCol -= GetIntCSIVal(0, 1);
-              if CursorCol < 0 then
-                CursorCol := 0;
-            end;
-
-          'E':  // CNL - col 0 down n lines
-            begin
-              CursorCol := 0;
-              CursorRow += GetIntCSIVal(0, 1);
-              if CursorRow >= NumRows then
-              begin
-                seRows.Value := CursorRow + 1;
-                ResizePage;
-              end;
-            end;
-
-          'F':  // CPL - col 0 up n lines
-            begin
-              CursorCol := 0;
-              CursorRow -= GetIntCSIVal(0, 1);
-              if CursorRow < 0 then
-                CursorRow := 0;
-            end;
-
-          'G':  // CHA - move to col n
-            begin
-              CursorCol := GetIntCSIVal(0, 1) - 1;
-              if CursorCol >= NumCols then
-                CursorCol := NumCols - 1;
-            end;
-
-          'H', 'f': // CUP / HVP - move to r,c
-            begin
-              CursorRow:= GetIntCSIVal(0, 1) - 1;
-              CursorCol := GetIntCSIVal(1, 1) - 1;
-              if CursorRow  >= NumRows then
-                CursorRow := NumRows - 1;
-              if CursorCol >= NumCols then
-                CursorCol := NumCols - 1;
-            end;
-
-          'I':  ;
-          'J':  // ED - erase screen 1=sos,0=eos,2=all
-            begin
-              case GetIntCSIVal(0, 0) of
-                0:  // end of screen
-                  begin
-                    for k := CursorCol to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BLANK;
-                    for j := CursorRow + 1 to NumRows - 1 do
-                      for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BLANK;
-                  end;
-
-                1:  // start of screen
-                  begin
-                    for k := 0 to CursorCol do
-                      Page.Rows[CursorRow].Cells[k] := BLANK;
-                    for j := 0 to CursorRow - 1 do
-                      for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BLANK;
-                  end;
-
-                2:  // all
-                  begin
-                    CursorRow := 0;
-                    CursorCol := 0;
-                    for j := 0 to NumRows - 1 do
-                      for k := 0 to NumCols - 1 do
-                        Page.Rows[j].Cells[k] := BLANK;
-                  end;
-              end;
-            end;
-
-          'K':  // EL - erase line 1=sol,0=eol,2=all
-            begin
-              case GetIntCSIVal(0, 0) of
-                0:  // end of line
-                  begin
-                    for k := CursorCol to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BLANK;
-                  end;
-
-                1:  // start of line
-                  begin
-                    for k := 0 to CursorCol do
-                      Page.Rows[CursorRow].Cells[k] := BLANK;
-                  end;
-
-                2:  // all
-                  begin
-                    for k := 0 to NumCols - 1 do
-                      Page.Rows[CursorRow].Cells[k] := BLANK;
-                  end;
-              end;
-            end;
-
-          'L':  ;
-          'M':  ;
-          'N':  ;
-          'O':  ;
-          'P':  ;
-          'Q':  ;
-          'R':  ;
-
-          'S':  // SU - scroll up n
-            ;
-
-          'T':  // ST - scroll down n
-            ;
-
-          'U':  ;
-          'V':  ;
-          'W':  ;
-          'X':  ;
-          'Y':  ;
-          'Z':  ;
-          '[':  ;
-          '\':  ;
-          ']':  ;
-          '^':  ;
-          '_':  ;
-          '`':  ;
-          'a':  ;
-          'b':  ;
-          'c':  ;
-          'd':  ;
-          'e':  ;
-          'g':  ;
-          'h':  ;
-          'i':  ;
-          'j':  ;
-          'k':  ;
-          'l':  ;
-
-          'm':  // SGR - set attributes
-            begin
-              k := 0;
-              while k < length(pvals) do
-              begin
-                j := GetIntCSIVal(k, 0);
-                case j of
-                  0:  // reset
-                    CurrAttr := $0007;
-
-                  1:  // bold
-                    SetBit(CurrAttr, A_CELL_BOLD, true);
-
-                  2:  // faint
-                    SetBit(CurrAttr, A_CELL_FAINT, true);
-
-                  3:  // italics
-                    SetBit(CurrAttr, A_CELL_ITALICS, true);
-
-                  4:  // underline
-                    SetBit(CurrAttr, A_CELL_UNDERLINE, true);
-
-                  5:  // blink slow
-                    SetBit(CurrAttr, A_CELL_BLINKSLOW, true);
-
-                  6:  // blink fast
-                    SetBit(CurrAttr, A_CELL_BLINKFAST, true);
-
-                  7:  // reverse
-                    SetBit(CurrAttr, A_CELL_REVERSE, true);
-
-                  8:  // conceal
-                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL);
-
-                  9:  // strikethrough
-                    SetBit(CurrAttr, A_CELL_STRIKETHROUGH, true);
-
-                  10..19: // font - skip for now
-                    ;
-
-                  21: // bold off
-                    SetBit(CurrAttr, A_CELL_BOLD, false);
-
-                  22: // faint off
-                    SetBit(CurrAttr, A_CELL_FAINT, false);
-
-                  23: // italics off
-                    SetBit(CurrAttr, A_CELL_ITALICS, false);
-
-                  24: // underline off
-                    SetBit(CurrAttr, A_CELL_UNDERLINE, false);
-
-                  25, 26: // blink off
-                    SetBits(CurrAttr, A_CELL_BLINKSLOW or A_CELL_BLINKFAST, 0);
-
-                  27: // reverse off
-                    SetBit(CurrAttr, A_CELL_REVERSE, false);
-
-                  28: // concear off
-                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
-
-                  29: // strikethrough off
-                    SetBit(CurrAttr, A_CELL_STRIKETHROUGH, false);
-
-                  30..37: // fg color
-                    SetBits(CurrAttr, A_CELL_FG_MASK, j - 30);
-
-                  38: // get 5 , fg
-                    begin
-                      k += 1;
-                      if GetIntCSIVal(k, 0) = 5 then
-                      begin
-                        k += 1;
-                        SetBits(CurrAttr, A_CELL_FG_MASK, GetIntCSIVal(k, 0));
-                      end;
-                    end;
-
-                  39: // reset fg color
-                    SetBits(CurrAttr, A_CELL_FG_MASK, 7);
-
-                  40..47: // bg color
-                    SetBits(CurrAttr, A_CELL_BG_MASK, j - 40, 8);
-
-                  48: // get 5, bg
-                    begin
-                      k += 1;
-                      if GetIntCSIVal(k, 0) = 5 then
-                      begin
-                        k += 1;
-                        SetBits(CurrAttr, A_CELL_BG_MASK, GetIntCSIVal(k, 0), 8);
-                      end;
-                    end;
-
-                  49: // reset bg color
-                    SetBits(CurrAttr, A_CELL_BG_MASK, 0, 8);
-
-                  56: // doublestrike
-                    SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, true);
-
-                  57: // shadow
-                    SetBit(CurrAttr, A_CELL_SHADOW, true);
-
-                  58: // top half
-                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP);
-
-                  59: // bottom half
-                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM);
-
-                  76:
-                    SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, false);
-
-                  77:
-                    SetBit(CurrAttr, A_CELL_SHADOW, false);
-
-                  78, 79:
-                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
-
-                  90..97: // aixterm fg color
-                    SetBits(CurrAttr, A_CELL_FG_MASK, j - 90 + 8);
-
-                  100..107: // aixterm bg color
-                    SetBits(CurrAttr, A_CELL_BG_MASK, j - 100 + 8);
-
-                end;
-                k += 1;
-              end;
-            end;
-
-          'n':  ;
-          'o':  ;
-          'p':  ;
-          'q':  ;
-          'r':  ;
-
-          's':  // SCP - save cursor pos
-            begin
-              SaveRow := CursorRow;
-              SaveCol := CursorCol;
-            end;
-
-          't':  ;
-
-          'u':  // RCP - restore cursor pos
-            begin
-              CursorRow := SaveRow;
-              CursorCol := SaveCol;
-            end;
-
-          'v':  ;
-          'w':  ;
-          'x':  ;
-          'y':  ;
-          'z':  ;
-          '{':  ;
-          '|':  ;
-          '}':  ;
-          '~':  ;
-        end;
-      end;
-
-      if doeof then
-        break;
-    end;
-  end;
-
-begin
-  // ask to save
-
-  NumRows := 24;
-  NewFile;
-  if odAnsi.Execute then
-  begin
-
-    case odAnsi.FilterIndex of
-      1:  // vtx
+      13: // CR
         begin
-          LoadVTXFile(odAnsi.FileName);
+          CursorCol := 0;
         end;
 
-      2: // autodetect
+      26: // SAUSE RECORD.
         begin
-          LoadANSIFile(odAnsi.Filename, false);
-        end;
-
-      3: // 8bit
-        begin
-          LoadANSIFile(odAnsi.Filename, true);
+          doeof := true;
         end;
 
       else
         begin
-          LoadANSIFile(odAnsi.Filename, false);
-        end;
+          if between(chr, 0, 26) or between(chr, 28, 31) then
+            nop;
+
+          case state of
+            0:  // no state yet
+              begin
+                if chr = 27 then
+                  state := 1
+                else
+                begin
+                  // add to doc
+                  CurrChar := ord(chr);
+
+                  // adjust attr for page type / colors
+                  SaveAttr := CurrAttr;
+                  fg := GetBits(CurrAttr, A_CELL_FG_MASK);
+                  bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
+                  bold := HasBits(CurrAttr, A_CELL_BOLD);
+                  blink := HasBits(CurrAttr, A_CELL_BLINKFAST or A_CELL_BLINKSLOW);
+                  if PageType <> PAGETYPE_VTX then
+                  begin
+                    if bold and between(fg, 0, 7) then
+                    begin
+                      // adj FG
+                      SetBit(CurrAttr, A_CELL_BOLD, false);
+                      SetBits(CurrAttr, A_CELL_FG_MASK, fg + 8);
+                    end;
+                  end;
+
+                  if ColorScheme = COLORSCHEME_ICE then
+                  begin
+                    if blink then
+                    begin
+                      if between(bg, 0, 7) then
+                      begin
+                        // adj FG
+                        SetBits(CurrAttr, A_CELL_BLINKFAST or A_CELL_BLINKSLOW, 0);
+                        SetBits(CurrAttr, A_CELL_BG_MASK, bg + 8, 8);
+                      end;
+                    end;
+                  end;
+                  dochar := true;
+                end;
+              end;
+
+            1: // got esc / awaiting [
+              begin
+                case chr of
+                  91:   // [
+                    begin
+                      state := 2;
+                      parms := '';    // for collecting parameter bytes
+                    end;
+
+                  // other codes here (ESC A, ESC # n, etc)
+                  // ,,,
+
+                  else
+                    begin
+                      // unknown
+                      dochar := true;
+                      state := 0;
+                    end;
+                end;
+              end;
+
+            2:  // CSI
+              begin
+                if between(chr, $30, $3F) then
+                  // parameter bytes
+                  parms += WideChar(chr)
+                else if between(chr, $20, $2F) then
+                begin
+                  // itermediate bytes
+                  inter := WideChar(chr);
+                  state := 3;
+                end
+                else if between(chr, $40, $7E) then
+                begin
+                  // final byte
+                  docsi := true;
+                  state := 0;
+                end
+                else
+                begin
+                  // unknown
+                  dochar := true;
+                  state := 0;
+                end;
+              end;
+
+            3:  // collect intermediate
+              begin
+                if between(chr, $20, $2F) then
+                  // intermediate bytes
+                  inter += WideChar(chr)
+                else if between(chr, $40, $7E) then
+                begin
+                  // final byte
+                  docsi := true;
+                  state := 0;
+                end
+                else
+                begin
+                  // unknown
+                  dochar := true;
+                  state := 0;
+                end;
+              end;
+          end;
+      end;
     end;
 
-    CurrFileName := ExtractFileName(odAnsi.FileName);
-    CurrFileChanged := false;
-    UpdateTitles;
+    if dochar then
+    begin
+      if CursorRow >= NumRows then
+      begin
+        NumRows := CursorRow + 1;
+        skipResize := true;
+        seRows.Value := NumRows;
+        skipResize := false;
+        ResizePage;
+      end;
+      Page.Rows[CursorRow].Cells[CursorCol].Chr := ord(chr);
+      Page.Rows[CursorRow].Cells[CursorCol].Attr := CurrAttr;
+      CursorCol += 1;
+      if CursorCol >= NumCols then
+      begin
+        CursorCol := 0;
+        CursorRow += 1;
+        if CursorRow >= NumRows then
+        begin
+          NumRows := CursorRow + 1;
+          skipResize := true;
+          seRows.Value := NumRows;
+          skipResize := false;
+          ResizePage;
+        end;
+      end;
+      CurrAttr := SaveAttr;
+    end;
 
-    cbPageType.ItemIndex := PageType;
-    cbCodePage.ItemIndex := ord(CurrCodePage);
-    cbColorScheme.ItemIndex := ColorScheme;
-    seRows.Value := NumRows;
-    seCols.Value := NumCols;
-    seXScale.Value := XScale;
+    if docsi then
+    begin
+      pvals := parms.Split([';']);
+      case WideChar(chr) of
+        '@':  // insert n chars
+          ;
 
-    tbSauceTitle.Text :=  CharsToStr(Page.Sauce.Title,  sizeof(TSauceHeader.Title));
-    tbSauceAuthor.Text := CharsToStr(Page.Sauce.Author, sizeof(TSauceHeader.Author));
-    tbSauceGroup.Text :=  CharsToStr(Page.Sauce.Group,  sizeof(TSauceHeader.Group));
-    tbSauceDate.Text :=   CharsToStr(Page.Sauce.Date,   sizeof(TSauceHeader.Date));
+        'A':  // CUU - up n
+          begin
+            CursorRow -= GetIntCSIVal(0, 1);
+            if CursorRow < 0 then
+              CursorRow := 0;
+          end;
 
-    CurrAttr := $0007;
-    CurrChar := _SPACE;
-    CursorRow := 0;
-    CursorCol := 0;
-    SkipScroll := false;
-    SetAttrButtons(CurrAttr);
-    pbColors.Invalidate;
+        'B':  // CUD - down n
+          begin
+            CursorRow += GetIntCSIVal(0, 1);
+            if CursorRow >= NumRows then
+              CursorRow := NumRows - 1;
+          end;
 
-    ResizeScrolls;
-    GenerateBmpPage;
-    Invalidate;
+        'C':  // CUF - forward n
+          begin
+            CursorCol += GetIntCSIVal(0, 1);
+            if CursorCol > NumCols then
+              CursorCol := NumCols - 1;
+          end;
+
+        'D':  // CUB - back n
+          begin
+            CursorCol -= GetIntCSIVal(0, 1);
+            if CursorCol < 0 then
+              CursorCol := 0;
+          end;
+
+        'E':  // CNL - col 0 down n lines
+          begin
+            CursorCol := 0;
+            CursorRow += GetIntCSIVal(0, 1);
+            if CursorRow >= NumRows then
+            begin
+              seRows.Value := CursorRow + 1;
+              ResizePage;
+            end;
+          end;
+
+        'F':  // CPL - col 0 up n lines
+          begin
+            CursorCol := 0;
+            CursorRow -= GetIntCSIVal(0, 1);
+            if CursorRow < 0 then
+              CursorRow := 0;
+          end;
+
+        'G':  // CHA - move to col n
+          begin
+            CursorCol := GetIntCSIVal(0, 1) - 1;
+            if CursorCol >= NumCols then
+              CursorCol := NumCols - 1;
+          end;
+
+        'H', 'f': // CUP / HVP - move to r,c
+          begin
+            CursorRow:= GetIntCSIVal(0, 1) - 1;
+            CursorCol := GetIntCSIVal(1, 1) - 1;
+            if CursorRow  >= NumRows then
+              CursorRow := NumRows - 1;
+            if CursorCol >= NumCols then
+              CursorCol := NumCols - 1;
+          end;
+
+        'I':  ;
+        'J':  // ED - erase screen 1=sos,0=eos,2=all
+          begin
+            case GetIntCSIVal(0, 0) of
+              0:  // end of screen
+                begin
+                  for k := CursorCol to NumCols - 1 do
+                    Page.Rows[CursorRow].Cells[k] := BLANK;
+                  for j := CursorRow + 1 to NumRows - 1 do
+                    for k := 0 to NumCols - 1 do
+                      Page.Rows[j].Cells[k] := BLANK;
+                end;
+
+              1:  // start of screen
+                begin
+                  for k := 0 to CursorCol do
+                    Page.Rows[CursorRow].Cells[k] := BLANK;
+                  for j := 0 to CursorRow - 1 do
+                    for k := 0 to NumCols - 1 do
+                      Page.Rows[j].Cells[k] := BLANK;
+                end;
+
+              2:  // all
+                begin
+                  CursorRow := 0;
+                  CursorCol := 0;
+                  for j := 0 to NumRows - 1 do
+                    for k := 0 to NumCols - 1 do
+                      Page.Rows[j].Cells[k] := BLANK;
+                end;
+            end;
+          end;
+
+        'K':  // EL - erase line 1=sol,0=eol,2=all
+          begin
+            case GetIntCSIVal(0, 0) of
+              0:  // end of line
+                begin
+                  for k := CursorCol to NumCols - 1 do
+                    Page.Rows[CursorRow].Cells[k] := BLANK;
+                end;
+
+              1:  // start of line
+                begin
+                  for k := 0 to CursorCol do
+                    Page.Rows[CursorRow].Cells[k] := BLANK;
+                end;
+
+              2:  // all
+                begin
+                  for k := 0 to NumCols - 1 do
+                    Page.Rows[CursorRow].Cells[k] := BLANK;
+                end;
+            end;
+          end;
+
+        'L':  ;
+        'M':  ;
+        'N':  ;
+        'O':  ;
+        'P':  ;
+        'Q':  ;
+        'R':  ;
+
+        'S':  // SU - scroll up n
+          ;
+
+        'T':  // ST - scroll down n
+          ;
+
+        'U':  ;
+        'V':  ;
+        'W':  ;
+        'X':  ;
+        'Y':  ;
+        'Z':  ;
+        '[':  ;
+        '\':  ;
+        ']':  ;
+        '^':  ;
+        '_':  ;
+        '`':  ;
+        'a':  ;
+        'b':  ;
+        'c':  ;
+        'd':  ;
+        'e':  ;
+        'g':  ;
+        'h':  ;
+        'i':  ;
+        'j':  ;
+        'k':  ;
+        'l':  ;
+
+        'm':  // SGR - set attributes
+          begin
+            k := 0;
+            while k < length(pvals) do
+            begin
+              j := GetIntCSIVal(k, 0);
+              case j of
+                0:  // reset
+                  CurrAttr := $0007;
+
+                1:  // bold
+                  SetBit(CurrAttr, A_CELL_BOLD, true);
+
+                2:  // faint
+                  SetBit(CurrAttr, A_CELL_FAINT, true);
+
+                3:  // italics
+                  SetBit(CurrAttr, A_CELL_ITALICS, true);
+
+                4:  // underline
+                  SetBit(CurrAttr, A_CELL_UNDERLINE, true);
+
+                5:  // blink slow
+                  SetBit(CurrAttr, A_CELL_BLINKSLOW, true);
+
+                6:  // blink fast
+                  SetBit(CurrAttr, A_CELL_BLINKFAST, true);
+
+                7:  // reverse
+                  SetBit(CurrAttr, A_CELL_REVERSE, true);
+
+                8:  // conceal
+                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL);
+
+                9:  // strikethrough
+                  SetBit(CurrAttr, A_CELL_STRIKETHROUGH, true);
+
+                10..19: // font - skip for now
+                  ;
+
+                21: // bold off
+                  SetBit(CurrAttr, A_CELL_BOLD, false);
+
+                22: // faint off
+                  SetBit(CurrAttr, A_CELL_FAINT, false);
+
+                23: // italics off
+                  SetBit(CurrAttr, A_CELL_ITALICS, false);
+
+                24: // underline off
+                  SetBit(CurrAttr, A_CELL_UNDERLINE, false);
+
+                25, 26: // blink off
+                  SetBits(CurrAttr, A_CELL_BLINKSLOW or A_CELL_BLINKFAST, 0);
+
+                27: // reverse off
+                  SetBit(CurrAttr, A_CELL_REVERSE, false);
+
+                28: // concear off
+                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+
+                29: // strikethrough off
+                  SetBit(CurrAttr, A_CELL_STRIKETHROUGH, false);
+
+                30..37: // fg color
+                  SetBits(CurrAttr, A_CELL_FG_MASK, j - 30);
+
+                38: // get 5 , fg
+                  begin
+                    k += 1;
+                    if GetIntCSIVal(k, 0) = 5 then
+                    begin
+                      k += 1;
+                      SetBits(CurrAttr, A_CELL_FG_MASK, GetIntCSIVal(k, 0));
+                    end;
+                  end;
+
+                39: // reset fg color
+                  SetBits(CurrAttr, A_CELL_FG_MASK, 7);
+
+                40..47: // bg color
+                  SetBits(CurrAttr, A_CELL_BG_MASK, j - 40, 8);
+
+                48: // get 5, bg
+                  begin
+                    k += 1;
+                    if GetIntCSIVal(k, 0) = 5 then
+                    begin
+                      k += 1;
+                      SetBits(CurrAttr, A_CELL_BG_MASK, GetIntCSIVal(k, 0), 8);
+                    end;
+                  end;
+
+                49: // reset bg color
+                  SetBits(CurrAttr, A_CELL_BG_MASK, 0, 8);
+
+                56: // doublestrike
+                  SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, true);
+
+                57: // shadow
+                  SetBit(CurrAttr, A_CELL_SHADOW, true);
+
+                58: // top half
+                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP);
+
+                59: // bottom half
+                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM);
+
+                76:
+                  SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, false);
+
+                77:
+                  SetBit(CurrAttr, A_CELL_SHADOW, false);
+
+                78, 79:
+                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+
+                90..97: // aixterm fg color
+                  SetBits(CurrAttr, A_CELL_FG_MASK, j - 90 + 8);
+
+                100..107: // aixterm bg color
+                  SetBits(CurrAttr, A_CELL_BG_MASK, j - 100 + 8);
+
+              end;
+              k += 1;
+            end;
+          end;
+
+        'n':  ;
+        'o':  ;
+        'p':  ;
+        'q':  ;
+        'r':  ;
+
+        's':  // SCP - save cursor pos
+          begin
+            SaveRow := CursorRow;
+            SaveCol := CursorCol;
+          end;
+
+        't':  ;
+
+        'u':  // RCP - restore cursor pos
+          begin
+            CursorRow := SaveRow;
+            CursorCol := SaveCol;
+          end;
+
+        'v':  ;
+        'w':  ;
+        'x':  ;
+        'y':  ;
+        'z':  ;
+        '{':  ;
+        '|':  ;
+        '}':  ;
+        '~':  ;
+      end;
+    end;
+
+    if doeof then
+      break;
   end;
 end;
-}
 
 procedure nop; begin end;
 
