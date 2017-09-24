@@ -81,6 +81,7 @@ function StrToQuad(str : unicodestring) : TQuad;
 procedure SetFormQuad(f : TForm; q : TQuad);
 function GetFormQuad(f : TForm) : TQuad;
 function CharsToStr(src : array of char; len : integer) : unicodestring;
+function CharsToStr(src : array of byte; len : integer) : unicodestring;
 function isInteger(str : unicodestring) : boolean;
 function iif(cond : boolean; trueval, falseval : integer) : integer; inline;
 function iif(cond : boolean; trueval, falseval : byte) : byte; inline;
@@ -663,6 +664,16 @@ begin
   len := length(src);
   for i := 0 to len - 1 do
     result += src[i];
+end;
+
+function CharsToStr(src : array of byte; len : integer) : unicodestring;
+var
+  i : integer;
+begin
+  result := '';
+  len := length(src);
+  for i := 0 to len - 1 do
+    result += char(src[i]);
 end;
 
 procedure DrawDashLine(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);

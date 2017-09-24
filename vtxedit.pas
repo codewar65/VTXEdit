@@ -7389,6 +7389,10 @@ begin
           ColorScheme := COLORSCHEME_ICE;
           cbColorScheme.ItemIndex := COLORSCHEME_ICE;
         end;
+        tbSauceTitle.Text := CharsToStr(Sauce.Title, sizeof(Sauce.Title));
+        tbSauceAuthor.Text := CharsToStr(Sauce.Author, sizeof(Sauce.Author));
+        tbSauceGroup.Text := CharsToStr(Sauce.Group, sizeof(Sauce.Group));
+        tbSauceDate.Text := CharsToStr(Sauce.Date, sizeof(Sauce.Date));
         ResizePage;
         //    TInfoS = Font name (from SauceFonts pattern)
       end;
