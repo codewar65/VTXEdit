@@ -33,13 +33,16 @@ UTF 8 nas no characters in the  128-191 range
 
   https://gist.github.com/NuSkooler/a235339cf383759c49c57ee30d34876c?fref=gc&dti=254577004687053
 
+  Tip :
+
+    Avoid drawing to TBGRABitmap directly. It's SLOOOOOOOOOW.
+
   TODO :
 
-    undo / redo
-      object manipulation (merge add remove)
-      page sizeing
+    max undo
 
-    paste object to center of window
+    Save/Open/Export/Import
+      Import = Load ANSI
 
     row attributes
 
@@ -49,24 +52,14 @@ UTF 8 nas no characters in the  128-191 range
 
     border on display / center document on window
 
-    line / rectangle / ellipse / fill tools
-
-    Zoom on mouse position
-
-    Confirn save on exit / load
+    paint / line / rectangle / ellipse / fill tools
 
     Terminate ANSI @ $1A
-
-    Prefernce window
-
-    Sauce Info Panel
 
     Perferences:
       [■] Save Sauce
       [■] Save BOM
       (●) LE  ( ) BE  on UTF16 save
-
-    UNDO
 
     Font Palette.
       Font 0-15 selectable (0=default codepage)
@@ -75,7 +68,6 @@ UTF 8 nas no characters in the  128-191 range
     Mode Char / Block (sixels in Teletext font)
 
     ESC cancels tool to default on editor
-
 
 }
 
@@ -115,11 +107,12 @@ uses
   VTXConst,
   VTXSupport,
   VTXEncDetect,
+  VTXExportOptions,
   UnicodeHelper,
   RecList,
-  LazUTF8,
   LResources,
   Memory,
+  dateutils,
   Inifiles;
 
 // used for version
@@ -148,6 +141,7 @@ type
     Label14: TLabel;
     Label15: TLabel;
     Label16: TLabel;
+    Label17: TLabel;
     Label2: TLabel;
     Label3: TLabel;
     Label4: TLabel;
@@ -160,6 +154,8 @@ type
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
     MenuItem5: TMenuItem;
+    MenuItem7: TMenuItem;
+    miFileImport: TMenuItem;
     miObjMergeAll: TMenuItem;
     miFileSaveAs: TMenuItem;
     miFileExport: TMenuItem;
@@ -192,14 +188,16 @@ type
     miView: TMenuItem;
     odAnsi: TOpenDialog;
     Panel2: TPanel;
+    Panel3: TPanel;
+    Panel4: TPanel;
     pbChars: TPaintBox;
     pbColors: TPaintBox;
+    pbCurrCell: TPaintBox;
     pRightBar: TPanel;
     pbPage: TPaintBox;
     pbRulerLeft: TPaintBox;
     pbRulerTop: TPaintBox;
     pPagePanel: TPanel;
-    pbCurrCell: TPaintBox;
     miFileExit: TMenuItem;
     miFileNew: TMenuItem;
     mMenu: TMainMenu;
@@ -214,10 +212,10 @@ type
     sbChars: TScrollBox;
     sdAnsi: TSaveDialog;
     seCharacter: TSpinEdit;
+    irqBlink: TTimer;
     seCols: TSpinEdit;
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
-    irqBlink: TTimer;
     SpeedButton1: TSpeedButton;
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
@@ -245,7 +243,6 @@ type
     bObjSave: TToolButton;
     bObjLoad: TToolButton;
     bObjHideOutlines: TToolButton;
-    ToolBar2: TToolBar;
     ToolButton1: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
@@ -287,9 +284,25 @@ type
     bObjMerge: TToolButton;
     ToolButton2: TToolButton;
     bObjMergeAll: TToolButton;
+    tbToolPaint: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
+    procedure FormDestroy(Sender: TObject);
+    procedure tbSauceAuthorEditingDone(Sender: TObject);
+    procedure tbSauceDateEditingDone(Sender: TObject);
+    procedure tbSauceGroupEditingDone(Sender: TObject);
+    procedure tbSauceTitleEditingDone(Sender: TObject);
+    procedure WriteANSI(fs : TFileStream; str : unicodestring);
+    procedure WriteANSIChunk(fs : TFileStream; maxlen : integer; var rowansi, ansi : unicodestring);
+    procedure miFileImportClick(Sender: TObject);
+    procedure OpenVTXFile(fname : string);
+    procedure SaveVTXFile(fname : string);
+    procedure SaveAsVTXFile;
+    procedure ImportANSIFile(fname : string);
+    procedure ExportANSIFile(fname : string; maxlen : integer; usesauce, staticobjects: boolean);
+    procedure CheckToSave;
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure SaveUndoKeys;
     procedure ClearAllUndo;
@@ -326,6 +339,7 @@ type
     procedure bObjMoveToFrontClick(Sender: TObject);
     procedure bObnjMoveForwardClick(Sender: TObject);
     procedure RefreshObject(objnum : integer);
+    function GetObjectCell(row, col : integer; var cell : TCell) : integer;
     function GetObject(row, col : integer) : integer;
     procedure LoadlvObjects;
     function CopySelectionToObject : TObj;
@@ -345,8 +359,6 @@ type
     procedure tbToolClick(Sender: TObject);
     procedure tbAttributesPalettePaintButton(Sender: TToolButton; State: integer);
     procedure UpdateTitles;
-    procedure SaveVTXFile(fname : string);
-    procedure LoadVTXFile(fname : string);
     procedure pbCurrCellPaint(Sender: TObject);
     procedure DrawCellEx(
       cnv : TCanvas;
@@ -381,6 +393,7 @@ type
     procedure pbStatusBarPaint(Sender: TObject);
     procedure ResizeScrolls;
     procedure ResizePage;
+    procedure ResizePage(row, col : integer);
     procedure sbHorzChange(Sender: TObject);
     procedure sbVertChange(Sender: TObject);
     procedure DrawCell(row, col : integer; skipUpdate : boolean = true);
@@ -410,11 +423,10 @@ type
     function SetBlockColor(clr: integer; cell : TCell; xsize, ysize, x, y : integer) : TCell;
     procedure GenerateBmpPage;
     procedure CodePageChange;
-    function GetNextCell(r, c : integer) : TRowCol;
+    function GetNextCell(r, c : integer; staticobjects : boolean; var cell : TCell) : TRowCol;
+    function GetNextObjectCell(Obj : TObj; r, c : integer; var cell : TCell) : TRowCol;
     Procedure LoadSettings;
     Procedure SaveSettings;
-    function BuildANSI : unicodestring;
-    procedure SaveANSIFile(fname : unicodestring; ansi : unicodestring; enc : TEncoding);
     procedure NewFile;
     procedure DoBlink;
 
@@ -439,25 +451,10 @@ type
 var
   fMain: TfMain;
 
-  FKeys : packed array [0..9] of TFKeySet = (
-      ( $DA, $BF, $C0, $D9, $C4, $B3, $C3, $B4, $C1, $C2 ),
-      ( $C9, $BB, $C8, $BC, $CD, $BA, $CC, $B9, $CA, $CB ),
-      ( $D5, $B8, $D4, $BE, $CD, $B3, $C6, $B5, $CF, $D1 ),
-      ( $D6, $B7, $D3, $BD, $C4, $BA, $C7, $B6, $D0, $D2 ),
-      ( $C5, $CE, $D8, $D7, $E8, $E8, $9B, $9C, $99, $EF ),
-      ( $B0, $B1, $B2, $DB, $DF, $DC, $DD, $DE, $FE, $FA ),
-      ( $01, $02, $03, $04, $05, $06, $F0, $0E, $0F, $20 ),
-      ( $18, $19, $1E, $1F, $10, $11, $12, $1D, $14, $15 ),
-      ( $AE, $AF, $F2, $F3, $A9, $AA, $FD, $F6, $AB, $AC ),
-      ( $E3, $F1, $F4, $F5, $EA, $9D, $E4, $F8, $FB, $FC ));
-
-  ObjectRename : boolean = false;
-  ObjectOutlines : boolean = true;
-
+procedure CopyObject(src : TObj; var dst : TObj);
 procedure DebugStart;
 procedure nop;
 
-procedure CopyObject(objin : TObj; var objout : TObj);
 
 
 implementation
@@ -515,9 +512,26 @@ var
   SkipScroll :              boolean;      // disable scroll to cursor
   SkipResize :              boolean;      // skip onchange updates on dynamic change.
 
-  bmpCharPalette : TBGRABitmap = nil;
+  bmpCharPalette :          TBitmap = nil;
 
-  TestCursor : TCursorImage;
+  FKeys : packed array [0..9] of TFKeySet = (
+      ( $DA, $BF, $C0, $D9, $C4, $B3, $C3, $B4, $C1, $C2 ),
+      ( $C9, $BB, $C8, $BC, $CD, $BA, $CC, $B9, $CA, $CB ),
+      ( $D5, $B8, $D4, $BE, $CD, $B3, $C6, $B5, $CF, $D1 ),
+      ( $D6, $B7, $D3, $BD, $C4, $BA, $C7, $B6, $D0, $D2 ),
+      ( $C5, $CE, $D8, $D7, $E8, $E8, $9B, $9C, $99, $EF ),
+      ( $B0, $B1, $B2, $DB, $DF, $DC, $DD, $DE, $FE, $FA ),
+      ( $01, $02, $03, $04, $05, $06, $F0, $0E, $0F, $20 ),
+      ( $18, $19, $1E, $1F, $10, $11, $12, $1D, $14, $15 ),
+      ( $AE, $AF, $F2, $F3, $A9, $AA, $FD, $F6, $AB, $AC ),
+      ( $E3, $F1, $F4, $F5, $EA, $9D, $E4, $F8, $FB, $FC ));
+
+  ObjectRename :            boolean = false;
+  ObjectOutlines :          boolean = true;
+
+  LastCharNum :             integer = 0;
+
+  CustomCursors : array [ CURSOR_ARROW .. CURSOR_EYEDROPPER ] of TCursorImage;
 
 {*****************************************************************************}
 
@@ -533,6 +547,36 @@ begin
   // toggle outlines on objects
   ObjectOutlines := bObjHideOutlines.Down;
   pbPage.Invalidate;
+end;
+
+// return the topmost cell of an object at row, cell or EMPTYCELL
+function TfMain.GetObjectCell(row, col : integer; var cell : TCell) : integer;
+var
+  i :             integer;
+  po :            PObj;
+  objr, objc, p : integer;
+  cellrec :       TCell;
+begin
+  for i := length(Objects) - 1 downto 0 do
+  begin
+    po := @Objects[i];
+
+    if InRect(col, row, po^.Col, po^.Row, po^.Width, po^.Height) then
+    begin
+      // on the col
+      objr := row - po^.Row;
+      objc := col - po^.Col;
+      p := objr * po^.Width + objc;
+      po^.Data.Get(@cellrec, p);
+      if cellrec.Chr <> EMPTYCHAR then
+      begin
+        cell := cellrec;
+        exit(i);
+      end;
+    end;
+  end;
+  cell := Page.Rows[row].Cells[col];
+  result := -1;
 end;
 
 // return the topmost cell of an object at row, cell or EMPTYCELL
@@ -735,7 +779,7 @@ begin
   begin
     setlength(Page.Rows, NumRows);
     for i := r to NumRows - 1 do
-      Page.Rows[i].Attr := A_ROW_HEIGHT_100 or A_ROW_WIDTH_100;
+      Page.Rows[i].Attr := A_ROW_WIDTH_100;
   end;
 
   for i := 0 to NumRows - 1 do
@@ -748,35 +792,36 @@ begin
         Page.Rows[i].Cells[j] := BLANK;
     end;
   end;
+  if CursorRow >= NumRows then CursorRow := NumRows - 1;
+  if CursorCol >= NumCols then CursorCol := NumCols - 1;
+  GenerateBmpPage;
+  pbPage.Invalidate;
 end;
 
-
-{ TfMain }
+procedure TfMain.ResizePage(row, col : integer);
+begin
+  if row >= NumRows then
+    seRows.Value := row + 1;
+  if col >= NumCols then
+    seCols.Value := col + 1;
+end;
 
 procedure TfMain.UpdateTitles;
 var
   altered : unicodestring;
+  displayname : unicodestring;
 begin
   altered := '';
   if CurrFileChanged then
     altered := '*';
-  Caption := Format('VTXEdit : %s - %s%s', [ Version, altered, CurrFileName ]);
-  Application.Title := Format('VTXEdit - %s%s', [ altered, CurrFileName ]);
+
+  displayname := CurrFileName;
+  if displayname = '' then
+    displayname := '<untitled>';
+
+  Caption := Format('VTXEdit : %s - %s%s', [ Version, altered, displayname ]);
+  Application.Title := Format('VTXEdit - %s%s', [ altered, displayname ]);
 end;
-
-const
-  CURSOR_ARROW =      2;
-  CURSOR_ARROWPLUS =  3;
-  CURSOR_ARROWMINUS = 4;
-  CURSOR_DRAW =       5;
-  CURSOR_FILL =       6;
-  CURSOR_LINE =       7;
-  CURSOR_RECT =       8;
-  CURSOR_ELLIPSE =    9;
-  CURSOR_EYEDROPPER = 10;
-
-var
-  CustomCursors : array [ CURSOR_ARROW .. CURSOR_EYEDROPPER ] of TCursorImage;
 
 procedure TfMain.FormCreate(Sender: TObject);
 var
@@ -785,8 +830,6 @@ var
   gt :  pbyte;
   gts : integer;
   enc : integer;
-  bmp : TBitmap;
-  str : string;
 begin
 
   // create custom cursors from imagelist
@@ -800,13 +843,14 @@ begin
   Screen.Cursors[CURSOR_RECT] := LoadCursorFromLazarusResource('C6');
   Screen.Cursors[CURSOR_ELLIPSE] := LoadCursorFromLazarusResource('C7');
   Screen.Cursors[CURSOR_EYEDROPPER] := LoadCursorFromLazarusResource('C8');
+  Screen.Cursors[CURSOR_PAINT] := LoadCursorFromLazarusResource('C9');
   pbPage.Cursor := CURSOR_ARROW;
   Application.ProcessMessages;
 
   seRows.MaxValue := MaxRows;
   seCols.MaxValue := MaxCols;
 
-  CurrFileName := 'Untitled.vtx';
+  CurrFileName := '';
   CurrFileChanged := false;
 
   // build codepage table
@@ -932,6 +976,7 @@ begin
   tbFont0.Down := true;
   BuildCharacterPalette;
   seCharacter.Value := CurrChar;
+  CodePageChange;
 
   PageType := PAGETYPE_BBS;
   cbPageType.ItemIndex := PageType;
@@ -957,6 +1002,9 @@ begin
 
   DebugStart;
 
+  tbSauceDate.Text := Format('%04.4d%02.2d%02.2d',
+    [ YearOf(now), MonthOf(now), DayOf(now) ]);
+
 end;
 
 procedure TfMain.LoadlvObjects;
@@ -972,19 +1020,17 @@ begin
 end;
 
 procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
-var
-  i : integer;
 begin
+  CheckToSave;
   SaveSettings;
   fPreviewBox.Hide;
   fPreviewBox.Free;
+end;
 
-  // free bitmaps
-  bmpPage.Free;
-  bmpPreview.Free;
-  if bmpCharPalette <> nil then
-    bmpCharPalette.Free;
-
+procedure TfMain.FormDestroy(Sender: TObject);
+var
+  i : integer;
+begin
   // free up document objects
   for i := 0 to length(Objects) - 1 do
     Objects[i].Data.free;
@@ -997,6 +1043,43 @@ begin
   ClearAllUndo;
   Undo.Free;
 
+  // free bitmaps
+  bmpPage.Free;
+  bmpPreview.Free;
+  bmpCharPalette.Free;
+  bmpCharPalette := nil;
+end;
+
+procedure StrToChars(str : unicodestring; buff : PByte; len : integer);
+var
+  b : TBytes;
+  i : integer;
+begin
+  MemZero(buff, len);
+  b := str.toEncodedCPBytes(CPages[CurrCodePage].EncodingLUT);
+  for i := 0 to len - 1 do
+    if i < length(b) then
+      buff[i] := b[i];
+end;
+
+procedure TfMain.tbSauceAuthorEditingDone(Sender: TObject);
+begin
+  StrToChars(unicodestring(tbSauceAuthor.Text), @Page.Sauce.Author[0], sizeof(Page.Sauce.Author));
+end;
+
+procedure TfMain.tbSauceDateEditingDone(Sender: TObject);
+begin
+  StrToChars(unicodestring(tbSauceDate.Text), @Page.Sauce.Date[0], sizeof(Page.Sauce.Date));
+end;
+
+procedure TfMain.tbSauceGroupEditingDone(Sender: TObject);
+begin
+  StrToChars(unicodestring(tbSauceGroup.Text), @Page.Sauce.Group[0], sizeof(Page.Sauce.Group));
+end;
+
+procedure TfMain.tbSauceTitleEditingDone(Sender: TObject);
+begin
+  StrToChars(unicodestring(tbSauceTitle.Text), @Page.Sauce.Title[0], sizeof(Page.Sauce.Title));
 end;
 
 // create new bmpPage of page at zoom 1
@@ -1010,31 +1093,18 @@ var
   off :     integer;
   bmp :     TBGRABitmap;
   w, h :    integer;
+  tmp : TBitmap;
 begin
 
   // create new
   w := NumCols * CellWidth;
   h := NumRows * CellHeight;
-  if (w = 0) or (h = 0) then exit;
+  if (w = 0) or (h = 0) then
+    exit;
 
-  if bmpPage <> nil then
-  begin
-    if (bmpPage.Width <> w) or (bmpPage.Height <> h) then
-    begin
-      // different size. create new
-      bmpPage.Free;
-      bmpPage := TBGRABitmap.Create(w, h);
-    end
-    else
-      // same size, just clear old.
-      bmpPage.FillRect(0,0,w,h,clBlack);
-  end
-  else
-    // create
-    bmpPage := TBGRABitmap.Create(w, h);
-
-  if bmpPreview <> nil then
-    bmpPreview.Free;
+  tmp := TBitmap.Create;
+  tmp.SetSize(w, h);
+  tmp.PixelFormat := pf16bit;
 
   // create mini bmp for character cells
   bmp := TBGRABitmap.Create(CellWidth, CellHeight);
@@ -1061,8 +1131,7 @@ begin
       end;
 
       GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      bmp.Draw(bmpPage.Canvas, x, y);
-//      bmpPage.Canvas.Draw(x, y, bmp.Bitmap);
+      tmp.Canvas.Draw(x, y, bmp.Bitmap);
 
       x += CellWidth;
     end;
@@ -1070,6 +1139,15 @@ begin
     y += CellHeight;
   end;
   bmp.free;
+
+  if bmpPage <> nil then
+    bmpPage.Free;
+  bmpPage := TBGRABitmap.Create(tmp, false);
+  tmp.free;
+
+  // create preview image
+  if bmpPreview <> nil then
+    bmpPreview.Free;
   bmpPage.ResampleFilter := rfMitchell;
   bmpPreview := bmpPage.Resample(bmpPage.Width>>2, bmpPage.Height>>2) as TBGRABitmap;
 
@@ -1308,9 +1386,9 @@ begin
     mclr := -1;     // other color with highest count
     for i := 0 to 3 do
     begin
-      inc(count[c4[i]]);
+      count[c4[i]] += 1;
       if count[c4[i]] = 1 then
-        inc(tot);
+        tot += 1;
       if (c4[i] <> clr) and (count[c4[i]] > mval) then
       begin
         mval := count[c4[i]];
@@ -1340,11 +1418,6 @@ begin
   result := cell;
 end;
 
-
-{-----------------------------------------------------------------------------}
-
-{ Non Control stuffs }
-
 function TfMain.HasUnicodes(cp : TEncoding; chars : array of UInt16) : boolean;
 var
   i, j : integer;
@@ -1365,7 +1438,6 @@ begin
       break;
   end;
 end;
-
 
 procedure TfMain.ScrollToCursor;
 begin
@@ -1402,15 +1474,14 @@ var
 begin
   v0 := CursorRow;
   v1 := CursorCol;
-  inc(CursorCol);
+  CursorCol += 1;
   if CursorCol >= NumCols then
   begin
     CursorCol := 0;
-    Inc(CursorRow);
+    CursorRow += 1;
     if CursorRow >= NumRows then
     begin
-      dec(CursorRow);
-      CursorCol := NumCols - 1;
+      seRows.Value := CursorRow + 1;
     end;
   end;
   DrawCell(v0, v1);
@@ -1424,14 +1495,14 @@ var
 begin
   v0 := CursorRow;
   v1 := CursorCol;
-  dec(CursorCol);
+  CursorCol -= 1;
   if CursorCol < 0 then
   begin
     CursorCol := NumCols - 1;
-    dec(CursorRow);
+    CursorRow -= 1;
     if CursorRow < 0 then
     begin
-      inc(CursorRow);
+      CursorRow -= 1;
       CursorCol := 0;
     end;
   end;
@@ -1446,9 +1517,9 @@ var
 begin
   v0 := CursorRow;
   v1 := CursorCol;
-  dec(CursorRow);
+  CursorRow -= 1;
   if CursorRow < 0 then
-    inc(CursorRow);
+    CursorRow := 0;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
   ScrollToCursor; // keep cursor on screen if typing
@@ -1460,9 +1531,11 @@ var
 begin
   v0 := CursorRow;
   v1 := CursorCol;
-  inc(CursorRow);
+  CursorRow += 1;
   if CursorRow >= NumRows then
-    dec(CursorRow);
+  begin
+    seRows.Value := CursorRow + 1;
+  end;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
   ScrollToCursor; // keep cursor on screen if typing
@@ -1474,9 +1547,11 @@ var
 begin
   v0 := CursorRow;
   v1 := CursorCol;
-  inc(CursorRow);
+  CursorRow += 1;
   if CursorRow >= NumRows then
-    dec(CursorRow);
+  begin
+    seRows.Value := CursorRow + 1;
+  end;
   CursorCol := 0;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
@@ -1524,10 +1599,6 @@ begin
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
-{-----------------------------------------------------------------------------}
-
-{ Keyboard stuff }
-
 procedure TfMain.CursorStatus;
 begin
   pbStatusBar.Invalidate;
@@ -1544,10 +1615,10 @@ begin
   fPreviewBox.Invalidate;
 end;
 
-procedure CopyObject(objin : TObj; var objout : TObj);
+procedure CopyObject(src : TObj; var dst : TObj);
 begin
-  objout := objin;
-  objout.Data := objin.Data.Copy;
+  dst := src;
+  dst.Data := src.Data.Copy;
 end;
 
 procedure TfMain.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -1586,6 +1657,10 @@ begin
     or seCols.Focused
     or seXScale.Focused
     or seCharacter.Focused
+    or tbSauceAuthor.Focused
+    or tbSauceDate.Focused
+    or tbSauceGroup.Focused
+    or tbSauceTitle.Focused
     or ObjectRename then
     exit;
 
@@ -1687,7 +1762,9 @@ begin
         pbCurrCell.Invalidate;
       end;
 
-    KA_CURSORNEWLINE:       CursorNewLine;
+    KA_CURSORNEWLINE:
+      CursorNewLine;
+
     KA_CURSORFORWARDTAB:
       begin
         SaveUndoKeys;
@@ -1773,6 +1850,9 @@ begin
     KA_TOOLDRAW:
       if tbToolDraw.Enabled then tbToolDraw.Click;
 
+    KA_TOOLPAINT:
+      if tbToolPaint.Enabled then tbToolPaint.Click;
+
     KA_TOOLFILL:
       if tbToolFill.Enabled then tbToolFill.Click;
 
@@ -1788,10 +1868,26 @@ begin
     KA_TOOLEYEDROPPER:
       if tbToolEyedropper.Enabled then tbToolEyedropper.Click;
 
-    KA_FILENEW:   NewFile;
-    KA_FILEOPEN:  miFileOpenClick(miFileOpen);
-    KA_FILESAVE:  miFileSaveClick(miFileSave);
-    KA_FILEEXIT:  Close;
+    KA_FILENEW:
+      begin
+        CheckToSave;
+        NewFile;
+      end;
+
+    KA_FILEOPEN:    miFileOpenClick(miFileOpen);
+    KA_FILESAVE:    miFileSaveClick(miFileSave);
+    KA_FILESAVEAS:
+      ;
+    KA_FILEIMPORT:
+      ;
+    KA_FILEEXPORT:
+      ;
+
+    KA_FILEEXIT:
+      begin
+        CheckToSave;
+        Close;
+      end;
 
     KA_EDITREDO:
       begin
@@ -1800,6 +1896,8 @@ begin
         begin
           RedoPerform(UndoPos);
           UndoPos += 1;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
@@ -1811,6 +1909,8 @@ begin
           // only if there is some undo to be done.
           UndoPerform(UndoPos - 1);
           UndoPos -= 1;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
@@ -1827,6 +1927,8 @@ begin
           SelectedObject := -1;
           lvObjects.ItemIndex := lvObjIndex(selectedObject);
           pbPage.Invalidate;
+          CurrFileChanged := true;
+          UpdateTitles;
         end
         else if CopySelection.Count > 0 then
         begin
@@ -1840,6 +1942,8 @@ begin
             Page.Rows[r].Cells[c] := BLANK;
             DrawCell(r, c, false);
           end;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
@@ -1852,11 +1956,15 @@ begin
           // copy object to clipboard
           Clipboard.Data.Free;
           CopyObject(Objects[SelectedObject], Clipboard);
+          CurrFileChanged := true;
+          UpdateTitles;
         end
         else if CopySelection.Count > 0 then
         begin
           Clipboard.Data.Free;
           Clipboard := CopySelectionToObject;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
@@ -1888,23 +1996,83 @@ begin
           lvObjects.ItemIndex := lvObjIndex(SelectedObject);
           pbPage.Invalidate;
           fPreviewBox.Invalidate;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
-    KA_OBJECTMOVEBACK:      ObjMoveBack;
-    KA_OBJECTMOVEFORWARD:   ObjMoveForward;
-    KA_OBJECTMOVETOBACK:    ObjMoveToBack;
-    KA_OBJECTMOVETOFRONT:   ObjMoveToFront;
-    KA_OBJECTFLIPHORZ:      ObjFlipHorz;
-    KA_OBJECTFLIPVERT:      ObjFlipVert;
-    KA_OBJECTMERGE:         ObjMerge;
-    KA_OBJECTMERGEALL:      ObjMergeAll;
-    KA_OBJECTNEXT:          ObjNext;
-    KA_OBJECTPREV:          ObjPrev;
+    KA_OBJECTMOVEBACK:
+      begin
+        ObjMoveBack;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTMOVEFORWARD:
+      begin
+        ObjMoveForward;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTMOVETOBACK:
+      begin
+        ObjMoveToBack;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTMOVETOFRONT:
+      begin
+        ObjMoveToFront;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTFLIPHORZ:
+      begin
+        ObjFlipHorz;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTFLIPVERT:
+      begin
+        ObjFlipVert;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTMERGE:
+      begin
+        ObjMerge;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTMERGEALL:
+      begin
+        ObjMergeAll;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTNEXT:
+      begin
+        ObjNext;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
+
+    KA_OBJECTPREV:
+      begin
+        ObjPrev;
+        CurrFileChanged := true;
+        UpdateTitles;
+      end;
 
     KA_DELETE:
       begin
-        SaveUndoKeys;
         if ToolMode = tmSelect then
         begin
           SaveUndoKeys;
@@ -1950,6 +2118,8 @@ begin
             CopySelection.Clear;
             pbPage.Invalidate;
           end;
+          CurrFileChanged := true;
+          UpdateTitles;
         end;
       end;
 
@@ -1995,6 +2165,10 @@ begin
     or seCols.Focused
     or seXScale.Focused
     or seCharacter.Focused
+    or tbSauceAuthor.Focused
+    or tbSauceDate.Focused
+    or tbSauceGroup.Focused
+    or tbSauceTitle.Focused
     or ObjectRename then
     exit;
 
@@ -2016,7 +2190,7 @@ begin
   Page.Rows[CursorRow].Cells[CursorCol].Attr := CurrAttr;
   DrawCell(CursorRow, CursorCol, false);
 
-  inc(CursorCol);
+  CursorCol += 1;
   if CursorCol >= NumCols then
   begin
     CursorCol := 0;
@@ -2080,9 +2254,6 @@ var
 begin
 //  ScrollToCursor; // keep cursor on screen if typing
 
-
-
-
   if tbAttrCharacter.Tag <> 0 then
     ch := Page.Rows[CursorRow].Cells[CursorCol].Chr;
 
@@ -2121,10 +2292,6 @@ begin
   CurrFileChanged := true;
   UpdateTitles;
 end;
-
-{-----------------------------------------------------------------------------}
-
-{ Control events }
 
 procedure TfMain.CodePageChange;
 begin
@@ -2277,7 +2444,6 @@ begin
   pbPage.Invalidate;
 end;
 
-
 procedure TfMain.sbHorzChange(Sender: TObject);
 begin
   ResizeScrolls;
@@ -2337,16 +2503,10 @@ begin
   ResizeScrolls;
 end;
 
-
 procedure TfMain.FormResize(Sender: TObject);
 begin
   ResizeScrolls;
 end;
-
-
-{-----------------------------------------------------------------------------}
-
-{ Menu Routines }
 
 procedure TfMain.NewFile;
 var
@@ -2375,7 +2535,7 @@ begin
     for c := 0 to NumCols - 1 do
       Page.Rows[r].Cells[c] := BLANK;
   MemZero(@Page.Sauce, sizeof(TSauceHeader));
-  CurrFileName := 'Untitled.vtx';
+  CurrFileName := '';
   CurrFileChanged := false;
   tbSauceAuthor.Text:='';
   tbSauceDate.Text:='';
@@ -2411,193 +2571,6 @@ end;
 procedure TfMain.miFileNewClick(Sender: TObject);
 begin
   NewFile;
-end;
-
-procedure TfMain.LoadVTXFile(fname : string);
-var
-  fin :         TFileStream;
-  head :        TVTXFileHeader;
-  i, j, r, c :  integer;
-  numobj :      integer;
-  b :           byte;
-  namein :      packed array [0..63] of char;
-  cellrec :     TCell;
-const
-  ID = 'VTXEDIT';
-begin
-  fin := TFileStream.Create(fname, fmOpenRead or fmShareDenyNone);
-  fin.Read(head, sizeof(TVTXFileHeader));
-
-  if not MemComp(@ID[0], @head.ID, 7) then
-  begin
-    ShowMessage('Bad Header.');
-    NewFile;
-    exit;
-  end;
-  if head.Version <> $0001 then
-  begin
-    ShowMessage('Bad Version.');
-    NewFile;
-    exit;
-  end;
-
-  PageType := head.PageType;
-  for i := 0 to 15 do
-    Fonts[i] := TEncoding(head.Fonts[i]);
-  ColorScheme := head.Colors;
-  NumRows := head.Height;
-  NumCols := head.Width;
-  XScale := head.XScale;
-  Page.PageAttr := head.PageAttr;
-  Page.CrsrAttr := head.CrsrAttr;
-  MemCopy(@head.Sauce, @Page.Sauce, sizeof(TSauceHeader));
-  numobj := head.NumObjects;
-
-  if length(Page.Rows) < NumRows then
-    setlength(Page.Rows, NumRows);
-  for r := 0 to NumRows - 1 do
-  begin
-    // row attributes here
-    fin.Read(Page.Rows[r].Attr, sizeof (Page.Rows[r].Attr));
-    if length(Page.Rows[r].Cells) < NumCols then
-      setlength(Page.Rows[r].Cells, NumCols);
-    for c := 0 to NumCols - 1 do
-    begin
-      fin.Read(Page.Rows[r].Cells[c], sizeof(TCell));
-    end;
-  end;
-
-  // load objects
-  setlength(Objects, numobj);
-  for i := 0 to numobj - 1 do
-  begin
-    Objects[i].Row := fin.ReadWord;
-    Objects[i].Col := fin.ReadWord;
-    Objects[i].Width := fin.ReadWord;
-    Objects[i].Height := fin.ReadWord;
-    Objects[i].Page := (fin.ReadByte = 1);
-    Objects[i].Locked := (fin.ReadByte = 1);
-    Objects[i].Hidden := (fin.ReadByte = 1);
-
-    // get name
-    fin.Read(namein, 64);
-    Objects[i].Name := namein;
-    Objects[i].Data.Create(sizeof(TCell), rleDoubles);
-    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
-    begin
-      fin.ReadBuffer(cellrec, sizeof(TCell));
-      Objects[i].Data.Add(@cellrec);
-    end;
-  end;
-
-  fin.free;
-end;
-
-procedure TfMain.SaveVTXFile(fname : string);
-var
-  fout : TFileStream;
-  head : TVTXFileHeader;
-  i, j, r, c : integer;
-  nameout : packed array [0..63] of char;
-  cellrec : TCell;
-const
-  ID = 'VTXEDIT';
-begin
-  fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
-  MemCopy(@ID[0], @head.ID, 7);
-  head.ID[7] := 0;
-  head.Version := $0001;
-  head.PageType := PageType;
-  for i := 0 to 15 do
-    head.Fonts[i] := word(ord(Fonts[i]));
-  head.Colors := ColorScheme;
-  head.Height := NumRows;
-  head.Width := NumCols;
-  MemZero(@head.Name[0], 64);
-  for i := 0 to length(fname) - 1 do
-  begin
-    if i >= 63 then break;
-    head.Name[i] := fname.Chars[i];
-  end;
-
-  head.XScale := XScale;
-  head.PageAttr := Page.PageAttr;
-  head.CrsrAttr := Page.CrsrAttr;
-  MemCopy(@Page.Sauce, @head.Sauce, sizeof(TSauceHeader));
-  head.NumObjects := length(Objects);
-  fout.Write(head, sizeof(TVTXFileHeader));
-
-  for r := 0 to numrows-1 do
-  begin
-    fout.WriteDWord(Page.Rows[r].Attr);
-    for c := 0 to numcols-1 do
-      fout.Write(Page.Rows[r].Cells[c], sizeof(TCell));
-  end;
-
-  // save objects
-  for i := 0 to length(Objects) - 1 do
-  begin
-    // save row, col, width, height, Page, Locked, Hidden, name, and data only
-    fout.WriteWord(Objects[i].Row);
-    fout.WriteWord(Objects[i].Col);
-    fout.WriteWord(Objects[i].Width);
-    fout.WriteWord(Objects[i].Height);
-    fout.WriteByte(iif(Objects[i].Page, 1, 0));
-    fout.WriteByte(iif(Objects[i].Locked, 1, 0));
-    fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
-
-    MemZero(@nameout[0], 64);
-    for j := 0 to length(Objects[i].Name) - 1 do
-    begin
-      if j >= 63 then break;
-      nameout[j] := char(Objects[i].Name.charAt(j));
-    end;
-    fout.Write(nameout[0], 64);
-
-    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
-    begin
-      Objects[i].Data.Get(@cellrec, j);
-      fout.Write(cellrec, sizeof(TCell));
-    end;
-  end;
-
-  fout.free;
-end;
-
-procedure TfMain.miFileExportClick(Sender: TObject);
-begin
-
-end;
-
-procedure TfMain.miFileSaveAsClick(Sender: TObject);
-begin
-
-end;
-
-procedure TfMain.miFileSaveClick(Sender: TObject);
-var
-  ansi : unicodestring;
-begin
-  sdAnsi.Filename := CurrFileName;
-  if sdAnsi.Execute then
-  begin
-    // get filter.
-    case sdAnsi.FilterIndex of
-      1:    // vtxedit file - save EVERYTHING
-        begin
-          SaveVTXFile(sdAnsi.Filename);
-        end;
-
-      else  // everything else
-        begin
-          ansi := BuildANSI;
-          SaveANSIFile(sdAnsi.FileName, ansi, CurrCodePage);
-        end;
-    end;
-    CurrFileName := ExtractFileName(sdAnsi.FileName);
-    CurrFileChanged := false;
-    UpdateTitles;
-  end;
 end;
 
 procedure TfMain.BuildCharacterPalette;
@@ -2642,10 +2615,18 @@ begin
 
   rows := (NumChars - 1) div PALCOLS + 1;
   if bmpCharPalette <> nil then
+  begin
     bmpCharPalette.Free;
-  bmpCharPalette := TBGRABitmap.Create(PALCOLS * CELL_WIDTH + 4, rows * CELL_HEIGHT + 4);
-  bmpCharPalette.FillRect(0,0,bmpCharPalette.Width,bmpCharPalette.Height,clBlack);
+    bmpCharPalette := nil;
+  end;
 
+  bmpCharPalette := TBitmap.Create;
+  bmpCharPalette.SetSize(PALCOLS * CELL_WIDTH + 4, rows * CELL_HEIGHT + 4);
+  bmpCharPalette.PixelFormat := pf16bit;
+
+  bmpCharPalette.Canvas.Brush.Style := bsSolid;
+  bmpCharPalette.Canvas.Brush.Color := clBlack;
+  bmpCharPalette.Canvas.FillRect(0, 0, bmpCharPalette.Width, bmpCharPalette.Height);
   for i := 0 to NumChars - 1 do
   begin
 
@@ -2668,8 +2649,11 @@ begin
     rect.Width := 16;
     rect.Height := 32;
 
-    bmpCharPalette.FillRect(2 + x - 1, 2 + y - 1, 4 + x + 17, 2 + y + 33, clDkGray);
-    DrawStretchedBitmap(bmpCharPalette.Canvas, rect, cell);
+    rect.Inflate(1, 1);
+    bmpCharPalette.Canvas.Brush.Color := clDkGray;
+    bmpCharPalette.Canvas.FillRect(rect);
+    rect.Inflate(-1, -1);
+    bmpCharPalette.Canvas.StretchDraw(rect, cell.Bitmap);
   end;
   cell.Free;
   pbChars.Invalidate;
@@ -2727,9 +2711,12 @@ begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
 
+  if bmpCharPalette = nil then
+    exit;
+
   pb.Width := bmpCharPalette.Width;
   pb.Height := bmpCharPalette.Height;
-  cnv.Draw(0, 0, bmpCharPalette.Bitmap);
+  cnv.Draw(0, 0, bmpCharPalette);
 
   // hilight the selected char
   if CurrCodePage in [ encUTF8, encUTF16 ] then
@@ -2749,7 +2736,7 @@ begin
   cnv.Brush.Style := bsClear;
   cnv.Pen.Color := clRed;
   cnv.Pen.Width := 1;
-  cnv.Rectangle(x, y, x + 20, y + 36);
+  cnv.Rectangle(x - 2, y, x + 18, y + 36);
 
   pbCurrCell.Invalidate;
 end;
@@ -2875,9 +2862,6 @@ begin
       exit (i);
   result := 0;
 end;
-
-var
-  LastCharNum : integer = 0;
 
 procedure TfMain.seCharacterChange(Sender: TObject);
 var
@@ -3080,11 +3064,14 @@ end;
 
 procedure TfMain.tbModeClick(Sender: TObject);
 var
-  tb : TToolButton;
-  n : string;
+  tb :    TToolButton;
+  n :     string;
+  Pt :    TPoint;
+  X, Y :  integer;
 begin
   tb := TToolButton(Sender);
 
+  DrawCell(LastDrawRow, LastDrawCol);
   n := tb.Name;
   case n of
     'tbModeCharacter':
@@ -3122,6 +3109,17 @@ begin
         SubYSize := 3;
       end;
   end;
+  if ToolMode <> tmSelect then
+  begin
+    Pt := pbPage.ScreenToClient(Mouse.CursorPos);
+    X := Pt.x;
+    Y := Pt.y;
+    DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
+    DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
+    LastDrawRow := MouseRow;
+    LastDrawCol := MouseCol;
+    DrawMouseBox;
+  end;
 
   tbModeCharacter.Down := (tb.Name = 'tbModeCharacter');
   tbModeLeftRights.Down := (tb.Name = 'tbModeLeftRights');
@@ -3136,6 +3134,8 @@ var
 begin
   tb := TToolButton(Sender);
 
+  // disable the mousebox
+  DrawCell(LastDrawRow, LastDrawCol);
   case tb.Name of
     'tbToolSelect':
       begin
@@ -3149,6 +3149,15 @@ begin
         ToolMode := tmDraw;
         pbPage.Cursor := CURSOR_DRAW;
         Application.ProcessMessages;
+        DrawMouseBox;
+      end;
+
+    'tbToolPaint':
+      begin
+        ToolMode := tmPaint;
+        pbPage.Cursor := CURSOR_PAINT;
+        Application.ProcessMessages;
+        DrawMouseBox;
       end;
 
     'tbToolEyedropper':
@@ -3156,6 +3165,7 @@ begin
         ToolMode := tmEyedropper;
         pbPage.Cursor := CURSOR_EYEDROPPER;
         Application.ProcessMessages;
+        DrawMouseBox;
       end;
 
     'tbToolFill':
@@ -3163,6 +3173,7 @@ begin
         ToolMode := tmFill;
         pbPage.Cursor := CURSOR_FILL;
         Application.ProcessMessages;
+        DrawMouseBox;
       end;
 
     'tbToolLine':
@@ -3170,6 +3181,7 @@ begin
         ToolMode := tmLine;
         pbPage.Cursor := CURSOR_LINE;
         Application.ProcessMessages;
+        DrawMouseBox;
       end;
 
     'tbToolRect':
@@ -3177,6 +3189,7 @@ begin
         ToolMode := tmRect;
         pbPage.Cursor := CURSOR_RECT;
         Application.ProcessMessages;
+        DrawMouseBox;
       end;
 
     'tbToolEllipse':
@@ -3184,11 +3197,13 @@ begin
         ToolMode := tmEllipse;
         pbPage.Cursor := CURSOR_ELLIPSE;
         Application.ProcessMessages;
+        DrawMouseBox;
       end;
   end;
 
   tbToolSelect.Down := (tb.Name = 'tbToolSelect');
   tbToolDraw.Down := (tb.Name = 'tbToolDraw');
+  tbToolPaint.Down := (tb.Name = 'tbToolPaint');
   tbToolEyedropper.Down := (tb.Name = 'tbToolEyedropper');
   tbToolFill.Down := (tb.Name = 'tbToolFill');
   tbToolLine.Down := (tb.Name = 'tbToolLine');
@@ -3308,9 +3323,3757 @@ end;
 
 procedure TfMain.miFileExitClick(Sender: TObject);
 begin
+  CheckToSave;
   Close;
 end;
 
+procedure TfMain.pbPageMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  undoblk :   TUndoBlock;
+  tmp :       TRecList;
+begin
+  case Button of
+    mbLeft : MouseLeft := false;
+    mbMiddle : MouseMiddle := false;
+    mbRight : MouseRight := false;
+  end;
+
+  if Button = mbMiddle then
+    MousePan := false
+  else if drag then
+  begin
+    // add / remove selection
+    tmp := BuildDisplayCopySelection;
+    CopySelection.Free;
+    CopySelection := tmp;
+    drag := false;
+    pbPage.invalidate;
+  end
+  else if dragObj then
+  begin
+    // move object (dragrow/dragcol = initial pos)
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := dragObjRow;
+    undoblk.OldCol := dragObjCol;
+    undoblk.OldNum := SelectedObject;
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
+    dragObj := false;
+    fPreviewBox.Invalidate;
+  end
+  else
+  begin
+    // save CurrUndoData to undolist
+    if CurrUndoData.Count > 0 then
+    begin
+      undoblk.UndoType := utCells;
+      undoblk.CellData := CurrUndoData.Copy;
+      undoblk.CellData.Trim;
+      UndoAdd(undoblk);
+      CurrUndoData.Clear;
+    end;
+  end;
+end;
+
+procedure TfMain.pbPageMouseWheel(Sender: TObject; Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
+var
+  val :       integer;
+  PrevZoom :  double;
+  NewWindowCols, NewWindowRows : integer;
+begin
+  // zoom
+  if ssShift in Shift then
+  begin
+    PrevZoom := PageZoom;
+    if WheelDelta < 0 then
+    begin
+      PageZoom /= 2;
+      if PageZoom < 1/8 then
+        PageZoom := 1/8;
+    end
+    else if WheelDelta > 0 then
+    begin
+      PageZoom *= 2;
+      if PageZoom > 16 then
+        PageZoom := 16;
+    end;
+
+    // don't allow 0's for cellwidthz
+    if floor(CellWidth * PageZoom * XScale) = 0 then
+      PageZoom *= 2;
+
+    CellWidthZ := floor(CellWidth * PageZoom * XScale);
+    CellHeightZ := floor(CellHeight * PageZoom);
+
+    NewWindowCols := (pbPage.Width div CellWidthZ) + 1;
+    NewWindowRows := (pbPage.Height div CellHeightZ) + 1;
+
+    // adjust pagetop / pageleft so centered on mousepos
+    PageLeft := MouseCol - (NewWindowCols >> 1);
+    PageTop := MouseRow - (NewWindowRows >> 1);
+    sbHorz.Position:=PageLeft;
+    sbVert.Position:=PageTop;
+
+    ResizeScrolls;
+  end
+  else
+  begin
+    // scroll
+    val := sbVert.Position;
+    if WheelDelta > 0 then
+    begin
+      val -= 4;
+      if val < 0 then
+        val := 0;
+    end
+    else
+    begin
+      val += 4;
+      if val > sbvert.Max - WindowRows then
+        val  := sbvert.max - WindowRows;
+    end;
+    sbVert.Position := val;
+  end;
+  Handled := true;
+end;
+
+procedure TfMain.pbPageMouseLeave(Sender: TObject);
+begin
+  MousePan := false;
+  MouseRow := -1;
+  pbStatusBar.Invalidate;
+
+  if ToolMode = tmDraw then
+    DrawCell(LastDrawRow, LastDrawCol);
+end;
+
+procedure TfMain.SaveUndoKeys;
+var
+  undoblk : TUndoBlock;
+begin
+  if CurrUndoData.Count > 0 then
+  begin
+    // save key presses.
+    undoblk.UndoType := utCells;
+    undoblk.CellData := CurrUndoData.Copy;
+    undoblk.CellData.Trim;
+    UndoAdd(undoblk);
+    CurrUndoData.Clear;
+  end;
+end;
+
+procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  bcolor :        integer;
+  dcell :         TCell;
+  objnum :        integer;
+  tmp :           integer;
+begin
+  // left click to type.
+  // left drag to select
+  // right drag to pan
+  case Button of
+    mbLeft : MouseLeft := true;
+    mbMiddle : MouseMiddle := true;
+    mbRight : MouseRight := true;
+  end;
+
+  pSettings.SetFocus;
+  if Button = mbMiddle then
+  begin
+    // pan
+    DrawCell(LastDrawRow, LastDrawCol);
+    MousePan := true;
+    MousePanT := PageTop;
+    MousePanL := PageLeft;
+    MousePanX := X;
+    MousePanY := Y;
+  end
+  else
+  begin
+
+    SaveUndoKeys;
+
+    case ToolMode of
+      tmSelect:
+        begin
+
+          // check if clicking object
+          objnum := GetObject(MouseRow, MouseCol);
+          if objnum <> SelectedObject then
+          begin
+            tmp := SelectedObject;
+            SelectedObject := objnum;
+            RefreshObject(tmp);
+            RefreshObject(SelectedObject);
+          end;
+
+          lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+          lvObjects.Invalidate;
+          if (SelectedObject <> -1) then
+          begin
+            if not Objects[SelectedObject].Locked then
+            begin
+              dragObjRow := Objects[SelectedObject].Row;
+              dragObjCol := Objects[SelectedObject].Col;
+              dragRow := MouseRow - Objects[SelectedObject].Row; // save delta
+              dragCol := MouseCol - Objects[SelectedObject].Col;
+              dragObj := true;
+            end;
+          end
+          else
+          begin
+            // move cursor or select region
+            // drag = new selection
+            // shift drag = add to selection
+            // ctrl drag = remove from selection
+            // click = cell to new selection / move cursor
+            // shift click = add cell from selection
+            // ctrl click = remove cell from selection
+            if between(MouseRow, 0, NumRows - 1)
+              and between(MouseCol, 0, NumCols - 1) then
+            begin
+
+              if ssShift in Shift then
+              begin
+                // add to selection
+                // clear previous selection.
+                drag := true;
+                dragType := DRAG_ADD;
+                dragRow := MouseRow;
+                dragCol := MouseCol;
+              end
+              else if ssCtrl in Shift then
+              begin
+                // remove from selection
+                // clear previous selection.
+                drag := true;
+                dragType := DRAG_REMOVE;
+                dragRow := MouseRow;
+                dragCol := MouseCol;
+              end
+              else
+              begin
+                CursorMove(MouseRow, MouseCol);
+
+                // clear previous selection.
+                CopySelection.Clear;
+                pbPage.invalidate;
+
+                // normal click / start selection
+                drag := true;
+                dragType := DRAG_NEW;
+                dragRow := MouseRow;
+                dragCol := MouseCol;
+              end;
+            end;
+          end;
+        end;
+
+      tmDraw:
+        begin
+          // draw current character.
+          // left click = draw, right click = erase
+          if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
+            and between(MouseCol, 0, NumCols-1) then
+          begin
+            DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
+            DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
+            SubX := DrawX mod SubXSize;
+            SubY := DrawY mod SubYSize;
+
+            case DrawMode of
+              dmChars:
+                begin
+                  dcell.Chr := iif(Button = mbLeft, CurrChar, $20);
+                  dcell.Attr := iif(Button = mbLeft, CurrAttr, $0007);
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  PutCharEx(dcell.Chr, dcell.Attr, MouseRow, MouseCol);
+                end;
+
+              dmLeftRights:
+                begin
+                  bcolor := iif(Button = mbLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    2, 1, SubX, SubY);
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
+                  DrawCell(MouseRow, MouseCol, false);
+                  CurrFileChanged := true;
+                  UpdateTitles;
+                end;
+
+              dmTopBottoms:
+                begin
+                  bcolor := iif(Button = mbLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    1, 2, SubX, SubY);
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
+                  DrawCell(MouseRow, MouseCol,false);
+                  CurrFileChanged := true;
+                  UpdateTitles;
+                end;
+
+              dmQuarters:
+                begin
+                  bcolor := iif(Button = mbLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    2, 2, SubX, SubY);
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
+                  DrawCell(MouseRow, MouseCol,false);
+                  CurrFileChanged := true;
+                  UpdateTitles;
+                end;
+            end;
+          end;
+        end;
+    end;
+  end;
+end;
+
+procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
+  Y: Integer);
+var
+  i, dx, dy :       integer;
+  done :            boolean;
+  mr, mc, sx, sy :  integer;
+  bcolor :          integer;
+  dcell :           TCell;
+//  dattr, dchar :    integer;
+begin
+
+  // update mouse position
+  MouseRow := PageTop + floor(Y / CellHeightZ);
+  MouseCol := PageLeft + floor(X / CellWidthZ);
+  if Between(MouseRow, 0, NumRows - 1) and Between(MouseCol, 0, NumCols - 1) then
+  begin
+    // calc subx,y
+    DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
+    DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
+    SubX := DrawX mod SubXSize;
+    SubY := DrawY mod SubYSize;
+  end
+  else
+  begin
+    MouseRow := -1;
+    dragObj := false; // stop moving if off page
+  end;
+
+  // update mouse r,c on status bar
+  pbStatusBar.Invalidate;
+  if (DrawX <> LastDrawX) or (DrawY <> LastDrawY) then
+  begin
+    pbRulerLeft.Invalidate;
+    pbRulerTop.Invalidate;
+  end;
+
+  if MousePan then
+  begin
+    // panning the document
+    dx := round((MousePanX - X) / CellWidthZ);
+    dy := round((MousePanY - Y) / CellHeightZ);
+
+    if NumCols > WindowCols then
+    begin
+      i := MousePanL + dx;
+      if i < sbHorz.Min then
+        i := sbHorz.Min;
+      if i > sbHorz.Max - WindowCols then
+        i := sbHorz.Max - WindowCols + 1;
+      sbHorz.Position := i;
+    end;
+
+    if NumRows > WindowRows then
+    begin
+      i := MousePanT + dy;
+      if i < sbVert.Min then
+        i := sbVert.Min;
+      if i > sbVert.Max - WindowRows then
+        i := sbVert.Max - WindowRows + 1;
+      sbVert.Position := i;
+    end;
+  end
+  else if drag then
+  begin
+    // dragging copy selection
+    // let paint draw selection information
+    if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
+      dragType := DRAG_ADD;
+
+    pbPage.Invalidate;
+  end
+  else if dragObj then
+  begin
+    // moving an object
+    Objects[SelectedObject].Row := MouseRow - DragRow;
+    Objects[SelectedObject].Col := MouseCol - DragCol;
+    pbPage.Invalidate;
+  end
+  else
+  begin
+    case ToolMode of
+      tmDraw:
+        begin
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
+          begin
+            if (MouseLeft or MouseRight) and ((DrawX <> LastDrawX) or (DrawY <> LastDrawY)) then
+            begin
+              case DrawMode of
+                dmChars:
+                  begin
+                    // add move to
+                    dcell.chr := iif(MouseLeft, CurrChar, $20);
+                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                    LineCalcInit(LastDrawX, LastDrawY, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(LastDrawX, LastDrawY);
+                      RecordUndoCell(LastDrawY, LastDrawX, dcell);
+                      PutCharEx(dcell.Chr, dcell.Attr, LastDrawY, LastDrawX);
+                    until done;
+                  end;
+
+                dmLeftRights:
+                  begin
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(LastDrawX, LastDrawY);
+                      mr := LastDrawY div SubYSize;
+                      mc := LastDrawX div SubXSize;
+                      sx := LastDrawX mod SubXSize;
+                      sy := LastDrawY mod SubYSize;
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        2, 1, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+                      Page.Rows[mr].Cells[mc] := dcell;
+                      DrawCell(mr, mc, false);
+                      CurrFileChanged := true;
+                      UpdateTitles;
+                    until done;
+                  end;
+
+                dmTopBottoms:
+                  begin
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(LastDrawX, LastDrawY);
+                      mr := LastDrawY div SubYSize;
+                      mc := LastDrawX div SubXSize;
+                      sx := LastDrawX mod SubXSize;
+                      sy := LastDrawY mod SubYSize;
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        1, 2, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+                      Page.Rows[mr].Cells[mc] := dcell;
+                      DrawCell(mr, mc, false);
+                      CurrFileChanged := true;
+                      UpdateTitles;
+                    until done;
+                  end;
+
+                dmQuarters:
+                  begin
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(LastDrawX, LastDrawY);
+                      mr := LastDrawY div SubYSize;
+                      mc := LastDrawX div SubXSize;
+                      sx := LastDrawX mod SubXSize;
+                      sy := LastDrawY mod SubYSize;
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        2, 2, sx, sy);
+
+                      RecordUndoCell(mr, mc, dcell);
+                      Page.Rows[mr].Cells[mc] := dcell;
+                      DrawCell(mr, mc,false);
+                      CurrFileChanged := true;
+                      UpdateTitles;
+                    until done;
+                  end;
+              end;
+            end;
+
+            // draw square box retinal
+            DrawMouseBox;
+          end
+          else
+            DrawCell(LastDrawRow, LastDrawCol);
+        end;
+
+      tmLine: ;
+      tmRect:  ;
+      tmEllipse: ;
+    end
+  end;
+end;
+
+procedure TfMain.DrawMouseBox;
+var
+  x, y : integer;
+begin
+  // erase the previous
+  if (DrawX <> LastDrawX) or (DrawY <> LastDrawY) then
+  begin
+    DrawCell(LastDrawRow, LastDrawCol);
+
+    // compute x, y of little box
+    x := floor((DrawX - (PageLeft * SubXSize)) * CellWidthZ) div SubXSize;
+    y := floor((DrawY - (PageTop * SubYSize)) * CellHeightZ) div SubYSize;
+
+    if Between(MouseRow, PageTop, NumRows - 1)
+      and Between(MouseCol, PageLeft, NumCols - 1)
+      and (GetObject(MouseRow, MouseCol) = -1) then
+      DrawDashRect(pbPage.Canvas, x, y,
+        x + (CellWidthZ div SubXSize), y + (CellHeightZ div SubYSize),
+        clDrawCursor1, clDrawCursor2);
+
+    LastDrawRow := MouseRow;
+    LastDrawCol := MouseCol;
+    LastDrawX := DrawX;
+    LastDrawY := DrawY;
+  end;
+end;
+
+// draw a cell on screen from object on Page.Rows[].Cells[].
+// THIS ROUTINE IS TOOOOOOOOO SLOW!
+procedure TfMain.DrawCell(row, col : integer; skipUpdate : boolean = true);
+var
+  cnv :       TCanvas;
+  x, y :      integer;
+  cell :      TCell;
+  objnum :    integer;
+  cl1, cl2 :  TColor;
+  i :         integer;
+  copyrec :   TLoc;
+begin
+  // compute x, y of row, col
+  cnv := pbPage.Canvas;
+  x := (col - PageLeft) * CellWidthZ;
+  y := (row - PageTop) * CellHeightZ;
+  if Between(x, 0, pbPage.Width + CellWidthZ)
+    and Between(y, 0, pbPage.Height + CellHeightZ) then
+  begin
+    objnum := GetObjectCell(row, col, cell);
+    if (objnum = -1) then
+    begin
+      DrawCellEx(cnv, x, y, row, col, skipUpdate);
+      // draw selection borders
+      for i := CopySelection.Count - 1 downto 0 do
+      begin
+        CopySelection.Get(@copyrec, i);
+        if (copyrec.Row = row) and (copyrec.Col = col) then
+        begin
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
+            DrawDashLine(cnv,
+              x, y,
+              x + CellWidthZ, y,
+              clSelectionArea1, clSelectionArea2);
+
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
+            DrawDashLine(cnv,
+              x, y + CellHeightZ - 1,
+              x + CellWidthZ, y + CellHeightZ - 1,
+              clSelectionArea1, clSelectionArea2);
+
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
+            DrawDashLine(cnv,
+              x, y,
+              x, y + CellHeightZ,
+              clSelectionArea1, clSelectionArea2);
+
+          if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
+            DrawDashLine(cnv,
+              x + CellWidthZ - 1, y,
+              x + CellWidthZ - 1, y + CellHeightZ,
+              clSelectionArea1, clSelectionArea2);
+          break;
+        end;
+      end;
+    end
+    else
+    begin
+      // prevent stamping object onto bmp
+      if not skipupdate then
+        cell := Page.Rows[row].Cells[col];
+
+      DrawCellEx(cnv, x, y, row, col, skipUpdate, true, cell.Chr, cell.Attr);
+
+      // draw object edges
+      if ObjectOutlines then
+      begin
+        if objnum = SelectedObject then
+        begin
+          cl1 := clSelectedObject1;
+          cl2 := clSelectedObject2;
+        end
+        else
+        begin
+          cl1 := clUnselectedObject1;
+          cl2 := clUnselectedObject2;
+        end;
+
+        if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
+          DrawDashLine(cnv, x, y, x + CellWidthZ, y, cl1, cl2);
+
+        if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
+          DrawDashLine(cnv, x, y + CellHeightZ - 1, x + CellWidthZ, y + CellHeightZ - 1, cl1, cl2);
+
+        if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
+          DrawDashLine(cnv, x, y, x, y + CellHeightZ, cl1, cl2);
+
+        if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
+          DrawDashLine(cnv, x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ, cl1, cl2);
+      end;
+    end;
+  end;
+end;
+
+procedure TfMain.sePageSizeChange(Sender: TObject);
+begin
+  // resize document
+  if not SkipResize then
+  begin
+    NumRows := seRows.Value;
+    NumCols := seCols.Value;
+    ResizePage;
+    ResizeScrolls;
+  end;
+end;
+
+// add to selection. no dupes allowed
+procedure SelectionAdd(var selection : TRecList; r, c : integer);
+var
+  neighbor :  integer;
+  i, l :      integer;
+  copyrec :   TLoc;
+begin
+  neighbor := 0;
+  l := selection.count;
+  for i := 0 to l - 1 do
+  begin
+    selection.Get(@copyrec, i);
+
+    // already exists
+    if (copyrec.Row = r) and (copyrec.Col = c) then
+      exit;
+
+    // build neighbors
+    if (copyrec.Row = r - 1) and (copyrec.Col = c) then
+    begin
+      SetBit(copyrec.Neighbors, NEIGHBOR_SOUTH, true);
+      SetBit(neighbor, NEIGHBOR_NORTH, true);
+    end;
+
+    if (copyrec.Row = r + 1) and (copyrec.Col = c) then
+    begin
+      SetBit(copyrec.Neighbors, NEIGHBOR_NORTH, true);
+      SetBit(neighbor, NEIGHBOR_SOUTH, true);
+    end;
+
+    if (copyrec.Row = r) and (copyrec.Col = c - 1) then
+    begin
+      SetBit(copyrec.Neighbors, NEIGHBOR_EAST, true);
+      SetBit(neighbor, NEIGHBOR_WEST, true);
+    end;
+
+    if (copyrec.Row = r) and (copyrec.Col = c + 1) then
+    begin
+      SetBit(copyrec.Neighbors, NEIGHBOR_WEST, true);
+      SetBit(neighbor, NEIGHBOR_EAST, true);
+    end;
+
+    selection.Put(@copyrec, i);
+  end;
+
+  copyrec.Row := r;
+  copyrec.Col := c;
+  copyrec.Neighbors := neighbor;
+  selection.Add(@copyrec);
+end;
+
+// create an object from the CopySelection data.
+function TfMain.CopySelectionToObject : TObj;
+var
+  i, l :        integer;
+  r, c :        integer;
+  w, h :        integer;
+  maxr, maxc,
+  minr, minc :  integer;
+  p :           integer;
+  n :           byte;
+  copyrec :     TLoc;
+  cellrec :     TCell;
+begin
+  // get bounding box of copy selection
+  l := CopySelection.Count;
+  maxr := 0;
+  maxc := 0;
+  minr := 99999;
+  minc := 99999;
+  for i := 0 to l - 1 do
+  begin
+    CopySelection.Get(@copyrec, i);
+    r := copyrec.Row;
+    c := copyrec.Col;
+    minr := min(minr, r);
+    minc := min(minc, c);
+    maxr := max(maxr, r);
+    maxc := max(maxc, c);
+  end;
+  w := maxc - minc + 1;
+  h := maxr - minr + 1;
+  result.Width := w;
+  result.Height := h;
+
+  // allocate space for data and clear
+  result.Data.Create(sizeof(TCell), rleDoubles);
+  for i := 0 to (w * h) - 1 do
+  begin
+    cellrec.Attr := $0007;
+    cellrec.Chr := EMPTYCHAR;
+    result.Data.Add(@cellrec);
+  end;
+
+  // copyselection moved in
+  for i := 0 to l - 1 do
+  begin
+    CopySelection.Get(@copyrec, i);
+    r := copyrec.Row;
+    c := copyrec.Col;
+    p := ((r - minr) * w) + (c - minc);
+    result.Data.Get(@cellrec, p);
+    cellrec.Chr := Page.Rows[r].Cells[c].Chr;
+    cellrec.Attr := Page.Rows[r].Cells[c].Attr;
+    result.Data.Put(@cellrec, p);
+  end;
+
+  // populate the neighbors in cells
+  // copyrec has neighbors - copy it!
+  p := 0;
+  for r := 0 to h - 1 do
+  begin
+    for c := 0 to w - 1 do
+    begin
+      n := 0;
+
+      if r > 0 then
+      begin
+        result.Data.Get(@cellrec, p - w);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_NORTH;
+      end;
+
+      if r < h - 1 then
+      begin
+        result.Data.Get(@cellrec, p + w);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_SOUTH;
+      end;
+
+      if c > 0 then
+      begin
+        result.Data.Get(@cellrec, p - 1);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_WEST;
+      end;
+
+      if c < w - 1 then
+      begin
+        result.Data.Get(@cellrec, p + 1);
+        if cellrec.Chr <> EMPTYCHAR then
+          n := n or NEIGHBOR_EAST;
+      end;
+
+      result.Data.Get(@cellrec, p);
+      cellrec.Neighbors:=n;
+      result.Data.Put(@cellrec, p);
+
+      p += 1;
+    end;
+  end;
+
+  // normalize : make ul of bounding box 0,0 for object
+  result.Row := 0;
+  result.Col := 0;
+  result.Locked:=false;
+  result.Hidden:=false;
+  result.Page:=false;
+  result.Data.Trim;
+  result.Name := '[Clipboard]';
+end;
+
+function TfMain.BuildDisplayCopySelection : TRecList;
+var
+  i, l,
+  r, c,
+  r1, c1,
+  r2, c2 :  integer;
+  copyrec : TLoc;
+begin
+  result.Create(sizeof(TLoc), rleDoubles);
+  if drag then
+  begin
+    r1 := MouseRow;
+    c1 := MouseCol;
+    r2 := dragRow;
+    c2 := dragCol;
+    if r2 < r1 then Swap(r1, r2);
+    if c2 < c1 then Swap(c1, c2);
+    if dragType = DRAG_ADD then
+      // add these straight up
+      for r := r1 to r2 do
+        for c := c1 to c2 do
+          SelectionAdd(result, r, c);
+  end;
+  l := CopySelection.Count;
+  for i := 0 to l - 1 do
+  begin
+    CopySelection.Get(@copyrec, i);
+    // add if not already in selection and not inside a remove drag
+    if drag and (dragType = DRAG_REMOVE) then
+    begin
+      if not between(copyrec.Row, r1, r2)
+        or not between(copyrec.Col, c1, c2) then
+        SelectionAdd(result, copyrec.Row, copyrec.Col);
+    end
+    else
+      SelectionAdd(result, copyrec.Row, copyrec.Col);
+  end;
+end;
+
+procedure TfMain.lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  lv :  TListView;
+begin
+  // click on lock/unlock hide/shown
+  lv := TListView(Sender);
+  SelectedObject := lvObjIndex(lv.ItemIndex);
+  if between(X, 6, 6 + 16) then
+  begin
+    Objects[SelectedObject].Locked := not Objects[SelectedObject].Locked;
+    lvObjects.Invalidate;
+  end
+  else if between(X, 24, 24 + 16) then
+  begin
+    Objects[SelectedObject].Hidden := not Objects[SelectedObject].Hidden;
+    lvObjects.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+  pbPage.Invalidate;
+end;
+
+procedure TfMain.RefreshObject(objnum : integer);
+var
+  r, c : integer;
+  rr, cc : integer;
+begin
+  if objnum >= 0 then
+  begin
+    rr := Objects[objnum].Row;
+    for r := Objects[objnum].Height - 1 downto 0 do
+    begin
+      cc := Objects[objnum].Col;
+      for c := Objects[objnum].Width - 1 downto 0 do
+      begin
+        if between(rr, 0, NumRows - 1) and between(cc, 0, NumCols - 1) then
+          DrawCell(rr, cc);
+        cc += 1;
+      end;
+      rr += 1;
+    end;
+  end;
+end;
+
+procedure TfMain.DoObjFlipHorz(objnum : integer);
+var
+  po :            PObj;
+  i, j, r, c :    integer;
+  p1, p2 :        integer;
+  fnt :           integer;
+  cp :            TEncoding;
+  chr, flipchr :  integer;
+  n :             byte;
+  cellrec : TCell;
+begin
+  po := @Objects[objnum];
+
+  for r := 0 to po^.Height - 1 do
+  begin
+    // flip this rows character positions
+
+    for c := 1 to po^.Width div 2 do
+    begin
+      p1 := (r * po^.Width) + (c - 1);
+      p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
+      po^.Data.Swap(p1, p2);
+    end;
+
+    //  flip the characters in the row if we can, plus neighbors
+    p1 := (r * po^.Width);
+    for c := 0 to po^.Width - 1 do
+    begin
+      po^.Data.Get(@cellrec, p1);
+
+      // get encoding for this character
+      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
+      cp := Fonts[fnt];
+      chr := GetUnicode(cellrec);
+      i := 0;
+      while i < CPages[cp].MirrorTableSize do
+      begin
+        if CPages[cp].MirrorTable[i] = chr then
+        begin
+          flipchr := CPages[cp].MirrorTable[i + 1];
+
+          // convert flip unicode back to this codepage
+          if CurrCodePage in [ encUTF8, encUTF16] then
+            cellrec.Chr := flipchr
+          else
+            for j := 0 to 255 do
+              if flipchr = CPages[cp].EncodingLUT[j] then
+              begin
+                cellrec.Chr := j;
+                break;
+              end;
+          break;
+        end;
+        i += 3;
+      end;
+
+      n := cellrec.Neighbors;
+      cellrec.Neighbors :=
+        (n and %0101) or ((n and %1000) >> 2) or ((n and %0010) << 2);
+
+      po^.Data.Put(@cellrec, p1);
+      p1 += 1;
+    end;
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.DoObjFlipVert(objnum : integer);
+var
+  po :            PObj;
+  i, j, r, c :    integer;
+  p1, p2 :        integer;
+  fnt :           integer;
+  cp :            TEncoding;
+  chr, flipchr :  integer;
+  n :             byte;
+  cellrec :       TCell;
+begin
+  po := @Objects[objnum];
+  for c := 0 to po^.Width - 1 do
+  begin
+
+    // flip this rows character positions
+    for r := 1 to po^.Height div 2 do
+    begin
+      p1 := ((r - 1) * po^.Width) + c;
+      p2 := ((po^.Height - r) * po^.Width) + c;
+      po^.Data.Swap(p1, p2);
+    end;
+
+    //  flip the characters in the row if we can
+    p1 := c;
+    for r := 0 to po^.Height - 1 do
+    begin
+      po^.Data.Get(@cellrec, p1);
+
+      // get encoding number for this character
+      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
+      cp := Fonts[fnt];
+        chr := GetUnicode(cellrec);
+      i := 0;
+      while i < CPages[cp].MirrorTableSize do
+      begin
+        if CPages[cp].MirrorTable[i] = chr then
+        begin
+          flipchr := CPages[cp].MirrorTable[i + 2];
+
+          // convert flip unicode back to this codepage
+          for j := 0 to 255 do
+            if flipchr = CPages[cp].EncodingLUT[j] then
+            begin
+              cellrec.Chr := j;
+              break;
+            end;
+          break;
+        end;
+        i += 3;
+      end;
+
+      n := cellrec.Neighbors;
+      cellrec.Neighbors :=
+        (n and %1010) or ((n and %0100) >> 2) or ((n and %0001) << 2);
+
+      po^.Data.Put(@cellrec, p1);
+      p1 += po^.Width;
+    end;
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjFlipHorz;
+var
+  undoblk : TUndoBlock;
+begin
+  if SelectedObject >= 0 then
+  begin
+    SaveUndoKeys;
+    DoObjFlipHorz(SelectedObject);
+    undoblk.UndoType:= utObjFlipHorz;
+    undoblk.OldNum := SelectedObject;
+    UndoAdd(undoblk);
+  end;
+end;
+
+procedure TfMain.ObjFlipVert;
+var
+  undoblk : TUndoBlock;
+begin
+  if SelectedObject >= 0 then
+  begin
+    SaveUndoKeys;
+    DoObjFlipVert(SelectedObject);
+    undoblk.UndoType:= utObjFlipHorz;
+    undoblk.OldNum := SelectedObject;
+    UndoAdd(undoblk);
+  end;
+end;
+
+procedure TfMain.ObjMoveBack;
+var
+  undoblk : TUndoBlock;
+  tmp :     TObj;
+begin
+  if SelectedObject > 0 then
+  begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    // swap objects
+    tmp := Objects[SelectedObject];
+    Objects[SelectedObject] := Objects[SelectedObject - 1];
+    Objects[SelectedObject - 1] := tmp;
+    SelectedObject -= 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveForward;
+var
+  undoblk : TUndoBlock;
+  tmp :     TObj;
+begin
+  if SelectedObject < length(Objects) - 1 then
+  begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    // swap objects
+    tmp := Objects[SelectedObject];
+    Objects[SelectedObject] := Objects[SelectedObject + 1];
+    Objects[SelectedObject + 1] := tmp;
+    SelectedObject += 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveToBack;
+var
+  undoblk : TUndoBlock;
+  tmp :     TObj;
+begin
+  if SelectedObject > 0 then
+  begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    tmp := Objects[SelectedObject];
+    RemoveObject(SelectedObject);
+    InsertObject(tmp, 0);
+    SelectedObject := 0;
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMoveToFront;
+var
+  l :       integer;
+  tmp :     TObj;
+  undoblk : TUndoBlock;
+begin
+  l := length(Objects);
+  if SelectedObject < l - 1 then
+  begin
+    SaveUndoKeys;
+    undoblk.UndoType := utObjMove;
+    undoblk.NewRow := Objects[SelectedObject].Row;
+    undoblk.NewCol := Objects[SelectedObject].Col;
+    undoblk.OldRow := undoblk.NewRow;
+    undoblk.OldCol := undoblk.NewCol;
+    undoblk.OldNum := SelectedObject;
+
+    tmp := Objects[SelectedObject];
+    RemoveObject(SelectedObject);
+    InsertObject(tmp, l - 1);
+    SelectedObject := l - 1;
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+
+    // add to undo.
+    undoblk.NewNum := SelectedObject;
+    UndoAdd(undoblk);
+
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.RemoveObject(objnum : integer);
+var
+  i : integer;
+begin
+  Objects[objnum].Data.Free;
+  for i := objnum + 1 to length(Objects) - 1 do
+    Objects[i - 1] := Objects[i];
+  Setlength(Objects, length(Objects) - 1);
+end;
+
+procedure TfMain.InsertObject(obj : TObj; pos : integer);
+var
+  i, l : integer;
+begin
+  l := length(Objects);
+  Setlength(Objects, l + 1);
+  for i := l - 1 downto pos do
+    Objects[i + 1] := Objects[i];
+  CopyObject(obj, Objects[pos]);
+//  Objects[pos] := obj;
+end;
+
+procedure TfMain.ObjMerge;
+var
+  po :      PObj;
+  p :       integer;
+  r, c :    integer;
+  cellrec : TCell;
+  undoblk : TUndoBlock;
+begin
+  // merge this object to page. and remove object
+  if SelectedObject >= 0 then
+  begin
+    SaveUndoKeys;
+
+    po := @Objects[SelectedObject];
+    p := 0;
+    for r := po^.Row to po^.Row + po^.Height - 1 do
+      for c := po^.Col to po^.Col + po^.Width - 1 do
+      begin
+        po^.Data.Get(@cellrec, p);
+        if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
+          if cellrec.Chr <> EMPTYCHAR then
+          begin
+            RecordUndoCell(r, c, cellrec);
+            Page.Rows[r].Cells[c] := cellrec;
+          end;
+        p += 1;
+      end;
+
+    undoblk.UndoType := utObjMerge;
+    undoblk.CellData := CurrUndoData.Copy;
+    CurrUndoData.Clear;
+    undoblk.CellData.Trim;
+    undoblk.OldRow := Objects[SelectedObject].Row;
+    undoblk.OldCol := Objects[SelectedObject].Col;
+    undoblk.OldNum := SelectedObject;
+    CopyObject(Objects[SelectedObject], undoblk.Obj);
+    UndoAdd(undoblk);
+
+    RemoveObject(SelectedObject);
+    SelectedObject := -1;
+
+
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    GenerateBmpPage;
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjMergeAll;
+var
+  po :      PObj;
+  p :       integer;
+  r, c :    integer;
+  objnum :  integer;
+  cellrec : TCell;
+  undoblk : TUndoBlock;
+begin
+  // merge this object to page. and remove object
+  SelectedObject := -1;
+  if length(Objects) > 0 then
+  begin
+    SaveUndoKeys;
+    for objnum := 0 to length(Objects) - 1 do
+    begin
+
+      po := @Objects[objnum];
+      p := 0;
+      for r := po^.Row to po^.Row + po^.Height - 1 do
+        for c := po^.Col to po^.Col + po^.Width - 1 do
+        begin
+          po^.Data.Get(@cellrec, p);
+          if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
+            if cellrec.Chr <> EMPTYCHAR then
+            begin
+              RecordUndoCell(r, c, cellrec);
+              Page.Rows[r].Cells[c] := cellrec;
+            end;
+          p += 1;
+        end;
+
+      undoblk.UndoType := utObjMerge;
+      undoblk.CellData := CurrUndoData.Copy;
+      CurrUndoData.Clear;
+      undoblk.CellData.Trim;
+      undoblk.OldRow := Objects[objnum].Row;
+      undoblk.OldCol := Objects[objnum].Col;
+      undoblk.OldNum := 0;
+      CopyObject(Objects[objnum], undoblk.Obj);
+      UndoAdd(undoblk);
+
+      Objects[objnum].Data.Free;
+    end;
+
+    setlength(Objects, 0);
+    LoadlvObjects;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    GenerateBmpPage;
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjNext;
+begin
+  if length(Objects) >= 0 then
+  begin
+    SelectedObject += 1;
+    if SelectedObject >= length(Objects) then
+      SelectedObject := 0;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.ObjPrev;
+begin
+  if length(Objects) >= 0 then
+  begin
+    SelectedObject -= 1;
+    if SelectedObject < 0 then
+      SelectedObject := length(Objects) - 1;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.bObjMoveBackClick(Sender: TObject);
+begin
+  ObjMoveBack;
+end;
+
+procedure TfMain.bObnjMoveForwardClick(Sender: TObject);
+begin
+  ObjMoveForward;
+end;
+
+procedure TfMain.bObjMoveToBackClick(Sender: TObject);
+begin
+  ObjMoveToBack;
+end;
+
+procedure TfMain.bObjMoveToFrontClick(Sender: TObject);
+begin
+  ObjMoveToFront;
+end;
+
+procedure TfMain.bObjMergeAllClick(Sender: TObject);
+begin
+  ObjMergeAll;
+end;
+
+procedure TfMain.bObjMergeClick(Sender: TObject);
+begin
+  ObjMerge;
+end;
+
+procedure TfMain.bObjFlipHorzClick(Sender: TObject);
+begin
+  ObjFlipHorz;
+end;
+
+procedure TfMain.bObjFlipVertClick(Sender: TObject);
+begin
+  ObjFlipVert;
+end;
+
+procedure TfMain.miObjPrevClick(Sender: TObject);
+begin
+  ObjPrev;
+end;
+
+procedure TfMain.miObjNextClick(Sender: TObject);
+begin
+  ObjNext;
+end;
+
+procedure TfMain.bObjLoadClick(Sender: TObject);
+var
+  fin : TFileStream;
+  head : TVTXObjHeader;
+  i, l : integer;
+  obj : TObj;
+  cellrec : TCell;
+const
+  ID = 'VTXEDIT';
+begin
+  if odObject.Execute then
+  begin
+    fin := TFileStream.Create(odObject.FileName, fmOpenRead or fmShareDenyNone);
+
+    fin.Read(head, sizeof(TVTXObjHeader));
+
+    if not MemComp(@ID[0], @head.ID, 7) then
+    begin
+      ShowMessage('Bad Header.');
+      fin.Free;
+      exit;
+    end;
+    if head.Version <> $0001 then
+    begin
+      ShowMessage('Bad Version.');
+      fin.Free;
+      exit;
+    end;
+
+    if head.PageType <> 3 then
+    begin
+      ShowMessage('Not an Object file.');
+      fin.Free;
+      exit;
+    end;
+
+    obj.Name := ExtractFileNameOnly(odObject.FileName);
+    obj.Width := head.Width;
+    obj.Height := head.Height;
+    obj.Locked := false;
+    obj.Hidden := false;
+    obj.Page := false;
+
+    obj.Data.Create(sizeof(TCell), rleDoubles);
+    for i := 0 to head.Width * head.Height - 1 do
+    begin
+      fin.Read(cellrec, sizeof(TCell));
+      obj.Data.Add(@cellrec);
+    end;
+    fin.free;
+
+    l := length(Objects);
+    setlength(Objects, l + 1);
+    CopyObject(Obj, Objects[l]);
+    obj.Data.Free;
+
+    // drop it onto window. top left for now
+    Objects[l].Row := PageTop;
+    Objects[l].Col := PageLeft;
+    LoadlvObjects;
+    pbPage.Invalidate;
+  end
+end;
+
+// save selected object to file
+procedure TfMain.bObjSaveClick(Sender: TObject);
+var
+  fout :    TFileStream;
+  head :    TVTXObjHeader;
+  i :       integer;
+  fname :   string;
+  cellrec : TCell;
+const
+  ID = 'VTXEDIT';
+begin
+  if SelectedObject >= 0 then
+  begin
+    sdObject.FileName := Objects[SelectedObject].Name + '.vof';
+    if sdObject.Execute then
+    begin
+      fout := TFileStream.Create(sdObject.FileName, fmCreate or fmShareExclusive);
+      MemCopy(@ID[0], @head.ID, 7);
+      head.ID[7] := 0;
+      head.Version := $0001;
+      head.PageType := 3;
+      head.Width := Objects[SelectedObject].Width;
+      head.Height := Objects[SelectedObject].Height;
+      MemZero(@head.Name[0], 64);
+      fname := ExtractFileNameOnly(sdObject.FileName);
+      for i := 0 to length(sdObject.Filename) - 1 do
+      begin
+        if i >= 63 then break;
+        head.Name[i] := fname.Chars[i];
+      end;
+      fout.Write(head, sizeof(TVTXObjHeader));
+      for i := 0 to head.Height * head.Width - 1 do
+      begin
+        Objects[SelectedObject].Data.Get(@cellrec, i);
+        fout.Write(cellrec, sizeof(TCell));
+      end;
+      fout.free;
+    end;
+  end;
+end;
+
+procedure TfMain.lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
+  ARect: TRect; AState: TOwnerDrawState);
+var
+  cnv : TCanvas;
+  bmp : TBitmap;
+  val : string;
+begin
+  // draw lock / hidden icons and name
+  // 56/57 = unlock/lock
+  // 58/59 = hidden/shown
+  cnv := Sender.Canvas;
+  bmp := TBitmap.Create;
+  bmp.PixelFormat:=pf32bit;
+  bmp.SetSize(16,16);
+
+  // draw row backgrounds
+  if LCLType.odSelected in AState then
+  begin
+    cnv.Brush.Color := clHighlight;
+    cnv.Font.Color := clHighlightText;
+  end
+  else
+  begin
+    cnv.Brush.Color := clBtnFace;
+    cnv.Font.Color := clBtnText;
+  end;
+
+  cnv.FillRect(ARect.Left + 4, ARect.Top, ARect.Right, ARect.Bottom);
+
+  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Locked, 57, 56), bmp);
+  cnv.Draw(ARect.Left + 6, ARect.Top,bmp);
+  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Hidden, 58, 59), bmp);
+  cnv.Draw(ARect.Left + 24, ARect.Top,bmp);
+  bmp.free;
+
+  cnv.Brush.Style := bsClear;
+  val := AItem.Caption;
+  cnv.TextOut(ARect.Left + 48, ARect.Top, val);
+end;
+
+procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem;
+  var AValue: string);
+begin
+  ObjectRename := false;
+  Objects[Item.Index].Name := AValue;
+  nop;
+end;
+
+procedure TfMain.lvObjectsEditing(Sender: TObject; Item: TListItem;
+  var AllowEdit: Boolean);
+begin
+  ObjectRename := true;
+  nop;
+end;
+
+// draw the document
+procedure TfMain.pbPagePaint(Sender: TObject);
+var
+  panel :     TPaintBox;
+  cnv :       TCanvas;
+  r, c :      integer;
+  pr :        TRect;
+  tmp, tmp2 : TBGRABitmap;
+  tmpreg :    TRecList;
+  i :         integer;
+  x, y :      integer;
+  cell :      TCell;
+  objnum :    integer;
+  cl1, cl2 :  TColor;
+  copyrec :   TLoc;
+
+begin
+  if bmpPage = nil then exit;
+
+  panel := TPaintBox(Sender);
+  cnv := panel.Canvas;
+
+  // clear page : todo : border
+  cnv.Brush.Color := AnsiColor[GetBits(Page.PageAttr, A_PAGE_PAGE_MASK)];
+  cnv.FillRect(0, 0, cnv.Width, cnv.Height);
+
+  // extract displayable part unscaled
+  pr.Top := PageTop * CellHeight;
+  pr.Left := PageLeft * CellWidth;
+  if PageLeft + WindowCols >= NumCols then
+    pr.Width := (NumCols - PageLeft) * CellWidth
+  else
+    pr.Width := WindowCols * CellWidth;
+
+  if PageTop + WindowRows >= NumRows then
+    pr.Height := (NumRows - PageTop) * CellHeight
+  else
+    pr.Height := WindowRows * CellHeight;
+
+  tmp := bmpPage.GetPart(pr) as TBGRABitmap;
+
+  // scale up for display
+  pr.Top := 0;
+  pr.Left := 0;
+  if PageLeft + WindowCols >= NumCols then
+    pr.Width := (NumCols - PageLeft) * CellWidthZ
+  else
+    pr.Width := WindowCols * CellWidthZ;
+
+  if PageTop + WindowRows >= NumRows then
+    pr.Height := (NumRows - PageTop) * CellHeightZ
+  else
+    pr.Height := WindowRows * CellHeightZ;
+
+  if PageZoom < 1 then
+    tmp2 := tmp.Resample(pr.Width, pr.Height, rmFineResample) as TBGRABitmap
+  else
+    tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap;
+  tmp.Free;
+
+  // display page from bitmap
+  cnv.Draw(0, 0, tmp2.Bitmap);
+  tmp2.free;
+
+  // draw selection information
+  tmpreg := BuildDisplayCopySelection;
+  for i := tmpreg.Count - 1 downto 0 do
+  begin
+    tmpreg.Get(@copyrec, i);
+    pr.Top := (copyrec.Row - PageTop) * CellHeightZ;
+    pr.Left := (copyrec.Col - PageLeft) * CellWidthZ;
+    pr.Width := CellWidthZ;
+    pr.Height := CellHeightZ;
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top,
+        pr.Left + CellWidthZ, pr.Top,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top + CellHeightZ - 1,
+        pr.Left + CellWidthZ, pr.Top + CellHeightZ - 1,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top,
+        pr.Left, pr.Top + CellHeightZ - 1,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
+      DrawDashLine(cnv,
+        pr.Left + CellWidthZ - 1, pr.Top,
+        pr.Left + CellWidthZ - 1, pr.Top + CellHeightZ,
+        clSelectionArea1, clSelectionArea2);
+  end;
+  tmpreg.Free;
+
+  // draw objects over top
+  for r := PageTop to PageTop + WindowRows do
+  begin
+    if r >= NumRows then break;
+
+      y := (r - PageTop) * CellHeightZ;
+      for c := PageLeft to PageLeft + WindowCols do
+      begin
+        if c >= NumCols then break;
+
+        x := (c - PageLeft) * CellWidthZ;
+        objnum := GetObjectCell(r, c, cell);
+        if (objnum <> -1) and (cell.Chr <> EMPTYCHAR) then
+        begin
+          // object here.
+          DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
+          if ObjectOutlines then
+          begin
+            if objnum = SelectedObject then
+            begin
+              cl1 := clSelectedObject1;
+              cl2 := clSelectedObject2;
+            end
+            else
+            begin
+              cl1 := clUnselectedObject1;
+              cl2 := clUnselectedObject2;
+            end;
+            if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
+              DrawDashLine(cnv,
+                x, y,
+                x + CellWidthZ, y,
+                cl1, cl2);
+            if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
+              DrawDashLine(cnv,
+                x, y + CellHeightZ - 1,
+                x + CellWidthZ, y + CellHeightZ - 1,
+                cl1, cl2);
+            if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
+              DrawDashLine(cnv,
+                x, y,
+                x, y + CellHeightZ,
+                cl1, cl2);
+            if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
+              DrawDashLine(cnv,
+                x + CellWidthZ - 1, y,
+                x + CellWidthZ - 1, y + CellHeightZ,
+                cl1, cl2);
+          end;
+        end;
+    end;
+  end;
+
+  // draw page guidelines
+  r := floor((NumRows - PageTop) * CellHeightZ);
+  c := floor((NumCols - PageLeft) * CellWidthZ);
+  DrawDashLine(cnv, 0, r, pbPage.Width, r, clPageBorder1, clPageBorder2);
+  DrawDashLine(cnv, c, 0, c, pbPage.Height, clPageBorder1, clPageBorder2);
+
+end;
+
+// draw the current cell preview
+procedure TfMain.pbCurrCellPaint(Sender: TObject);
+var
+  pb :        TPaintBox;
+  cnv :       TCanvas;
+  r, rarea :  TRect;
+  bmp :       TBGRABitmap;
+  off, ch :   integer;
+  cp :        TEncoding;
+  h, w :      integer;
+  fg, bg :    integer;
+const
+  crsize = 38;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+
+  ch := CurrChar;
+  cp := Fonts[GetBits(CurrAttr, A_CELL_FONT_MASK, 28)];
+  fg := GetBits(CurrAttr, A_CELL_FG_MASK);
+  bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
+
+  // get codepage / offset for this ch
+  if cp in [ encUTF8, encUTF16 ] then
+    off := GetGlyphOff(CurrChar, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
+  else
+  begin
+    if ch > 255 then ch := 0;
+    off := CPages[cp].QuickGlyph[ch];
+  end;
+
+  // draw right side
+  rarea := pb.ClientRect;
+  rarea.left := rarea.Right - rarea.Height;
+  rarea.width := rarea.height;
+  r := rarea;
+
+  // change this to background color in VTX mode
+  cnv.Brush.Color := ANSIColor[16];
+  cnv.FillRect(r);
+
+  bmp := TBGRABitmap.Create(CellWidth, CellHeight);
+  GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, CurrAttr, false);
+  w := 40;
+  h := 80;
+  r.left := rarea.left + (rarea.Width - w) >> 1;
+  r.top :=  rarea.top + (rarea.Height - h) >> 1;
+  r.width := w;
+  r.height := h;
+  DrawStretchedBitmap(cnv, r, bmp);
+
+  // draw colors
+  rarea := pb.ClientRect;
+  w := (rarea.height >> 1);
+  h := (rarea.height >> 1);
+  rarea.width := w;
+  rarea.height := h;
+
+  // draw background color
+  r := rarea;
+  r.Left += w - crsize;
+  r.Top += h - crsize + 2;
+  r.width := crsize;
+  r.height := crsize;
+  DrawRectangle(cnv, r, clBlack);
+  r.inflate(-1,-1);
+  cnv.brush.color := AnsiColor[bg];
+  cnv.FillRect(r);
+
+  // draw foreground color
+  r := rarea;
+  r.top += 2;
+  r.width := crsize;
+  r.height := crsize;
+  cnv.brush.color := AnsiColor[fg];
+  cnv.FillRect(r);
+  DrawRectangle(cnv, r, clBlack);
+
+  // draw plain character
+  rarea := pb.ClientRect;
+  w := (rarea.height >> 1);
+  h := (rarea.height >> 1);
+  rarea.top += h;
+  rarea.width := w;
+  rarea.height := h;
+
+  GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, $000F, false);
+  w := 20;
+  h := 40;
+  r.left := rarea.left + (rarea.Width - w) >> 1;
+  r.top :=  rarea.bottom - h - 2;
+  r.width := w;
+  r.height := h;
+  DrawStretchedBitmap(cnv, r, bmp);
+  bmp.free;
+end;
+
+procedure TfMain.pbPreviewClick(Sender: TObject);
+begin
+  if fPreviewBox.Visible then
+    fPreviewBox.Hide
+  else
+    fPreviewBox.Show;
+end;
+
+procedure TfMain.pbRulerLeftPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  r, x, y : integer;
+  my : integer;
+  rect : Trect;
+  nonum : boolean;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+  with cnv do
+  begin
+    Pen.Color := clBlack;
+    Brush.Style := bsClear;
+    Font.Color := clBlack;
+    Font.Size := 6;
+    rect.Left := 1;
+    for r := 0 to WindowRows - 1 do
+    begin
+      if PageTop + r > NumRows then break;
+
+      y := r * CellHeightZ;
+      x := 3;
+      nonum := true;
+      if ((PageTop + r) mod 10) = 0 then
+      begin
+        if PageTop + r > 0 then
+        begin
+          rect.Top := y - 10;
+          rect.Width := 13;
+          rect.Height := 10;
+          DrawTextRight(cnv, rect, IntToStr(PageTop + r));
+          nonum := false;
+        end;
+        x := 8
+      end
+      else if ((PageTop + r) mod 5) = 0 then
+        x := 5;
+
+      if (PageZoom > 2) and nonum then
+      begin
+        rect.Top := y - 10;
+        rect.Width := 13;
+        rect.Height := 10;
+        DrawTextRight(cnv, rect, IntToStr(PageTop + r));
+      end;
+      Line(pb.Width - x, y, pb.Width - 1, y);
+    end;
+    // draw row marker
+    if MouseRow >= 0 then
+    begin
+      Brush.Color := clBlack;
+      my := (MouseRow - PageTop) * CellHeightZ;
+      FillRect(1, my + 1, 3, my + CellHeightZ - 1);
+    end;
+  end;
+end;
+
+procedure TfMain.pbRulerTopPaint(Sender: TObject);
+var
+  pb :      TPaintBox;
+  cnv :     TCanvas;
+  c, x, y : integer;
+  mx :      integer;
+  rect :    TRect;
+  nonum :   boolean;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+  with cnv do
+  begin
+    Pen.Color := clBlack;
+    Brush.Style := bsClear;
+    Font.Color := clBlack;
+    Font.Size := 6;
+    rect.Top := 1;
+    for c := 0 to WindowCols - 1 do
+    begin
+      if PageLeft + c > NumCols then break;
+
+      x := pbRulerLeft.Width + c * CellWidthZ;
+      y := 3;
+      nonum := true;
+      if ((PageLeft + c) mod 10) = 0 then
+      begin
+        if PageLeft + c > 0 then
+        begin
+          rect.Left := x - 17;
+          rect.Width := 16;
+          rect.Height := 10;
+          DrawTextRight(cnv, rect, IntToStr(PageLeft+c));
+          nonum := false;
+        end;
+        y := 8
+      end
+      else if ((PageLeft + c) mod 5) = 0 then
+        y := 5;
+
+      if (PageZoom > 2) and nonum then
+      begin
+        rect.Left := x - 17;
+        rect.Width := 16;
+        rect.Height := 10;
+        DrawTextRight(cnv, rect, IntToStr(PageLeft+c));
+      end;
+
+      Line(x, pb.Height - y, x, pb.Height - 1);
+    end;
+    // draw row marker
+    if MouseRow >= 0 then
+    begin
+      Brush.Color := clBlack;
+      mx := (MouseCol - PageLeft) * CellWidthZ;
+      FillRect(pbRulerLeft.Width + mx + 1, 1, pbRulerLeft.Width + mx + CellWidthZ - 1, 3);
+    end;
+  end;
+end;
+
+// draw cell at row, col at x, y of cnv (also copy to bmpPage)
+// draw topmost cell from any objects first. exit after blocking object cell has
+// been drawn.
+procedure TfMain.DrawCellEx(
+  cnv : TCanvas;
+  x, y,
+  row, col : integer;
+  skipUpdate : boolean = true;
+  skipDraw : boolean = false;
+  usech : uint16 = EMPTYCHAR;   // overrides
+  useattr : uint32 = $FFFF);
+var
+  bmp, bmp2 :     TBGRABitmap;
+  ch :            Uint16;
+  off :           integer;
+  attr :          Uint32;
+  rect :          TRect;
+  bslow, bfast :  boolean;
+  cp :            TEncoding;
+begin
+  if bmpPage = nil then exit; // ?!
+
+  if between(row, PageTop, PageTop + WindowRows)
+    and Between(col, PageLeft, PageLeft + WindowCols) then
+  begin
+    // on screen.
+
+    // load page cell
+    if usech = EMPTYCHAR then
+    begin
+      ch := Page.Rows[row].Cells[col].Chr;
+      attr := Page.Rows[row].Cells[col].Attr;
+    end else begin
+      ch := usech;
+      attr := useattr;
+    end;
+
+    bslow := HasBits(attr, A_CELL_BLINKSLOW);
+    bfast  := HasBits(attr, A_CELL_BLINKFAST);
+
+    // convert value in chr to unicode.
+    cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
+    if cp in [ encUTF8, encUTF16 ] then
+      off := GetGlyphOff(ch, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize)
+    else
+    begin
+      if ch > 255 then ch := 0;
+      off := CPages[CurrCodePage].QuickGlyph[ch];
+    end;
+
+    // create bmp for cell
+    bmp := TBGRABitmap.Create(8,16);
+    if not skipUpdate then
+    begin
+      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      bmpPage.Canvas.Draw(col * CellWidth, row * CellHeight, bmp.Bitmap);
+
+      bmp.ResampleFilter := rfMitchell;
+      bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
+      bmpPreview.Canvas.Draw(col * (CellWidth >> 2), row * (CellHeight >> 2), bmp2.Bitmap);
+      bmp2.free;
+
+      fPreviewBox.Invalidate;
+
+      if bslow and not BlinkSlow then
+      begin
+        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
+        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      end;
+
+      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
+      begin
+        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
+        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      end;
+    end
+    else
+    begin
+      if bslow and not BlinkSlow then
+        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
+      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
+        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
+      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+    end;
+
+    // plop it down- scale if needed
+    if not skipDraw then
+    begin
+      rect.Top := y;
+      rect.Left := x;
+      rect.Width := CellWidthZ;
+      rect.Height := CellHeightZ;
+      if PageZoom < 1 then
+      begin
+        bmp.ResampleFilter:=rfMitchell;
+        BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ));
+      end;
+      DrawStretchedBitmap(cnv, rect, bmp);
+    end;
+    bmp.free;
+  end;
+end;
+
+function GetKeyAction(str : string) : integer;
+var
+  i : integer;
+begin
+  for i := 0 to length(KeyActions)-1 do
+    if str.ToUpper = KeyActions[i].ToUpper then
+      exit(i);
+  result := -1;
+end;
+
+procedure TfMain.SetAttrButtons(attr : Uint32);
+var
+  bits : integer;
+begin
+  tbAttrBold.Down := HasBits(attr, A_CELL_BOLD);
+  tbAttrFaint.Down := HasBits(attr, A_CELL_FAINT);
+  tbAttrItalics.Down := HasBits(attr, A_CELL_ITALICS);
+  tbAttrUnderline.Down := HasBits(attr, A_CELL_UNDERLINE);
+  tbAttrBlinkSlow.Down := HasBits(attr, A_CELL_BLINKSLOW);
+  tbAttrBlinkFast.Down := HasBits(attr, A_CELL_BLINKFAST);
+  tbAttrReverse.Down := HasBits(attr, A_CELL_REVERSE);
+  tbAttrStrikethrough.Down := HasBits(attr, A_CELL_STRIKETHROUGH);
+  tbAttrDoublestrike.Down := HasBits(attr, A_CELL_DOUBLESTRIKE);
+  tbAttrShadow.Down := HasBits(attr, A_CELL_SHADOW);
+
+  bits := GetBits(attr, A_CELL_DISPLAY_MASK);
+  tbAttrConceal.Down := (bits = A_CELL_DISPLAY_CONCEAL);
+  tbAttrTop.Down := (bits = A_CELL_DISPLAY_TOP);
+  tbAttrBottom.Down := (bits = A_CELL_DISPLAY_BOTTOM);
+end;
+
+procedure TfMain.LoadSettings;
+var
+  iin : TIniFile;
+  q : TQuad;
+  keys : TStringList;
+  subkeys : TStringArray;
+  keyval0, keyval1, tmp : string;
+  i, j, len : integer;
+  shortcut : integer;
+const
+  sect : unicodestring = 'VTXEdit';
+
+begin
+  iin := TIniFile.Create('vtxedit.ini');
+
+  q := StrToQuad(iin.ReadString(sect, 'Window','64,64 640,480'));
+  SetFormQuad(fMain, q);
+
+  q := StrToQuad(iin.ReadString(sect, 'PreviewBox', '64,64 640,480'));
+  q.v2 := 0;
+  SetFormQuad(fPreviewBox, q);
+
+  if iin.ReadBool(sect, 'PreviewBoxOpen', false) then fPreviewBox.Show;
+  if iin.ReadBool(sect, 'WindowMax', false) then fMain.WindowState := wsMaximized;
+
+  keys := TStringList.Create;
+  if iin.SectionExists('KeyBinds') then
+  begin
+    iin.ReadSectionValues('KeyBinds', keys);
+    setlength(KeyBinds, keys.Count);
+    for i := 0 to keys.Count - 1 do
+    begin
+      tmp := keys[i];
+
+      len := tmp.IndexOf('=');
+      if len = -1 then continue;
+
+      keyval0 := tmp.substring(0, len);
+      keyval1 := tmp.substring(len + 1);
+
+      KeyBinds[i].Ctrl := false;
+      KeyBinds[i].Shift := false;
+      KeyBinds[i].Alt := false;
+      KeyBinds[i].KeyStr := '';
+
+      tmp := keyval0.ToUpper;
+      subkeys := tmp.Split(['+']);
+      for j := 0 to length(subkeys) - 1 do
+      begin
+        case subkeys[j] of
+          'CTRL': Keybinds[i].Ctrl := true;
+          'SHIFT': Keybinds[i].Shift := true;
+          'ALT':   KeyBinds[i].Alt := true;
+
+          'BACK':
+            begin
+              KeyBinds[i].KeyCode := 8;
+              keybinds[i].KeyStr := 'Backspace';
+            end;
+
+          'TAB':
+            begin
+              KeyBinds[i].KeyCode := 9;
+              keybinds[i].KeyStr := 'Tab';
+            end;
+
+          'CLEAR':
+            begin
+              KeyBinds[i].KeyCode := 12;
+              keybinds[i].KeyStr := 'Clear';
+            end;
+
+          'RETURN','ENTER':
+            begin
+              KeyBinds[i].KeyCode := 13;
+              keybinds[i].KeyStr := 'Return';
+            end;
+
+          'PAUSE':
+            begin
+              KeyBinds[i].KeyCode := 19;
+              keybinds[i].KeyStr := 'Pause';
+            end;
+
+          'ESCAPE','ESC':
+            begin
+              KeyBinds[i].KeyCode := 27;
+              keybinds[i].KeyStr := 'Esc';
+            end;
+
+          'SPACE':
+            begin
+              KeyBinds[i].KeyCode := 32;
+              keybinds[i].KeyStr := 'Space';
+            end;
+
+          'PRIOR', 'PGUP':
+            begin
+              KeyBinds[i].KeyCode := 33;
+              keybinds[i].KeyStr := 'PgUp';
+            end;
+          'NEXT', 'PGDN':
+            begin
+              KeyBinds[i].KeyCode := 34;
+              keybinds[i].KeyStr := 'PgDn';
+            end;
+
+          'END':
+            begin
+              KeyBinds[i].KeyCode := 35;
+              keybinds[i].KeyStr := 'End';
+            end;
+          'HOME':
+            begin
+              KeyBinds[i].KeyCode := 36;
+              keybinds[i].KeyStr := 'Home';
+            end;
+
+          'LEFT':
+            begin
+              KeyBinds[i].KeyCode := 37;
+              keybinds[i].KeyStr := 'Left';
+            end;
+          'UP':
+            begin
+              KeyBinds[i].KeyCode := 38;
+              keybinds[i].KeyStr := 'Up';
+            end;
+          'RIGHT':
+            begin
+              KeyBinds[i].KeyCode := 39;
+              keybinds[i].KeyStr := 'Right';
+            end;
+          'DOWN':
+            begin
+              KeyBinds[i].KeyCode := 40;
+              keybinds[i].KeyStr := 'Down';
+            end;
+
+          'SNAPSHOT','PRTSCR','PRINTSCREEN':
+            begin
+              KeyBinds[i].KeyCode := 44;
+              keybinds[i].KeyStr := 'PrtScr';
+            end;
+
+          'INSERT','INS':
+            begin
+              KeyBinds[i].KeyCode := 45;
+              keybinds[i].KeyStr := 'Insert';
+            end;
+
+          'DELETE','DEL':
+            begin
+              KeyBinds[i].KeyCode := 46;
+              keybinds[i].KeyStr := 'Delete';
+            end;
+
+          '0':
+            begin
+              KeyBinds[i].KeyCode := 48;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '1':
+            begin
+              KeyBinds[i].KeyCode := 49;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '2':
+            begin
+              KeyBinds[i].KeyCode := 50;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '3':
+            begin
+              KeyBinds[i].KeyCode := 51;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '4':
+            begin
+              KeyBinds[i].KeyCode := 52;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '5':
+            begin
+              KeyBinds[i].KeyCode := 53;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '6':
+            begin
+              KeyBinds[i].KeyCode := 54;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '7':
+            begin
+              KeyBinds[i].KeyCode := 55;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '8':
+            begin
+              KeyBinds[i].KeyCode := 56;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          '9':
+            begin
+              KeyBinds[i].KeyCode := 57;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+
+          'A':
+            begin
+              KeyBinds[i].KeyCode := 65;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'B':
+            begin
+              KeyBinds[i].KeyCode := 66;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'C':
+            begin
+              KeyBinds[i].KeyCode := 67;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'D':
+            begin
+              KeyBinds[i].KeyCode := 68;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'E':
+            begin
+              KeyBinds[i].KeyCode := 69;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'F':
+            begin
+              KeyBinds[i].KeyCode := 70;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'G':
+            begin
+              KeyBinds[i].KeyCode := 71;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'H':
+            begin
+              KeyBinds[i].KeyCode := 72;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'I':
+            begin
+              KeyBinds[i].KeyCode := 73;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'J':
+            begin
+              KeyBinds[i].KeyCode := 74;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'K':
+            begin
+              KeyBinds[i].KeyCode := 75;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'L':
+            begin
+              KeyBinds[i].KeyCode := 76;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'M':
+            begin
+              KeyBinds[i].KeyCode := 77;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'N':
+            begin
+              KeyBinds[i].KeyCode := 78;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'O':
+            begin
+              KeyBinds[i].KeyCode := 79;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'P':
+            begin
+              KeyBinds[i].KeyCode := 80;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'Q':
+            begin
+              KeyBinds[i].KeyCode := 81;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'R':
+            begin
+              KeyBinds[i].KeyCode := 82;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'S':
+            begin
+              KeyBinds[i].KeyCode := 83;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'T':
+            begin
+              KeyBinds[i].KeyCode := 84;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'U':
+            begin
+              KeyBinds[i].KeyCode := 85;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'V':
+            begin
+              KeyBinds[i].KeyCode := 86;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'W':
+            begin
+              KeyBinds[i].KeyCode := 87;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'X':
+            begin
+              KeyBinds[i].KeyCode := 88;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'Y':
+            begin
+              KeyBinds[i].KeyCode := 89;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+          'Z':
+            begin
+              KeyBinds[i].KeyCode := 90;
+              keybinds[i].KeyStr := subkeys[j];
+            end;
+
+          'NUMPAD0':
+            begin
+              KeyBinds[i].KeyCode := 96;
+              keybinds[i].KeyStr := 'NumPad0';
+            end;
+          'NUMPAD1':
+            begin
+              KeyBinds[i].KeyCode := 97;
+              keybinds[i].KeyStr := 'NumPad1';
+            end;
+          'NUMPAD2':
+            begin
+              KeyBinds[i].KeyCode := 98;
+              keybinds[i].KeyStr := 'NumPad2';
+            end;
+          'NUMPAD3':
+            begin
+              KeyBinds[i].KeyCode := 99;
+              keybinds[i].KeyStr := 'NumPad3';
+            end;
+          'NUMPAD4':
+            begin
+              KeyBinds[i].KeyCode := 100;
+              keybinds[i].KeyStr := 'NumPad4';
+            end;
+          'NUMPAD5':
+            begin
+              KeyBinds[i].KeyCode := 101;
+              keybinds[i].KeyStr := 'NumPad5';
+            end;
+          'NUMPAD6':
+            begin
+              KeyBinds[i].KeyCode := 102;
+              keybinds[i].KeyStr := 'NumPad6';
+            end;
+          'NUMPAD7':
+            begin
+              KeyBinds[i].KeyCode := 103;
+              keybinds[i].KeyStr := 'NumPad7';
+            end;
+          'NUMPAD8':
+            begin
+              KeyBinds[i].KeyCode := 104;
+              keybinds[i].KeyStr := 'NumPad8';
+            end;
+          'NUMPAD9':
+            begin
+              KeyBinds[i].KeyCode := 105;
+              keybinds[i].KeyStr := 'NumPad9';
+            end;
+          'MULTIPLY':
+            begin
+              KeyBinds[i].KeyCode := 106;
+              keybinds[i].KeyStr := 'NumPad*';
+            end;
+          'ADD':
+            begin
+              KeyBinds[i].KeyCode := 107;
+              keybinds[i].KeyStr := 'NumPad+';
+            end;
+          'SUBTRACT':
+            begin
+              KeyBinds[i].KeyCode := 109;
+              keybinds[i].KeyStr := 'NumPad-';
+            end;
+          'DECIMAL':
+            begin
+              KeyBinds[i].KeyCode := 110;
+              keybinds[i].KeyStr := 'NumPad.';
+            end;
+          'DIVIDE':
+            begin
+              KeyBinds[i].KeyCode := 111;
+              keybinds[i].KeyStr := 'NumPad/';
+            end;
+
+          'F1':
+            begin
+              KeyBinds[i].KeyCode := 112;
+              keybinds[i].KeyStr := 'F1';
+            end;
+          'F2':
+            begin
+              KeyBinds[i].KeyCode := 113;
+              keybinds[i].KeyStr := 'F2';
+            end;
+          'F3':
+            begin
+              KeyBinds[i].KeyCode := 114;
+              keybinds[i].KeyStr := 'F3';
+            end;
+          'F4':
+            begin
+              KeyBinds[i].KeyCode := 115;
+              keybinds[i].KeyStr := 'F4';
+            end;
+          'F5':
+            begin
+              KeyBinds[i].KeyCode := 116;
+              keybinds[i].KeyStr := 'F5';
+            end;
+          'F6':
+            begin
+              KeyBinds[i].KeyCode := 117;
+              keybinds[i].KeyStr := 'F6';
+            end;
+          'F7':
+            begin
+              KeyBinds[i].KeyCode := 118;
+              keybinds[i].KeyStr := 'F7';
+            end;
+          'F8':
+            begin
+              KeyBinds[i].KeyCode := 119;
+              keybinds[i].KeyStr := 'F8';
+            end;
+          'F9':
+            begin
+              KeyBinds[i].KeyCode := 120;
+              keybinds[i].KeyStr := 'F9';
+            end;
+          'F10':
+            begin
+              KeyBinds[i].KeyCode := 121;
+              keybinds[i].KeyStr := 'F10';
+            end;
+          'F11':
+            begin
+              KeyBinds[i].KeyCode := 122;
+              keybinds[i].KeyStr := 'F11';
+            end;
+          'F12':
+            begin
+              KeyBinds[i].KeyCode := 123;
+              keybinds[i].KeyStr := 'F12';
+            end;
+
+          'SEMICOLON':
+            begin
+              KeyBinds[i].KeyCode := $BA;
+              KeyBinds[i].KeyStr := ';';
+            end;
+
+          'PLUS':
+            begin
+              KeyBinds[i].KeyCode := $BB;
+              KeyBinds[i].KeyStr := '+';
+            end;
+
+          'COMMA':
+            begin
+              KeyBinds[i].KeyCode := $BC;
+              KeyBinds[i].KeyStr := ',';
+            end;
+
+          'MINUS':
+            begin
+              KeyBinds[i].KeyCode := $BD;
+              KeyBinds[i].KeyStr := '-';
+            end;
+
+          'PERIOD':
+            begin
+              KeyBinds[i].KeyCode := $BE;
+              KeyBinds[i].KeyStr := '.';
+            end;
+
+          'SLASH':
+            begin
+              KeyBinds[i].KeyCode := $BF;
+              KeyBinds[i].KeyStr := ',';
+            end;
+
+          'ACCENT':
+            begin
+              KeyBinds[i].KeyCode := $C0;
+              KeyBinds[i].KeyStr := '`';
+            end;
+
+          'LEFTSQUARE':
+            begin
+              KeyBinds[i].KeyCode := $DB;
+              KeyBinds[i].KeyStr := '[';
+            end;
+
+          'BACKSLASH':
+            begin
+              KeyBinds[i].KeyCode := $DC;
+              KeyBinds[i].KeyStr := '\';
+            end;
+
+          'RIGHTSQUARE':
+            begin
+              KeyBinds[i].KeyCode := $DD;
+              KeyBinds[i].KeyStr := ']';
+            end;
+
+          'QUOTE':
+            begin
+              KeyBinds[i].KeyCode := $DE;
+              KeyBinds[i].KeyStr := '''';
+            end;
+          else
+          begin
+            ShowMessage('Unknown Key in .INI file: ' + subkeys[j]);
+            break;
+          end;
+        end;
+      end;
+
+      if KeyBinds[i].Ctrl then KeyBinds[i].KeyStr := 'Ctrl+' + KeyBinds[i].KeyStr;
+      if KeyBinds[i].Shift then KeyBinds[i].KeyStr := 'Shift+' + KeyBinds[i].KeyStr;
+      if KeyBinds[i].Alt then KeyBinds[i].KeyStr := 'Alt+' + KeyBinds[i].KeyStr;
+
+      // action is first word of val
+      tmp := keyval1;
+      len := tmp.IndexOf(' ');
+      if len = -1 then
+      begin
+        KeyBinds[i].Action := GetKeyAction(tmp);
+        KeyBinds[i].Val := '';
+      end
+      else
+      begin
+        KeyBinds[i].Action := GetKeyAction(tmp.substring(0,len));
+        KeyBinds[i].Val := tmp.Substring(len + 1);
+      end;
+
+      // load hints and menu items shortcuts
+      shortcut := Keybinds[i].KeyCode;
+      if Keybinds[i].Shift then shortcut := (shortcut or $2000);
+      if Keybinds[i].Ctrl then shortcut := (shortcut or $4000);
+      if Keybinds[i].Alt then shortcut := (shortcut or $8000);
+      case KeyBinds[i].Action of
+        KA_MODECHARS:
+          tbModeCharacter.Hint := tbModeCharacter.Hint + ' ' + KeyBinds[i].KeyStr;
+
+        KA_MODELEFTRIGHTBLOCKS:
+          tbModeLeftRights.Hint := tbModeLeftRights.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_MODETOPBOTTOMBLOCKS:
+          tbModeTopBottoms.Hint := tbModeTopBottoms.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_MODEQUARTERBLOCKS:
+          tbModeQuarters.Hint := tbModeQuarters.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_MODESIXELS:
+          tbModeSixels.Hint := tbModeSixels.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLSELECT:
+          tbToolSelect.Hint := tbToolSelect.Hint+ ' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLDRAW:
+          tbToolDraw.Hint := tbToolDraw.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLPAINT:
+          tbToolPaint.Hint := tbToolPaint.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLFILL:
+          tbToolFill.Hint := tbToolFill.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLLINE:
+          tbToolLine.Hint := tbToolLine.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLRECTANGLE:
+          tbToolRect.Hint := tbToolRect.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLELLIPSE:
+          tbToolEllipse.Hint := tbToolEllipse.Hint + ' ' + KeyBinds[i].KeyStr;
+
+        KA_TOOLEYEDROPPER:  tbToolEyedropper.Hint := tbToolEyedropper.Hint+' ' + KeyBinds[i].KeyStr;
+
+        KA_FILENEW:           miFileNew.ShortCut := shortcut;
+        KA_FILEOPEN:          miFileOpen.ShortCut := shortcut;
+        KA_FILESAVE:          miFileSave.ShortCut := shortcut;
+        KA_FILESAVEAS:        miFileSaveAs.ShortCut := shortcut;
+        KA_FILEIMPORT:        miFileImport.ShortCut := shortcut;
+        KA_FILEEXPORT:        miFileExport.ShortCut := shortcut;
+        KA_FILEEXIT:          miFileExit.ShortCut := shortcut;
+
+        KA_EDITREDO:          miEditRedo.ShortCut := shortcut;
+        KA_EDITUNDO:          miEditUndo.ShortCut := shortcut;
+        KA_EDITCUT:           miEditCut.ShortCut := shortcut;
+        KA_EDITCOPY:          miEditCopy.ShortCut := shortcut;
+        KA_EDITPASTE:         miEditPaste.ShortCut := shortcut;
+
+        KA_OBJECTMOVEBACK:    miObjBackOne.ShortCut := shortcut;
+        KA_OBJECTMOVEFORWARD: miObjForwardOne.ShortCut := shortcut;
+        KA_OBJECTMOVETOBACK:  miObjToBack.ShortCut := shortcut;
+        KA_OBJECTMOVETOFRONT: miObjToFront.ShortCut := shortcut;
+        KA_OBJECTFLIPHORZ:    miObjFlipHorz.ShortCut := shortcut;
+        KA_OBJECTFLIPVERT:    miObjFlipVert.ShortCut := shortcut;
+        KA_OBJECTMERGE:       miObjMerge.ShortCut := shortcut;
+        KA_OBJECTMERGEALL:    miObjMergeAll.ShortCut := shortcut;
+        KA_OBJECTNEXT:        miObjNext.ShortCut := shortcut;
+        KA_OBJECTPREV:        miObjPrev.ShortCut := shortcut;
+
+        KA_SHOWPREVIEW:       miViewPreview.ShortCut := shortcut;
+
+      end;
+    end;
+  end;
+  keys.free;
+
+  iin.free;
+end;
+
+procedure TfMain.SaveSettings;
+var
+  iin : TIniFile;
+const
+  sect : unicodestring = 'VTXEdit';
+begin
+  iin := TIniFile.Create('vtxedit.ini');
+
+  // window positions
+  iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
+  iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
+  iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
+
+  iin.WriteBool(sect, 'WindowMax', fMain.WindowState = wsMaximized);
+
+  iin.free;
+end;
+
+// append a cell to an undo cell delta reclist
+procedure TfMain.RecordUndoCell(row, col : uint16; newcell : TCell);
+var
+  rec :   TUndoCells;
+  i, l :  integer;
+begin
+  // look for this cell in undo data
+  l := CurrUndoData.Count;
+  for i := 0 to l - 1 do
+  begin
+    CurrUndoData.Get(@rec, i);
+    if (rec.Row = row) and (rec.Col = col) then
+    begin
+      // if exists, update the new cell - if different
+      if (newcell.Chr <> rec.NewCell.Chr)
+        or (newcell.Attr <> rec.NewCell.Attr) then
+      begin
+        rec.NewCell := newcell;
+        CurrUndoData.Put(@rec, i);
+      end;
+      exit;
+    end;
+  end;
+  // new record - if different
+  if (newcell.Chr <> Page.Rows[row].Cells[col].Chr)
+    or (newcell.Attr <> Page.Rows[row].Cells[col].Attr) then
+  begin
+    rec.Row := row;
+    rec.Col := col;
+    rec.NewCell := newcell;
+    rec.OldCell := Page.Rows[row].Cells[col];
+    CurrUndoData.Add(@rec);
+  end;
+end;
+
+// clear all data from pos to end of list. move list count down.
+procedure TfMain.UndoTruncate(pos : integer);
+var
+  i : integer;
+  undoblk : TUndoBlock;
+begin
+  for i := pos to Undo.Count - 1 do
+  begin
+    Undo.Get(@undoblk, i);
+    case undoblk.UndoType of
+
+      utCells:      undoblk.CellData.Free;
+
+      utObjAdd:     undoblk.Obj.Data.Free;
+      utObjRemove:  undoblk.Obj.Data.Free;
+
+      utObjMerge:
+        begin
+          undoblk.Obj.Data.Free;
+          undoblk.CellData.Free;
+        end;
+    end;
+  end;
+  Undo.Count := pos;
+end;
+
+// truncate if needed. add undo block to undo list at undopos.
+procedure TfMain.UndoAdd(undoblk : TUndoBlock);
+begin
+  // don't add empty cell deltas
+  if (undoblk.UndoType = utCells) and (undoblk.CellData.Count = 0) then exit;
+
+  UndoTruncate(UndoPos);
+  Undo.Add(@undoblk);
+  UndoPos += 1;
+end;
+
+// undo stuff at this pos
+procedure TfMain.UndoPerform(pos : integer);
+var
+  undocell :  TUndoCells;
+  i :         integer;
+  undoblk :   TUndoBlock;
+  tmpobj :    TObj;
+begin
+  Undo.Get(@undoblk, pos);
+  case undoblk.UndoType of
+    utCells:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          ResizePage(undocell.Row, undocell.Col);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
+        end;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
+
+    utObjMove:
+      begin
+        // move from oldrow/col/num to newrow/col/num
+        if undoblk.OldNum <> undoblk.NewNum then
+        begin
+          // move forward / back
+          tmpobj := Objects[undoblk.NewNum];
+          RemoveObject(undoblk.NewNum);
+          InsertObject(tmpobj, undoblk.OldNum);
+        end;
+        if (undoblk.OldRow <> undoblk.NewRow)
+          or (undoblk.OldCol <> undoblk.NewCol) then
+        begin
+          Objects[undoblk.OldNum].Row := undoblk.OldRow;
+          Objects[undoblk.OldNum].Col := undoblk.OldCol;
+        end;
+        pbPage.Invalidate;
+      end;
+
+    utObjAdd:
+      begin
+        // an added object on top. remove it.
+        SelectedObject := -1;
+        RemoveObject(length(Objects) - 1);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
+    utObjRemove:
+      begin
+        // readd at oldnum
+        SelectedObject := -1;
+        InsertObject(undoblk.Obj, undoblk.OldNum);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
+    utObjMerge:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          ResizePage(undocell.Row, undocell.Col);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
+        end;
+        SelectedObject := -1;
+        InsertObject(undoblk.Obj, undoblk.OldNum);
+        LoadlvObjects;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
+
+    utObjFlipHorz:
+      begin
+        DoObjFlipHorz(undoblk.OldNum);
+      end;
+
+    utObjFlipVert:
+      begin
+        DoObjFlipVert(undoblk.OldNum);
+      end;
+
+  end;
+  CurrFileChanged := true;
+end;
+
+// redo
+procedure TfMain.RedoPerform(pos : integer);
+var
+  undocell :  TUndoCells;
+  i, l :      integer;
+  undoblk :   TUndoBlock;
+  tmpobj :    TObj;
+begin
+  Undo.Get(@undoblk, pos);
+  case undoblk.UndoType of
+    utCells:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          ResizePage(undocell.Row, undocell.Col);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
+        end;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
+
+    utObjMove:
+      begin
+        // move from oldrow/col/num to newrow/col/num
+        if undoblk.OldNum <> undoblk.NewNum then
+        begin
+          // move forward / back
+          tmpobj := Objects[undoblk.OldNum];
+          RemoveObject(undoblk.OldNum);
+          InsertObject(tmpobj, undoblk.NewNum);
+        end;
+        if (undoblk.OldRow <> undoblk.NewRow)
+          or (undoblk.OldCol <> undoblk.NewCol) then
+        begin
+          Objects[undoblk.NewNum].Row := undoblk.NewRow;
+          Objects[undoblk.NewNum].Col := undoblk.NewCol;
+        end;
+        pbPage.Invalidate;
+      end;
+
+    utObjAdd:
+      // readd object
+      begin
+        SelectedObject := -1;
+        l := length(Objects);
+        setlength(Objects, l + 1);
+        CopyObject(undoblk.Obj, Objects[l]);
+        Objects[l].Row := undoblk.OldRow;
+        Objects[l].Col := undoblk.OldCol;
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
+    utObjRemove:
+      begin
+        // reremove object
+        SelectedObject := -1;
+        RemoveObject(undoblk.OldNum);
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+
+    utObjMerge:
+      begin
+        for i := 0 to undoblk.CellData.Count - 1 do
+        begin
+          undoblk.CellData.Get(@undocell, i);
+          ResizePage(undocell.Row, undocell.Col);
+          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
+        end;
+        SelectedObject := -1;
+        RemoveObject(undoblk.OldNum);
+        LoadlvObjects;
+        GenerateBmpPage;
+        pbPage.Invalidate;
+        CurrFileChanged := true;
+      end;
+
+    utObjFlipHorz:
+      begin
+        DoObjFlipHorz(undoblk.OldNum);
+      end;
+
+    utObjFlipVert:
+      begin
+        DoObjFlipVert(undoblk.OldNum);
+      end;
+
+  end;
+end;
+
+procedure TfMain.ClearAllUndo;
+begin
+  // clear any UndoData left over.
+  UndoTruncate(0);
+  UndoPos:=0;
+end;
+
+procedure TfMain.OpenVTXFile(fname : string);
+var
+  fin :         TFileStream;
+  head :        TVTXFileHeader;
+  i, j, r, c :  integer;
+  numobj :      integer;
+  b :           byte;
+  namein :      packed array [0..63] of char;
+  cellrec :     TCell;
+const
+  ID = 'VTXEDIT';
+begin
+  fin := TFileStream.Create(fname, fmOpenRead or fmShareDenyNone);
+  fin.Read(head, sizeof(TVTXFileHeader));
+
+  if not MemComp(@ID[0], @head.ID, 7) then
+  begin
+    ShowMessage('Bad Header.');
+    exit;
+  end;
+  if head.Version <> $0001 then
+  begin
+    ShowMessage('Bad Version.');
+    exit;
+  end;
+
+  NewFile;
+
+  PageType := head.PageType;
+  for i := 0 to 15 do
+    Fonts[i] := TEncoding(head.Fonts[i]);
+  ColorScheme := head.Colors;
+  NumRows := head.Height;
+  NumCols := head.Width;
+  XScale := head.XScale;
+  Page.PageAttr := head.PageAttr;
+  Page.CrsrAttr := head.CrsrAttr;
+  MemCopy(@head.Sauce, @Page.Sauce, sizeof(TSauceHeader));
+  numobj := head.NumObjects;
+
+  if length(Page.Rows) < NumRows then
+    setlength(Page.Rows, NumRows);
+  for r := 0 to NumRows - 1 do
+  begin
+    // row attributes here
+    fin.Read(Page.Rows[r].Attr, sizeof (Page.Rows[r].Attr));
+    if length(Page.Rows[r].Cells) < NumCols then
+      setlength(Page.Rows[r].Cells, NumCols);
+    for c := 0 to NumCols - 1 do
+    begin
+      // don't save / load neighbors.
+      fin.ReadBuffer(Page.Rows[r].Cells[c].Chr, sizeof(Word));
+      fin.ReadBuffer(Page.Rows[r].Cells[c].Attr, sizeof(DWord));
+    end;
+  end;
+
+  // load objects
+  setlength(Objects, numobj);
+  for i := 0 to numobj - 1 do
+  begin
+    Objects[i].Row := fin.ReadWord;
+    Objects[i].Col := fin.ReadWord;
+    Objects[i].Width := fin.ReadWord;
+    Objects[i].Height := fin.ReadWord;
+    Objects[i].Page := (fin.ReadByte = 1);
+    Objects[i].Locked := (fin.ReadByte = 1);
+    Objects[i].Hidden := (fin.ReadByte = 1);
+
+    // get name
+    fin.Read(namein, 64);
+    Objects[i].Name := namein;
+    Objects[i].Data.Create(sizeof(TCell), rleDoubles);
+    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
+    begin
+      // don't load / save neighbors
+      fin.ReadBuffer(cellrec.Chr, sizeof(Word));
+      fin.ReadBuffer(cellrec.Attr, sizeof(DWord));
+      Objects[i].Data.Add(@cellrec);
+    end;
+  end;
+
+  fin.free;
+end;
+
+procedure TfMain.SaveVTXFile(fname : string);
+var
+  fout : TFileStream;
+  head : TVTXFileHeader;
+  i, j, r, c : integer;
+  nameout : packed array [0..63] of char;
+  cellrec : TCell;
+const
+  ID = 'VTXEDIT';
+begin
+  fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
+  MemCopy(@ID[0], @head.ID, 7);
+  head.ID[7] := 0;
+  head.Version := $0001;
+  head.PageType := PageType;
+  for i := 0 to 15 do
+    head.Fonts[i] := word(ord(Fonts[i]));
+  head.Colors := ColorScheme;
+  head.Height := NumRows;
+  head.Width := NumCols;
+  MemZero(@head.Name[0], 64);
+  for i := 0 to length(fname) - 1 do
+  begin
+    if i >= 63 then break;
+    head.Name[i] := fname.Chars[i];
+  end;
+
+  head.XScale := XScale;
+  head.PageAttr := Page.PageAttr;
+  head.CrsrAttr := Page.CrsrAttr;
+  MemCopy(@Page.Sauce, @head.Sauce, sizeof(TSauceHeader));
+  head.NumObjects := length(Objects);
+  fout.Write(head, sizeof(TVTXFileHeader));
+
+  for r := 0 to numrows-1 do
+  begin
+    fout.WriteDWord(Page.Rows[r].Attr);
+    for c := 0 to numcols-1 do
+    begin
+      fout.Write(Page.Rows[r].Cells[c].Chr, sizeof(WORD));
+      fout.Write(Page.Rows[r].Cells[c].Attr, sizeof(DWORD));
+    end;
+  end;
+
+  // save objects
+  for i := 0 to length(Objects) - 1 do
+  begin
+    // save row, col, width, height, Page, Locked, Hidden, name, and data only
+    fout.WriteWord(Objects[i].Row);
+    fout.WriteWord(Objects[i].Col);
+    fout.WriteWord(Objects[i].Width);
+    fout.WriteWord(Objects[i].Height);
+    fout.WriteByte(iif(Objects[i].Page, 1, 0));
+    fout.WriteByte(iif(Objects[i].Locked, 1, 0));
+    fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
+
+    MemZero(@nameout[0], 64);
+    for j := 0 to length(Objects[i].Name) - 1 do
+    begin
+      if j >= 63 then break;
+      nameout[j] := char(Objects[i].Name.charAt(j));
+    end;
+    fout.Write(nameout[0], 64);
+
+    for j := 0 to Objects[i].Width * Objects[i].Height - 1 do
+    begin
+      Objects[i].Data.Get(@cellrec, j);
+      fout.Write(cellrec.Chr, sizeof(WORD));
+      fout.Write(cellrec.Attr, sizeof(DWORD));
+    end;
+  end;
+
+  fout.free;
+end;
+
+{ load a VTX file }
+procedure TfMain.miFileOpenClick(Sender: TObject);
+begin
+  CheckToSave;
+
+  odAnsi.Filter:=     'VTX File (*.vtx)|*.vtx';
+  odAnsi.Title:=      'Open VTX File';
+  odAnsi.Filename :=  '';
+  if odAnsi.Execute then
+  begin
+    OpenVTXFile(odAnsi.Filename);
+    GenerateBmpPage;
+    pbPage.Invalidate;
+    CurrFileName := ExtractFileName(odAnsi.FileName);
+    CurrFileChanged := false;
+    UpdateTitles;
+  end;
+end;
+
+procedure TfMain.SaveAsVTXFile;
+begin
+  sdAnsi.Filter:=     'VTX File (*.vtx)|*.vtx';
+  sdAnsi.Title:=      'Save VTX File';
+  sdAnsi.Filename :=  '';
+  if sdAnsi.Execute then
+  begin
+    SaveVTXFile(sdAnsi.Filename);
+    CurrFileName := ExtractFileName(sdAnsi.FileName);
+    CurrFileChanged := false;
+    UpdateTitles;
+  end;
+end;
+
+// if current document needs saving, ask to save.
+procedure TfMain.CheckToSave;
+begin
+  // if no filename assigned yet, ask
+  if CurrFileChanged then
+  begin
+    if QuestionDlg(
+      'Save',
+      'Save current VTX file first?',
+      mtConfirmation, [mrYes, mrNo], '') = mrYes then
+    begin
+      if CurrFileName = '' then
+        SaveAsVTXFile
+      else
+      begin
+        SaveVTXFile(CurrFileName);
+        CurrFileName := ExtractFileName(sdAnsi.FileName);
+        CurrFileChanged := false;
+        UpdateTitles;
+      end;
+    end;
+  end;
+end;
+
+procedure TfMain.miFileSaveAsClick(Sender: TObject);
+begin
+  SaveAsVTXFile;
+end;
+
+procedure TfMain.miFileSaveClick(Sender: TObject);
+var
+  ansi : unicodestring;
+begin
+  if CurrFileName = '' then
+    SaveAsVTXFile
+  else
+    SaveVTXFile(CurrFileName);
+  CurrFileChanged := false;
+  UpdateTitles;
+end;
+
+procedure TfMain.miFileExportClick(Sender: TObject);
+var
+  xo :          TfExportOptions;
+  linelen :     integer;
+  uselinelen,
+  staticobjects,
+  usesauce :    boolean;
+begin
+  // need to ask if
+  //  ANSI
+  //    restrict to 79 column output
+  //    append SAUCE
+
+  xo := TfExportOptions.Create(self);
+  xo.cbUseSauce.Enabled := not (CurrCodePage in [ encUTF8, encUTF16 ]);
+
+  if xo.ShowModal = mrOK then
+  begin
+    usesauce := xo.cbUseSauce.Checked;
+    uselinelen := xo.cbUseLineLen.Checked;
+    linelen := xo.seLineLen.Value;
+    staticobjects := xo.cbStaticObjects.Checked;
+
+    sdAnsi.Filter:=     'ANSI File (*.ans)|*.ans';
+    sdAnsi.Title:=      'Export File';
+    sdAnsi.Filename :=  '';
+    if sdAnsi.Execute then
+    begin
+      ExportANSIFile(sdAnsi.Filename, iif(uselinelen, linelen, -1), usesauce, staticobjects);
+    end;
+  end;
+  xo.Free;
+end;
+
+// find next character in object from r, c. r/c relative to UL of object (0/0).
+function TfMain.GetNextObjectCell(Obj : TObj; r, c : integer; var cell : TCell) : TRowCol;
+var
+  c1, r1 : integer;
+begin
+  c1 := c;
+  r1 := r;
+
+  if c1 >= obj.Width then
+  begin
+    c1 := 0;
+    r1 += 1;
+  end;
+  if r1 < obj.Height then
+  begin
+    Obj.Data.Get(@cell, r1 * obj.Width + c1);
+    while (cell.Chr = EMPTYCHAR) and (r1 < obj.Height) do
+    begin
+      c1 += 1;
+      if c1 >= obj.Width then
+      begin
+        c1 := 0;
+        r1 += 1;
+        if r1 >= obj.Height then break;
+      end;
+      Obj.Data.Get(@cell, r1 * obj.Width + c1);
+    end;
+  end;
+  result.row := r1;
+  result.col := c1;
+end;
+
+// find next character on page from r, c. include objects if staticobjects
+function TfMain.GetNextCell(r, c : integer; staticobjects : boolean; var cell : TCell) : TRowCol;
+var
+  c1, r1 : integer;
+begin
+  c1 := c;
+  r1 := r;
+
+  // look for viewable cell.
+  if staticobjects then
+    GetObjectCell(r1, c1, cell)
+  else
+    cell := Page.Rows[r1].Cells[c1];
+
+  while (cell.Chr = _SPACE)
+    and (GetBits(cell.Attr, A_CELL_BG_MASK, 8) = 0)
+    and (r1 < NumRows) do
+  begin
+    c1 += 1;
+    if (c1 >= NumCols) then
+    begin
+      c1 := 0;
+      r1 += 1;
+      if r1 >= NumRows then break;
+    end;
+
+    if staticobjects then
+      GetObjectCell(r1, c1, cell)
+    else
+      cell := Page.Rows[r1].Cells[c1];
+
+  end;
+  result.row := r1;
+  result.col := c1;
+end;
+
+procedure TfMain.miFileImportClick(Sender: TObject);
+begin
+
+end;
+
+procedure TfMain.ImportANSIFile(fname : string);
+begin
+
+end;
+
+procedure TfMain.WriteANSI(fs : TFileStream; str : unicodestring);
+var
+  buff :  TBytes;
+  l :     longint;
+begin
+  // save ansi - mind codepage
+  case CurrCodePage of
+    encUTF8:    buff := str.toUTF8Bytes;
+    encUTF16:   buff := str.toUTF16Bytes;
+    else        buff := str.toCPBytes;
+  end;
+
+  l := length(buff);
+  fs.WriteBuffer(buff[0], l);
+  setlength(buff, 0);
+end;
+
+procedure TfMain.WriteANSIChunk(fs : TFileStream; maxlen : integer; var rowansi, ansi : unicodestring);
+begin
+  if (maxlen > 0) and (rowansi.length + ansi.length > (maxlen - 3)) then
+  begin
+    rowansi += CSI + 's' + CRLF;
+    WriteANSI(fs, rowansi);
+    rowansi := CSI + 'u' + ansi;
+    ansi := '';
+  end
+  else
+  begin
+    rowansi += ansi;
+    ansi := '';
+  end;
+end;
+
+function Space(num : integer) : unicodestring;
+var
+  i : integer;
+begin
+  result := '';
+  for i := 1 to num do
+    result += widechar(' ');
+end;
+
+// need function that takes 2 cell attr (current and target) and returns
+// required SGR given PageType
+function TfMain.ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
+var
+  sgr :     unicodestring;
+  fg, bg :  integer;
+begin
+
+  fg := GetBits(targetattr, A_CELL_FG_MASK);
+  bg := GetBits(targetattr, A_CELL_BG_MASK, 8);
+
+  if ColorScheme <> COLORSCHEME_256 then
+  begin
+    fg := fg and $07;
+    if fg > 7 then
+    begin
+      fg -= 8;
+      SetBit(targetattr, A_CELL_BOLD, true);
+    end;
+    bg := bg and $07;
+    if bg > 7 then
+    begin
+      bg -= 8;
+      SetBit(targetattr, A_CELL_BLINKFAST, true);
+    end;
+  end;
+
+  sgr := CSI;
+
+  // better logic - if VTX mode, can use turn offs
+  // build two sets of SGR's, 1 with reset + ons, 2 with offs
+  //  compare lengths
+
+  // need to reset? if a SGR flips to off, need to reset.
+  if   (not HasBits(targetattr, A_CELL_BOLD) and           HasBits(currattr, A_CELL_BOLD))
+    or (not HasBits(targetattr, A_CELL_FAINT) and          HasBits(currattr, A_CELL_FAINT))
+    or (not HasBits(targetattr, A_CELL_ITALICS) and        HasBits(currattr, A_CELL_ITALICS))
+    or (not HasBits(targetattr, A_CELL_UNDERLINE) and      HasBits(currattr, A_CELL_UNDERLINE))
+    or (not HasBits(targetattr, A_CELL_BLINKFAST) and      HasBits(currattr, A_CELL_BLINKFAST))
+    or (not HasBits(targetattr, A_CELL_BLINKSLOW) and      HasBits(currattr, A_CELL_BLINKSLOW))
+    or (not HasBits(targetattr, A_CELL_REVERSE) and        HasBits(currattr, A_CELL_REVERSE))
+    or (not HasBits(targetattr, A_CELL_STRIKETHROUGH) and  HasBits(currattr, A_CELL_STRIKETHROUGH))
+    or (not HasBits(targetattr, A_CELL_DOUBLESTRIKE) and   HasBits(currattr, A_CELL_DOUBLESTRIKE))
+    or (not HasBits(targetattr, A_CELL_SHADOW) and         HasBits(currattr, A_CELL_SHADOW))
+    or ((GetBits(targetattr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_CONCEAL) and (GetBits(currattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_CONCEAL))
+    or ((GetBits(targetattr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_TOP) and (GetBits(currattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_TOP))
+    or ((GetBits(targetattr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_BOTTOM) and (GetBits(currattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_BOTTOM)) then
+  begin
+    sgr += '0;';    // reset. use shortest.
+    currattr := $0007;
+  end;
+
+  // mind the color mode! - be sure colors are cleaned up
+  if fg <> GetBits(currattr, A_CELL_FG_MASK) then
+  begin
+    if fg < 8 then
+      sgr += IntToStr(30 + integer(fg)) + ';'
+    else
+      sgr += '38;5;' + inttostr(fg) + ';';
+  end;
+
+  if bg <> GetBits(currattr, A_CELL_BG_MASK, 8) then
+  begin
+    if bg < 8 then
+      sgr += IntToStr(40 + integer(bg)) + ';'
+    else
+      sgr += '48;5;' + inttostr(bg) + ';';
+  end;
+
+  if HasBits(targetattr, A_CELL_BOLD) then            sgr += '1;';
+  if HasBits(targetattr, A_CELL_FAINT) then           sgr += '2;';
+  if HasBits(targetattr, A_CELL_ITALICS) then         sgr += '3;';
+  if HasBits(targetattr, A_CELL_UNDERLINE) then       sgr += '4;';
+  if HasBits(targetattr, A_CELL_BLINKSLOW) then       sgr += '5;';
+  if HasBits(targetattr, A_CELL_BLINKFAST) then       sgr += '6;';
+  if HasBits(targetattr, A_CELL_REVERSE) then         sgr += '7;';
+  if HasBits(targetattr, A_CELL_STRIKETHROUGH) then   sgr += '9;';
+  if HasBits(targetattr, A_CELL_DOUBLESTRIKE) then    sgr += '56;';
+  if HasBits(targetattr, A_CELL_SHADOW) then          sgr += '57;';
+
+  if GetBits(targetattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_CONCEAL then  sgr += '8;';
+  if GetBits(targetattr, A_CELL_DISPLAY_TOP) = A_CELL_DISPLAY_TOP then       sgr += '58;';
+  if GetBits(targetattr, A_CELL_DISPLAY_BOTTOM) = A_CELL_DISPLAY_BOTTOM then sgr += '59;';
+
+  sgr := leftstr(sgr, length(sgr) - 1) + 'm';
+  result := sgr;
+end;
+
+// export contents of Page to fname using CurrCodePage encoding
+// if maxlen = -1, no max length check
+// append sauce if usesauce
+// if staticobjects, use topmost object cell for page cell,
+// else draw objects bottom to top after page
+
+procedure TfMain.ExportANSIFile(
+  fname : string;
+  maxlen : integer;
+  usesauce,
+  staticobjects: boolean);
+var
+  fout :        TFileStream;
+  po :          PObj;
+  ansi,
+  sgr,
+  rowansi:      unicodestring;
+  cell :        TCell;
+  i :           integer;
+  r, c :        integer;
+  ro, co,
+  wo, ho :      integer;
+  objr, objc :  integer;
+  cattr :       DWORD;
+  pt :          TRowCol;
+  delta :       integer;
+  fg, bg :      integer;
+  tmp :         TObj;
+  p :           longint;
+begin
+  fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
+
+  // initial reset
+  cell := BLANK;
+  cattr := BLANK.Attr;
+  rowansi := CSI + '0m' + CSI + '0;0H' + CSI + '2J';
+  r := 0;
+  c := 0;
+  // do page first
+  while r < NumRows do
+  begin
+    // find next cell
+    pt := GetNextCell(r, c, staticobjects, cell);
+
+    if pt.row >= NumRows then
+    begin
+      nop;
+      break;
+    end;
+
+    if pt.row = r then
+    begin
+      // on the same row. advance
+      delta := pt.col - c;
+      if delta > 0 then
+      begin
+        if delta < 4 then
+          ansi := Space(delta)
+        else
+          ansi := CSI + inttostr(delta) + 'C';
+        c := pt.col;
+        WriteANSIChunk(fout, maxlen, rowansi, ansi);
+      end
+      else
+      begin
+        // at character. adjust attributes
+        // adjust bold/FG - blink/BG
+        fg := GetBits(cell.attr, A_CELL_FG_MASK);
+        bg := GetBits(cell.attr, A_CELL_BG_MASK, 8);
+        if ColorScheme <> COLORSCHEME_256 then
+        begin
+          if fg > 7 then
+          begin
+            fg -= 8;
+            SetBit(cell.attr, A_CELL_BOLD, true);
+          end;
+          if bg > 7 then
+          begin
+            bg -= 8;
+            SetBit(cell.attr, A_CELL_BLINKFAST, true);
+          end;
+        end;
+
+        if cattr <> cell.attr then
+        begin
+          sgr := ComputeSGR(cattr, cell.attr);
+          ansi := sgr;
+          WriteANSIChunk(fout, maxlen, rowansi, ansi);
+          cattr := cell.attr;
+        end;
+
+        if c = NumCols - 1 then
+          // character on last column
+          ansi := #13#10#27'[A'#27'['+inttostr(NumCols-1)+'C'#27'[s' + WideChar(cell.chr) + #27'[u'#13#10
+        else
+          ansi := WideChar(cell.chr);
+        WriteANSIChunk(fout, maxlen, rowansi, ansi);
+
+        c += 1;
+        if c >= NumCols then
+        begin
+          c := 0;
+          r += 1;
+        end;
+      end;
+    end
+    else
+    begin
+      // on a different row
+      // another row.
+      rowansi += CRLF;
+      WriteANSI(fout, rowansi);
+      rowansi := '';
+
+      r += 1;
+      c := 0;
+    end;
+  end;
+
+  // do dynamic objects last
+  if not staticobjects then
+  begin
+    for i := 0 to length(Objects) - 1 do
+    begin
+
+      po := @Objects[i];
+
+      // build temp object cropped to page dimensions
+      // get destination height
+      ro := po^.Row;
+      co := po^.Col;
+      wo := po^.Width;
+      ho := po^.Height;
+      if ro < 0 then
+      begin
+        ro := 0;
+        ho += po^.Row;
+      end;
+      if co < 0 then
+      begin
+        co := 0;
+        wo += po^.Col;
+      end;
+      if ro + ho >= NumRows then
+        ho -= (ro + ho) - NumRows;
+      if co + wo >= NumCols then
+        wo -= (co + wo) - NumCols;
+
+      tmp := po^;
+      tmp.Row := ro;
+      tmp.Col := co;
+      tmp.Width := wo;
+      tmp.Height := ho;
+      tmp.Data.Data := nil;
+      tmp.Data.Create(sizeof(TCell), rleAdds);
+
+      p := 0;
+      for r := 0 to po^.Height - 1 do
+        for c := 0 to po^.Width - 1 do
+        begin
+          po^.Data.Get(@cell, p);
+          p += 1;
+          if between(po^.Row + r, 0, NumRows - 1)
+            and between(po^.Col + c, 0, NumCols - 1) then
+            tmp.Data.Add(@cell);
+        end;
+
+      po := @tmp;
+      objr := po^.Row;
+      objc := po^.Col;
+
+      ansi := CSI + '0;0m';
+      WriteANSIChunk(fout, maxlen, rowansi, ansi);
+      cattr := $0007;
+
+      ansi := CSI
+        + inttostr(objr + 1) + ';'
+        + inttostr(objc + 1) +'H';
+      WriteANSIChunk(fout, maxlen, rowansi, ansi);
+
+      r := 0;
+      c := 0;
+      while r < po^.Height do
+      begin
+        // find next cell in this object
+        pt := GetNextObjectCell(po^, r, c, cell);
+
+        if pt.row >= po^.Height then
+          break;
+
+        // on the page
+        if pt.row = r then
+        begin
+          // on the same row. advance
+          delta := pt.col - c;
+          if delta > 0 then
+          begin
+            c := pt.col;
+            ansi := CSI + inttostr(delta) + 'C';
+            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+          end
+          else
+          begin
+            // at character. adjust attributes
+            // adjust bold/FG - blink/BG
+            fg := GetBits(cell.attr, A_CELL_FG_MASK);
+            bg := GetBits(cell.attr, A_CELL_BG_MASK, 8);
+            if ColorScheme <> COLORSCHEME_256 then
+            begin
+              if fg > 7 then
+              begin
+                fg -= 8;
+                SetBit(cell.attr, A_CELL_BOLD, true);
+              end;
+              if bg > 7 then
+              begin
+                bg -= 8;
+                SetBit(cell.attr, A_CELL_BLINKFAST, true);
+              end;
+            end;
+
+            if cattr <> cell.attr then
+            begin
+              sgr := ComputeSGR(cattr, cell.attr);
+              ansi := sgr;
+              WriteANSIChunk(fout, maxlen, rowansi, ansi);
+              cattr := cell.attr;
+            end;
+
+            if (objc + c) = (NumCols - 1) then
+              // character on last column
+              ansi := #13#10#27'[A'#27'['+inttostr(NumCols-1)+'C'#27'[s' + WideChar(cell.chr) + #27'[u'#13#10
+            else
+              ansi := WideChar(cell.chr);
+            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+
+            c += 1;
+          end;
+        end
+        else
+        begin
+          // on a different row
+          r := pt.Row;
+          c := pt.Col;
+          ansi := CSI
+            + inttostr(objr + pt.row + 1) + ';'
+            + inttostr(objc + pt.col + 1) +'H';
+          WriteANSIChunk(fout, maxlen, rowansi, ansi);
+        end;
+      end;
+      po^.Data.Free
+    end;
+  end;
+
+  // write any remaining row ansi
+  WriteANSI(fout, rowansi);
+
+  // append sauce
+  if usesauce then
+  begin
+    StrToChars(unicodestring('SAUCE'), @Page.Sauce.ID[0], 5);
+    StrToChars(unicodestring('00'), @Page.Sauce.Version[0], 2);
+    Page.Sauce.DataFileType := SAUCE_CHR_ANSI;
+    if ColorScheme = COLORSCHEME_ICE then
+      Page.Sauce.TFlags := SAUCE_FLAG_ICE;
+    Page.Sauce.TInfo1 := NumRows;
+    Page.Sauce.TInfo2 := NumCols;
+    // skip the font info for now.
+    fout.WriteByte(_CPMEOF);
+    fout.write(Page.Sauce, sizeof(TSauceHeader));
+  end;
+
+  fout.Free;
+end;
+
+{
 procedure TfMain.miFileOpenClick(Sender: TObject);
 var
   fin :               TFileStream;
@@ -4064,3202 +7827,7 @@ begin
     Invalidate;
   end;
 end;
-
-procedure TfMain.SetAttrButtons(attr : Uint32);
-var
-  bits : integer;
-begin
-  tbAttrBold.Down := HasBits(attr, A_CELL_BOLD);
-  tbAttrFaint.Down := HasBits(attr, A_CELL_FAINT);
-  tbAttrItalics.Down := HasBits(attr, A_CELL_ITALICS);
-  tbAttrUnderline.Down := HasBits(attr, A_CELL_UNDERLINE);
-  tbAttrBlinkSlow.Down := HasBits(attr, A_CELL_BLINKSLOW);
-  tbAttrBlinkFast.Down := HasBits(attr, A_CELL_BLINKFAST);
-  tbAttrReverse.Down := HasBits(attr, A_CELL_REVERSE);
-  tbAttrStrikethrough.Down := HasBits(attr, A_CELL_STRIKETHROUGH);
-  tbAttrDoublestrike.Down := HasBits(attr, A_CELL_DOUBLESTRIKE);
-  tbAttrShadow.Down := HasBits(attr, A_CELL_SHADOW);
-
-  bits := GetBits(attr, A_CELL_DISPLAY_MASK);
-  tbAttrConceal.Down := (bits = A_CELL_DISPLAY_CONCEAL);
-  tbAttrTop.Down := (bits = A_CELL_DISPLAY_TOP);
-  tbAttrBottom.Down := (bits = A_CELL_DISPLAY_BOTTOM);
-end;
-
-{-----------------------------------------------------------------------------}
-
-{ Mouse Routines }
-
-
-procedure TfMain.pbPageMouseUp(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  undoblk :   TUndoBlock;
-  tmp :       TRecList;
-begin
-  case Button of
-    mbLeft : MouseLeft := false;
-    mbMiddle : MouseMiddle := false;
-    mbRight : MouseRight := false;
-  end;
-
-  if Button = mbMiddle then
-    MousePan := false
-  else if drag then
-  begin
-    // add / remove selection
-    tmp := BuildDisplayCopySelection;
-    CopySelection.Free;
-    CopySelection := tmp;
-    drag := false;
-    pbPage.invalidate;
-  end
-  else if dragObj then
-  begin
-    // move object (dragrow/dragcol = initial pos)
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := dragObjRow;
-    undoblk.OldCol := dragObjCol;
-    undoblk.OldNum := SelectedObject;
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    dragObj := false;
-    fPreviewBox.Invalidate;
-  end
-  else
-  begin
-    // save CurrUndoData to undolist
-    undoblk.UndoType := utCells;
-    undoblk.CellData := CurrUndoData.Copy;
-    undoblk.CellData.Trim;
-    UndoAdd(undoblk);
-    CurrUndoData.Clear;
-  end;
-end;
-
-
-procedure TfMain.pbPageMouseWheel(Sender: TObject; Shift: TShiftState;
-  WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
-var
-  val :       integer;
-  PrevZoom :  double;
-  NewWindowCols, NewWindowRows : integer;
-begin
-  // zoom
-  if ssShift in Shift then
-  begin
-    PrevZoom := PageZoom;
-    if WheelDelta < 0 then
-    begin
-      PageZoom /= 2;
-      if PageZoom < 1/8 then
-        PageZoom := 1/8;
-    end
-    else if WheelDelta > 0 then
-    begin
-      PageZoom *= 2;
-      if PageZoom > 16 then
-        PageZoom := 16;
-    end;
-
-    // don't allow 0's for cellwidthz
-    if floor(CellWidth * PageZoom * XScale) = 0 then
-      PageZoom *= 2;
-
-    CellWidthZ := floor(CellWidth * PageZoom * XScale);
-    CellHeightZ := floor(CellHeight * PageZoom);
-
-    NewWindowCols := (pbPage.Width div CellWidthZ) + 1;
-    NewWindowRows := (pbPage.Height div CellHeightZ) + 1;
-
-    // adjust pagetop / pageleft so centered on mousepos
-    PageLeft := MouseCol - (NewWindowCols >> 1);
-    PageTop := MouseRow - (NewWindowRows >> 1);
-    sbHorz.Position:=PageLeft;
-    sbVert.Position:=PageTop;
-
-    ResizeScrolls;
-  end
-  else
-  begin
-    // scroll
-    val := sbVert.Position;
-    if WheelDelta > 0 then
-    begin
-      val -= 4;
-      if val < 0 then
-        val := 0;
-    end
-    else
-    begin
-      val += 4;
-      if val > sbvert.Max - WindowRows then
-        val  := sbvert.max - WindowRows;
-    end;
-    sbVert.Position := val;
-  end;
-  Handled := true;
-end;
-
-
-procedure TfMain.pbPageMouseLeave(Sender: TObject);
-begin
-  MousePan := false;
-  MouseRow := -1;
-  pbStatusBar.Invalidate;
-
-  if ToolMode = tmDraw then
-    DrawCell(LastDrawRow, LastDrawCol);
-end;
-
-procedure TfMain.SaveUndoKeys;
-var
-  undoblk : TUndoBlock;
-begin
-  if CurrUndoData.Count > 0 then
-  begin
-    // save key presses.
-    undoblk.UndoType := utCells;
-    undoblk.CellData := CurrUndoData.Copy;
-    undoblk.CellData.Trim;
-    UndoAdd(undoblk);
-    CurrUndoData.Clear;
-  end;
-end;
-
-procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  bcolor :        integer;
-  dcell :         TCell;
-  objnum :        integer;
-  tmp :           integer;
-begin
-  // left click to type.
-  // left drag to select
-  // right drag to pan
-  case Button of
-    mbLeft : MouseLeft := true;
-    mbMiddle : MouseMiddle := true;
-    mbRight : MouseRight := true;
-  end;
-
-  pSettings.SetFocus;
-  if Button = mbMiddle then
-  begin
-    // pan
-    DrawCell(LastDrawRow, LastDrawCol);
-    MousePan := true;
-    MousePanT := PageTop;
-    MousePanL := PageLeft;
-    MousePanX := X;
-    MousePanY := Y;
-  end
-  else
-  begin
-
-    SaveUndoKeys;
-
-    case ToolMode of
-      tmSelect:
-        begin
-
-          // check if clicking object
-          objnum := GetObject(MouseRow, MouseCol);
-          if objnum <> SelectedObject then
-          begin
-            tmp := SelectedObject;
-            SelectedObject := objnum;
-            RefreshObject(tmp);
-            RefreshObject(SelectedObject);
-          end;
-
-          lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-          lvObjects.Invalidate;
-          if (SelectedObject <> -1) then
-          begin
-            if not Objects[SelectedObject].Locked then
-            begin
-              dragObjRow := Objects[SelectedObject].Row;
-              dragObjCol := Objects[SelectedObject].Col;
-              dragRow := MouseRow - Objects[SelectedObject].Row; // save delta
-              dragCol := MouseCol - Objects[SelectedObject].Col;
-              dragObj := true;
-            end;
-          end
-          else
-          begin
-            // move cursor or select region
-            // drag = new selection
-            // shift drag = add to selection
-            // ctrl drag = remove from selection
-            // click = cell to new selection / move cursor
-            // shift click = add cell from selection
-            // ctrl click = remove cell from selection
-            if between(MouseRow, 0, NumRows - 1)
-              and between(MouseCol, 0, NumCols - 1) then
-            begin
-
-              if ssShift in Shift then
-              begin
-                // add to selection
-                // clear previous selection.
-                drag := true;
-                dragType := DRAG_ADD;
-                dragRow := MouseRow;
-                dragCol := MouseCol;
-              end
-              else if ssCtrl in Shift then
-              begin
-                // remove from selection
-                // clear previous selection.
-                drag := true;
-                dragType := DRAG_REMOVE;
-                dragRow := MouseRow;
-                dragCol := MouseCol;
-              end
-              else
-              begin
-                CursorMove(MouseRow, MouseCol);
-
-                // clear previous selection.
-                CopySelection.Clear;
-                pbPage.invalidate;
-
-                // normal click / start selection
-                drag := true;
-                dragType := DRAG_NEW;
-                dragRow := MouseRow;
-                dragCol := MouseCol;
-              end;
-            end;
-          end;
-        end;
-
-      tmDraw:
-        begin
-          // draw current character.
-          // left click = draw, right click = erase
-          if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
-            and between(MouseCol, 0, NumCols-1) then
-          begin
-            DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
-            DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
-            SubX := DrawX mod SubXSize;
-            SubY := DrawY mod SubYSize;
-
-            case DrawMode of
-              dmChars:
-                begin
-                  dcell.Chr := iif(Button = mbLeft, CurrChar, $20);
-                  dcell.Attr := iif(Button = mbLeft, CurrAttr, $0007);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  PutCharEx(dcell.Chr, dcell.Attr, MouseRow, MouseCol);
-                end;
-
-              dmLeftRights:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    2, 1, SubX, SubY);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol, false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-
-              dmTopBottoms:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    1, 2, SubX, SubY);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol,false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-
-              dmQuarters:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    2, 2, SubX, SubY);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol,false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-            end;
-          end;
-        end;
-    end;
-  end;
-end;
-
-procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
-  Y: Integer);
-var
-  i, dx, dy :       integer;
-  done :            boolean;
-  mr, mc, sx, sy :  integer;
-  bcolor :          integer;
-  dcell :           TCell;
-//  dattr, dchar :    integer;
-begin
-
-  // update mouse position
-  MouseRow := PageTop + floor(Y / CellHeightZ);
-  MouseCol := PageLeft + floor(X / CellWidthZ);
-  if Between(MouseRow, 0, NumRows - 1) and Between(MouseCol, 0, NumCols - 1) then
-  begin
-    // calc subx,y
-    DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
-    DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
-    SubX := DrawX mod SubXSize;
-    SubY := DrawY mod SubYSize;
-  end
-  else
-  begin
-    MouseRow := -1;
-    dragObj := false; // stop moving if off page
-  end;
-
-  // update mouse r,c on status bar
-  pbStatusBar.Invalidate;
-  if (DrawX <> LastDrawX) or (DrawY <> LastDrawY) then
-  begin
-    pbRulerLeft.Invalidate;
-    pbRulerTop.Invalidate;
-  end;
-
-  if MousePan then
-  begin
-    // panning the document
-    dx := round((MousePanX - X) / CellWidthZ);
-    dy := round((MousePanY - Y) / CellHeightZ);
-
-    if NumCols > WindowCols then
-    begin
-      i := MousePanL + dx;
-      if i < sbHorz.Min then
-        i := sbHorz.Min;
-      if i > sbHorz.Max - WindowCols then
-        i := sbHorz.Max - WindowCols + 1;
-      sbHorz.Position := i;
-    end;
-
-    if NumRows > WindowRows then
-    begin
-      i := MousePanT + dy;
-      if i < sbVert.Min then
-        i := sbVert.Min;
-      if i > sbVert.Max - WindowRows then
-        i := sbVert.Max - WindowRows + 1;
-      sbVert.Position := i;
-    end;
-  end
-  else if drag then
-  begin
-    // dragging copy selection
-    // let paint draw selection information
-    if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
-      dragType := DRAG_ADD;
-
-    pbPage.Invalidate;
-  end
-  else if dragObj then
-  begin
-    // moving an object
-    Objects[SelectedObject].Row := MouseRow - DragRow;
-    Objects[SelectedObject].Col := MouseCol - DragCol;
-    pbPage.Invalidate;
-  end
-  else
-  begin
-    case ToolMode of
-      tmDraw:
-        begin
-          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
-          begin
-            if (MouseLeft or MouseRight) and ((DrawX <> LastDrawX) or (DrawY <> LastDrawY)) then
-            begin
-              case DrawMode of
-                dmChars:
-                  begin
-                    // add move to
-                    dcell.chr := iif(MouseLeft, CurrChar, $20);
-                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
-                    LineCalcInit(LastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      RecordUndoCell(LastDrawY, LastDrawX, dcell);
-                      PutCharEx(dcell.Chr, dcell.Attr, LastDrawY, LastDrawX);
-                    until done;
-                  end;
-
-                dmLeftRights:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        2, 1, sx, sy);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc, false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-
-                dmTopBottoms:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        1, 2, sx, sy);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc, false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-
-                dmQuarters:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        2, 2, sx, sy);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc,false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-              end;
-            end;
-
-            // draw square box retinal
-            DrawMouseBox;
-          end
-          else
-            DrawCell(LastDrawRow, LastDrawCol);
-        end;
-
-      tmLine: ;
-      tmRect:  ;
-      tmEllipse: ;
-    end
-  end;
-end;
-
-
-{-----------------------------------------------------------------------------}
-
-{ Drawing functions }
-
-procedure TfMain.DrawMouseBox;
-var
-  x, y : integer;
-begin
-  // erase the previous
-  if (DrawX <> LastDrawX) or (DrawY <> LastDrawY) then
-  begin
-    DrawCell(LastDrawRow, LastDrawCol);
-
-    // compute x, y of little box
-    x := floor((DrawX - (PageLeft * SubXSize)) * CellWidthZ) div SubXSize;
-    y := floor((DrawY - (PageTop * SubYSize)) * CellHeightZ) div SubYSize;
-
-    if Between(MouseRow, PageTop, NumRows - 1)
-      and Between(MouseCol, PageLeft, NumCols - 1)
-      and (GetObject(MouseRow, MouseCol) = -1) then
-      DrawDashRect(pbPage.Canvas, x, y,
-        x + (CellWidthZ div SubXSize), y + (CellHeightZ div SubYSize),
-        clDrawCursor1, clDrawCursor2);
-
-    LastDrawRow := MouseRow;
-    LastDrawCol := MouseCol;
-    LastDrawX := DrawX;
-    LastDrawY := DrawY;
-  end;
-end;
-
-// draw a cell on screen from object on Page.Rows[].Cells[].
-// THIS ROUTINE IS TOOOOOOOOO SLOW!
-procedure TfMain.DrawCell(row, col : integer; skipUpdate : boolean = true);
-var
-  cnv :       TCanvas;
-  x, y :      integer;
-  cell :      TCell;
-  objnum :    integer;
-  cl1, cl2 :  TColor;
-  i :         integer;
-  copyrec :   TLoc;
-begin
-  // compute x, y of row, col
-  cnv := pbPage.Canvas;
-  x := (col - PageLeft) * CellWidthZ;
-  y := (row - PageTop) * CellHeightZ;
-  if Between(x, 0, pbPage.Width + CellWidthZ)
-    and Between(y, 0, pbPage.Height + CellHeightZ) then
-  begin
-    objnum := GetObjectCell(row, col, cell);
-    if (objnum = -1) then
-    begin
-      DrawCellEx(cnv, x, y, row, col, skipUpdate);
-      // draw selection borders
-      for i := CopySelection.Count - 1 downto 0 do
-      begin
-        CopySelection.Get(@copyrec, i);
-        if (copyrec.Row = row) and (copyrec.Col = col) then
-        begin
-          if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
-            DrawDashLine(cnv,
-              x, y,
-              x + CellWidthZ, y,
-              clSelectionArea1, clSelectionArea2);
-
-          if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
-            DrawDashLine(cnv,
-              x, y + CellHeightZ - 1,
-              x + CellWidthZ, y + CellHeightZ - 1,
-              clSelectionArea1, clSelectionArea2);
-
-          if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
-            DrawDashLine(cnv,
-              x, y,
-              x, y + CellHeightZ,
-              clSelectionArea1, clSelectionArea2);
-
-          if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
-            DrawDashLine(cnv,
-              x + CellWidthZ - 1, y,
-              x + CellWidthZ - 1, y + CellHeightZ,
-              clSelectionArea1, clSelectionArea2);
-          break;
-        end;
-      end;
-    end
-    else
-    begin
-      // prevent stamping object onto bmp
-      if not skipupdate then
-        cell := Page.Rows[row].Cells[col];
-
-      DrawCellEx(cnv, x, y, row, col, skipUpdate, true, cell.Chr, cell.Attr);
-
-      // draw object edges
-      if ObjectOutlines then
-      begin
-        if objnum = SelectedObject then
-        begin
-          cl1 := clSelectedObject1;
-          cl2 := clSelectedObject2;
-        end
-        else
-        begin
-          cl1 := clUnselectedObject1;
-          cl2 := clUnselectedObject2;
-        end;
-
-        if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
-          DrawDashLine(cnv, x, y, x + CellWidthZ, y, cl1, cl2);
-
-        if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
-          DrawDashLine(cnv, x, y + CellHeightZ - 1, x + CellWidthZ, y + CellHeightZ - 1, cl1, cl2);
-
-        if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
-          DrawDashLine(cnv, x, y, x, y + CellHeightZ, cl1, cl2);
-
-        if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
-          DrawDashLine(cnv, x + CellWidthZ - 1, y, x + CellWidthZ - 1, y + CellHeightZ, cl1, cl2);
-      end;
-    end;
-  end;
-end;
-
-procedure TfMain.sePageSizeChange(Sender: TObject);
-begin
-  // resize document
-  if not SkipResize then
-  begin
-    NumRows := seRows.Value;
-    NumCols := seCols.Value;
-    ResizePage;
-    GenerateBmpPage;
-    ResizeScrolls;
-  end;
-end;
-
-// add to selection. no dupes allowed
-procedure SelectionAdd(var selection : TRecList; r, c : integer);
-var
-  neighbor :  integer;
-  i, l :      integer;
-  copyrec :   TLoc;
-begin
-  neighbor := 0;
-  l := selection.count;
-  for i := 0 to l - 1 do
-  begin
-    selection.Get(@copyrec, i);
-
-    // already exists
-    if (copyrec.Row = r) and (copyrec.Col = c) then
-      exit;
-
-    // build neighbors
-    if (copyrec.Row = r - 1) and (copyrec.Col = c) then
-    begin
-      SetBit(copyrec.Neighbors, NEIGHBOR_SOUTH, true);
-      SetBit(neighbor, NEIGHBOR_NORTH, true);
-    end;
-
-    if (copyrec.Row = r + 1) and (copyrec.Col = c) then
-    begin
-      SetBit(copyrec.Neighbors, NEIGHBOR_NORTH, true);
-      SetBit(neighbor, NEIGHBOR_SOUTH, true);
-    end;
-
-    if (copyrec.Row = r) and (copyrec.Col = c - 1) then
-    begin
-      SetBit(copyrec.Neighbors, NEIGHBOR_EAST, true);
-      SetBit(neighbor, NEIGHBOR_WEST, true);
-    end;
-
-    if (copyrec.Row = r) and (copyrec.Col = c + 1) then
-    begin
-      SetBit(copyrec.Neighbors, NEIGHBOR_WEST, true);
-      SetBit(neighbor, NEIGHBOR_EAST, true);
-    end;
-
-    selection.Put(@copyrec, i);
-  end;
-
-  copyrec.Row := r;
-  copyrec.Col := c;
-  copyrec.Neighbors := neighbor;
-  selection.Add(@copyrec);
-end;
-
-// create an object from the CopySelection data.
-function TfMain.CopySelectionToObject : TObj;
-var
-  i, l :        integer;
-  r, c :        integer;
-  w, h :        integer;
-  maxr, maxc,
-  minr, minc :  integer;
-  p :           integer;
-  n :           byte;
-  copyrec :     TLoc;
-  cellrec :     TCell;
-begin
-  // get bounding box of copy selection
-  l := CopySelection.Count;
-  maxr := 0;
-  maxc := 0;
-  minr := 99999;
-  minc := 99999;
-  for i := 0 to l - 1 do
-  begin
-    CopySelection.Get(@copyrec, i);
-    r := copyrec.Row;
-    c := copyrec.Col;
-    minr := min(minr, r);
-    minc := min(minc, c);
-    maxr := max(maxr, r);
-    maxc := max(maxc, c);
-  end;
-  w := maxc - minc + 1;
-  h := maxr - minr + 1;
-  result.Width := w;
-  result.Height := h;
-
-  // allocate space for data and clear
-  result.Data.Create(sizeof(TCell), rleDoubles);
-  for i := 0 to (w * h) - 1 do
-  begin
-    cellrec.Attr := $0007;
-    cellrec.Chr := EMPTYCHAR;
-    result.Data.Add(@cellrec);
-  end;
-
-  // copyselection moved in
-  for i := 0 to l - 1 do
-  begin
-    CopySelection.Get(@copyrec, i);
-    r := copyrec.Row;
-    c := copyrec.Col;
-    p := ((r - minr) * w) + (c - minc);
-    result.Data.Get(@cellrec, p);
-    cellrec.Chr := Page.Rows[r].Cells[c].Chr;
-    cellrec.Attr := Page.Rows[r].Cells[c].Attr;
-    result.Data.Put(@cellrec, p);
-  end;
-
-  // populate the neighbors in cells
-  // copyrec has neighbors - copy it!
-  p := 0;
-  for r := 0 to h - 1 do
-  begin
-    for c := 0 to w - 1 do
-    begin
-      n := 0;
-
-      if r > 0 then
-      begin
-        result.Data.Get(@cellrec, p - w);
-        if cellrec.Chr <> EMPTYCHAR then
-          n := n or NEIGHBOR_NORTH;
-      end;
-
-      if r < h - 1 then
-      begin
-        result.Data.Get(@cellrec, p + w);
-        if cellrec.Chr <> EMPTYCHAR then
-          n := n or NEIGHBOR_SOUTH;
-      end;
-
-      if c > 0 then
-      begin
-        result.Data.Get(@cellrec, p - 1);
-        if cellrec.Chr <> EMPTYCHAR then
-          n := n or NEIGHBOR_WEST;
-      end;
-
-      if c < w - 1 then
-      begin
-        result.Data.Get(@cellrec, p + 1);
-        if cellrec.Chr <> EMPTYCHAR then
-          n := n or NEIGHBOR_EAST;
-      end;
-
-      result.Data.Get(@cellrec, p);
-      cellrec.Neighbors:=n;
-      result.Data.Put(@cellrec, p);
-
-      p += 1;
-    end;
-  end;
-
-  // normalize : make ul of bounding box 0,0 for object
-  result.Row := 0;
-  result.Col := 0;
-  result.Locked:=false;
-  result.Hidden:=false;
-  result.Page:=false;
-  result.Data.Trim;
-  result.Name := '[Clipboard]';
-end;
-
-function TfMain.BuildDisplayCopySelection : TRecList;
-var
-  i, l,
-  r, c,
-  r1, c1,
-  r2, c2 :  integer;
-  copyrec : TLoc;
-begin
-  result.Create(sizeof(TLoc), rleDoubles);
-  if drag then
-  begin
-    r1 := MouseRow;
-    c1 := MouseCol;
-    r2 := dragRow;
-    c2 := dragCol;
-    if r2 < r1 then Swap(r1, r2);
-    if c2 < c1 then Swap(c1, c2);
-    if dragType = DRAG_ADD then
-      // add these straight up
-      for r := r1 to r2 do
-        for c := c1 to c2 do
-          SelectionAdd(result, r, c);
-  end;
-  l := CopySelection.Count;
-  for i := 0 to l - 1 do
-  begin
-    CopySelection.Get(@copyrec, i);
-    // add if not already in selection and not inside a remove drag
-    if drag and (dragType = DRAG_REMOVE) then
-    begin
-      if not between(copyrec.Row, r1, r2)
-        or not between(copyrec.Col, c1, c2) then
-        SelectionAdd(result, copyrec.Row, copyrec.Col);
-    end
-    else
-      SelectionAdd(result, copyrec.Row, copyrec.Col);
-  end;
-end;
-
-procedure TfMain.lvObjectsMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  lv :  TListView;
-begin
-  // click on lock/unlock hide/shown
-  lv := TListView(Sender);
-  SelectedObject := lvObjIndex(lv.ItemIndex);
-  if between(X, 6, 6 + 16) then
-  begin
-    Objects[SelectedObject].Locked := not Objects[SelectedObject].Locked;
-    lvObjects.Invalidate;
-  end
-  else if between(X, 24, 24 + 16) then
-  begin
-    Objects[SelectedObject].Hidden := not Objects[SelectedObject].Hidden;
-    lvObjects.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-  pbPage.Invalidate;
-end;
-
-procedure TfMain.RefreshObject(objnum : integer);
-var
-  r, c : integer;
-  rr, cc : integer;
-begin
-  if objnum >= 0 then
-  begin
-    rr := Objects[objnum].Row;
-    for r := Objects[objnum].Height - 1 downto 0 do
-    begin
-      cc := Objects[objnum].Col;
-      for c := Objects[objnum].Width - 1 downto 0 do
-      begin
-        if between(rr, 0, NumRows - 1) and between(cc, 0, NumCols - 1) then
-          DrawCell(rr, cc);
-        cc += 1;
-      end;
-      rr += 1;
-    end;
-  end;
-end;
-
-procedure TfMain.DoObjFlipHorz(objnum : integer);
-var
-  po :            PObj;
-  i, j, r, c :    integer;
-  p1, p2 :        integer;
-  fnt :           integer;
-  cp :            TEncoding;
-  chr, flipchr :  integer;
-  n :             byte;
-  cellrec : TCell;
-begin
-  po := @Objects[objnum];
-
-  for r := 0 to po^.Height - 1 do
-  begin
-    // flip this rows character positions
-
-    for c := 1 to po^.Width div 2 do
-    begin
-      p1 := (r * po^.Width) + (c - 1);
-      p2 := ((r + 1) * po^.Width) - 1 - (c - 1);
-      po^.Data.Swap(p1, p2);
-    end;
-
-    //  flip the characters in the row if we can, plus neighbors
-    p1 := (r * po^.Width);
-    for c := 0 to po^.Width - 1 do
-    begin
-      po^.Data.Get(@cellrec, p1);
-
-      // get encoding for this character
-      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
-      cp := Fonts[fnt];
-      chr := GetUnicode(cellrec);
-      i := 0;
-      while i < CPages[cp].MirrorTableSize do
-      begin
-        if CPages[cp].MirrorTable[i] = chr then
-        begin
-          flipchr := CPages[cp].MirrorTable[i + 1];
-
-          // convert flip unicode back to this codepage
-          if CurrCodePage in [ encUTF8, encUTF16] then
-            cellrec.Chr := flipchr
-          else
-            for j := 0 to 255 do
-              if flipchr = CPages[cp].EncodingLUT[j] then
-              begin
-                cellrec.Chr := j;
-                break;
-              end;
-          break;
-        end;
-        i += 3;
-      end;
-
-      n := cellrec.Neighbors;
-      cellrec.Neighbors :=
-        (n and %0101) or ((n and %1000) >> 2) or ((n and %0010) << 2);
-
-      po^.Data.Put(@cellrec, p1);
-      p1 += 1;
-    end;
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.DoObjFlipVert(objnum : integer);
-var
-  po :            PObj;
-  i, j, r, c :    integer;
-  p1, p2 :        integer;
-  fnt :           integer;
-  cp :            TEncoding;
-  chr, flipchr :  integer;
-  n :             byte;
-  cellrec :       TCell;
-begin
-  po := @Objects[objnum];
-  for c := 0 to po^.Width - 1 do
-  begin
-
-    // flip this rows character positions
-    for r := 1 to po^.Height div 2 do
-    begin
-      p1 := ((r - 1) * po^.Width) + c;
-      p2 := ((po^.Height - r) * po^.Width) + c;
-      po^.Data.Swap(p1, p2);
-    end;
-
-    //  flip the characters in the row if we can
-    p1 := c;
-    for r := 0 to po^.Height - 1 do
-    begin
-      po^.Data.Get(@cellrec, p1);
-
-      // get encoding number for this character
-      fnt := GetBits(cellrec.Attr, A_CELL_FONT_MASK, 28);
-      cp := Fonts[fnt];
-        chr := GetUnicode(cellrec);
-      i := 0;
-      while i < CPages[cp].MirrorTableSize do
-      begin
-        if CPages[cp].MirrorTable[i] = chr then
-        begin
-          flipchr := CPages[cp].MirrorTable[i + 2];
-
-          // convert flip unicode back to this codepage
-          for j := 0 to 255 do
-            if flipchr = CPages[cp].EncodingLUT[j] then
-            begin
-              cellrec.Chr := j;
-              break;
-            end;
-          break;
-        end;
-        i += 3;
-      end;
-
-      n := cellrec.Neighbors;
-      cellrec.Neighbors :=
-        (n and %1010) or ((n and %0100) >> 2) or ((n and %0001) << 2);
-
-      po^.Data.Put(@cellrec, p1);
-      p1 += po^.Width;
-    end;
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjFlipHorz;
-var
-  undoblk : TUndoBlock;
-begin
-  if SelectedObject >= 0 then
-  begin
-    SaveUndoKeys;
-    DoObjFlipHorz(SelectedObject);
-    undoblk.UndoType:= utObjFlipHorz;
-    undoblk.OldNum := SelectedObject;
-    UndoAdd(undoblk);
-  end;
-end;
-
-procedure TfMain.ObjFlipVert;
-var
-  undoblk : TUndoBlock;
-begin
-  if SelectedObject >= 0 then
-  begin
-    SaveUndoKeys;
-    DoObjFlipVert(SelectedObject);
-    undoblk.UndoType:= utObjFlipHorz;
-    undoblk.OldNum := SelectedObject;
-    UndoAdd(undoblk);
-  end;
-end;
-
-procedure TfMain.ObjMoveBack;
-var
-  undoblk : TUndoBlock;
-  tmp :     TObj;
-begin
-  if SelectedObject > 0 then
-  begin
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := undoblk.NewRow;
-    undoblk.OldCol := undoblk.NewCol;
-    undoblk.OldNum := SelectedObject;
-
-    // swap objects
-    tmp := Objects[SelectedObject];
-    Objects[SelectedObject] := Objects[SelectedObject - 1];
-    Objects[SelectedObject - 1] := tmp;
-    SelectedObject -= 1;
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-
-    // add to undo.
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjMoveForward;
-var
-  undoblk : TUndoBlock;
-  tmp :     TObj;
-begin
-  if SelectedObject < length(Objects) - 1 then
-  begin
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := undoblk.NewRow;
-    undoblk.OldCol := undoblk.NewCol;
-    undoblk.OldNum := SelectedObject;
-
-    // swap objects
-    tmp := Objects[SelectedObject];
-    Objects[SelectedObject] := Objects[SelectedObject + 1];
-    Objects[SelectedObject + 1] := tmp;
-    SelectedObject += 1;
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-
-    // add to undo.
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjMoveToBack;
-var
-  undoblk : TUndoBlock;
-  tmp :     TObj;
-begin
-  if SelectedObject > 0 then
-  begin
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := undoblk.NewRow;
-    undoblk.OldCol := undoblk.NewCol;
-    undoblk.OldNum := SelectedObject;
-
-    tmp := Objects[SelectedObject];
-    RemoveObject(SelectedObject);
-    InsertObject(tmp, 0);
-    SelectedObject := 0;
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-
-    // add to undo.
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjMoveToFront;
-var
-  l :       integer;
-  tmp :     TObj;
-  undoblk : TUndoBlock;
-begin
-  l := length(Objects);
-  if SelectedObject < l - 1 then
-  begin
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := undoblk.NewRow;
-    undoblk.OldCol := undoblk.NewCol;
-    undoblk.OldNum := SelectedObject;
-
-    tmp := Objects[SelectedObject];
-    RemoveObject(SelectedObject);
-    InsertObject(tmp, l - 1);
-    SelectedObject := l - 1;
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-
-    // add to undo.
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.RemoveObject(objnum : integer);
-var
-  i : integer;
-begin
-  Objects[objnum].Data.Free;
-  for i := objnum + 1 to length(Objects) - 1 do
-    Objects[i - 1] := Objects[i];
-  Setlength(Objects, length(Objects) - 1);
-end;
-
-procedure TfMain.InsertObject(obj : TObj; pos : integer);
-var
-  i, l : integer;
-begin
-  l := length(Objects);
-  Setlength(Objects, l + 1);
-  for i := l - 1 downto pos do
-    Objects[i + 1] := Objects[i];
-  CopyObject(obj, Objects[pos]);
-//  Objects[pos] := obj;
-end;
-
-procedure TfMain.ObjMerge;
-var
-  po :      PObj;
-  p :       integer;
-  r, c :    integer;
-  cellrec : TCell;
-  undoblk : TUndoBlock;
-begin
-  // merge this object to page. and remove object
-  if SelectedObject >= 0 then
-  begin
-    SaveUndoKeys;
-
-    po := @Objects[SelectedObject];
-    p := 0;
-    for r := po^.Row to po^.Row + po^.Height - 1 do
-      for c := po^.Col to po^.Col + po^.Width - 1 do
-      begin
-        po^.Data.Get(@cellrec, p);
-        if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-          if cellrec.Chr <> EMPTYCHAR then
-          begin
-            RecordUndoCell(r, c, cellrec);
-            Page.Rows[r].Cells[c] := cellrec;
-          end;
-        p += 1;
-      end;
-
-    undoblk.UndoType := utObjMerge;
-    undoblk.CellData := CurrUndoData.Copy;
-    CurrUndoData.Clear;
-    undoblk.CellData.Trim;
-    undoblk.OldRow := Objects[SelectedObject].Row;
-    undoblk.OldCol := Objects[SelectedObject].Col;
-    undoblk.OldNum := SelectedObject;
-    CopyObject(Objects[SelectedObject], undoblk.Obj);
-    UndoAdd(undoblk);
-
-    RemoveObject(SelectedObject);
-    SelectedObject := -1;
-
-
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-    GenerateBmpPage;
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjMergeAll;
-var
-  po :      PObj;
-  p :       integer;
-  r, c :    integer;
-  objnum :  integer;
-  cellrec : TCell;
-  undoblk : TUndoBlock;
-begin
-  // merge this object to page. and remove object
-  if length(Objects) > 0 then
-  begin
-    SaveUndoKeys;
-
-    for objnum := length(Objects) - 1 downto 0 do
-    begin
-
-      po := @Objects[objnum];
-      p := 0;
-      for r := po^.Row to po^.Row + po^.Height - 1 do
-        for c := po^.Col to po^.Col + po^.Width - 1 do
-        begin
-          po^.Data.Get(@cellrec, p);
-          if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-            if cellrec.Chr <> EMPTYCHAR then
-            begin
-              RecordUndoCell(r, c, cellrec);
-              Page.Rows[r].Cells[c] := cellrec;
-            end;
-          p += 1;
-        end;
-
-      undoblk.UndoType := utObjMerge;
-      undoblk.CellData := CurrUndoData.Copy;
-      CurrUndoData.Clear;
-      undoblk.CellData.Trim;
-      undoblk.OldRow := Objects[objnum].Row;
-      undoblk.OldCol := Objects[objnum].Col;
-      undoblk.OldNum := objnum;
-      CopyObject(Objects[objnum], undoblk.Obj);
-      UndoAdd(undoblk);
-
-      Objects[objnum].Data.Free;
-    end;
-
-    setlength(Objects, 0);
-    SelectedObject := -1;
-    LoadlvObjects;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-    GenerateBmpPage;
-    pbPage.Invalidate;
-    fPreviewBox.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjNext;
-begin
-  if length(Objects) >= 0 then
-  begin
-    SelectedObject += 1;
-    if SelectedObject >= length(Objects) then
-      SelectedObject := 0;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-    pbPage.Invalidate;
-  end;
-end;
-
-procedure TfMain.ObjPrev;
-begin
-  if length(Objects) >= 0 then
-  begin
-    SelectedObject -= 1;
-    if SelectedObject < 0 then
-      SelectedObject := length(Objects) - 1;
-    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
-    pbPage.Invalidate;
-  end;
-end;
-
-procedure TfMain.bObjMoveBackClick(Sender: TObject);
-begin
-  ObjMoveBack;
-end;
-
-procedure TfMain.bObnjMoveForwardClick(Sender: TObject);
-begin
-  ObjMoveForward;
-end;
-
-procedure TfMain.bObjMoveToBackClick(Sender: TObject);
-begin
-  ObjMoveToBack;
-end;
-
-procedure TfMain.bObjMoveToFrontClick(Sender: TObject);
-begin
-  ObjMoveToFront;
-end;
-
-procedure TfMain.bObjMergeAllClick(Sender: TObject);
-begin
-  ObjMergeAll;
-end;
-
-procedure TfMain.bObjMergeClick(Sender: TObject);
-begin
-  ObjMerge;
-end;
-
-procedure TfMain.bObjFlipHorzClick(Sender: TObject);
-begin
-  ObjFlipHorz;
-end;
-
-procedure TfMain.bObjFlipVertClick(Sender: TObject);
-begin
-  ObjFlipVert;
-end;
-
-procedure TfMain.miObjPrevClick(Sender: TObject);
-begin
-  ObjPrev;
-end;
-
-procedure TfMain.miObjNextClick(Sender: TObject);
-begin
-  ObjNext;
-end;
-
-procedure TfMain.bObjLoadClick(Sender: TObject);
-var
-  fin : TFileStream;
-  head : TVTXObjHeader;
-  i, l : integer;
-  obj : TObj;
-  cellrec : TCell;
-const
-  ID = 'VTXEDIT';
-begin
-  if odObject.Execute then
-  begin
-    fin := TFileStream.Create(odObject.FileName, fmOpenRead or fmShareDenyNone);
-
-    fin.Read(head, sizeof(TVTXObjHeader));
-
-    if not MemComp(@ID[0], @head.ID, 7) then
-    begin
-      ShowMessage('Bad Header.');
-      fin.Free;
-      exit;
-    end;
-    if head.Version <> $0001 then
-    begin
-      ShowMessage('Bad Version.');
-      fin.Free;
-      exit;
-    end;
-
-    if head.PageType <> 3 then
-    begin
-      ShowMessage('Not an Object file.');
-      fin.Free;
-      exit;
-    end;
-
-    obj.Name := ExtractFileNameOnly(odObject.FileName);
-    obj.Width := head.Width;
-    obj.Height := head.Height;
-    obj.Locked := false;
-    obj.Hidden := false;
-    obj.Page := false;
-
-    obj.Data.Create(sizeof(TCell), rleDoubles);
-    for i := 0 to head.Width * head.Height - 1 do
-    begin
-      fin.Read(cellrec, sizeof(TCell));
-      obj.Data.Add(@cellrec);
-    end;
-    fin.free;
-
-    l := length(Objects);
-    setlength(Objects, l + 1);
-    CopyObject(Obj, Objects[l]);
-    obj.Data.Free;
-
-    // drop it onto window. top left for now
-    Objects[l].Row := PageTop;
-    Objects[l].Col := PageLeft;
-    LoadlvObjects;
-    pbPage.Invalidate;
-  end
-end;
-
-// save selected object to file
-procedure TfMain.bObjSaveClick(Sender: TObject);
-var
-  fout :    TFileStream;
-  head :    TVTXObjHeader;
-  i :       integer;
-  fname :   string;
-  cellrec : TCell;
-const
-  ID = 'VTXEDIT';
-begin
-  if SelectedObject >= 0 then
-  begin
-    sdObject.FileName := Objects[SelectedObject].Name + '.vof';
-    if sdObject.Execute then
-    begin
-      fout := TFileStream.Create(sdObject.FileName, fmCreate or fmShareExclusive);
-      MemCopy(@ID[0], @head.ID, 7);
-      head.ID[7] := 0;
-      head.Version := $0001;
-      head.PageType := 3;
-      head.Width := Objects[SelectedObject].Width;
-      head.Height := Objects[SelectedObject].Height;
-      MemZero(@head.Name[0], 64);
-      fname := ExtractFileNameOnly(sdObject.FileName);
-      for i := 0 to length(sdObject.Filename) - 1 do
-      begin
-        if i >= 63 then break;
-        head.Name[i] := fname.Chars[i];
-      end;
-      fout.Write(head, sizeof(TVTXObjHeader));
-      for i := 0 to head.Height * head.Width - 1 do
-      begin
-        Objects[SelectedObject].Data.Get(@cellrec, i);
-        fout.Write(cellrec, sizeof(TCell));
-      end;
-      fout.free;
-    end;
-  end;
-end;
-
-procedure TfMain.lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem;
-  ARect: TRect; AState: TOwnerDrawState);
-var
-  cnv : TCanvas;
-  bmp : TBitmap;
-  val : string;
-begin
-  // draw lock / hidden icons and name
-  // 56/57 = unlock/lock
-  // 58/59 = hidden/shown
-  cnv := Sender.Canvas;
-  bmp := TBitmap.Create;
-  bmp.PixelFormat:=pf32bit;
-  bmp.SetSize(16,16);
-
-  // draw row backgrounds
-  if LCLType.odSelected in AState then
-  begin
-    cnv.Brush.Color := clHighlight;
-    cnv.Font.Color := clHighlightText;
-  end
-  else
-  begin
-    cnv.Brush.Color := clBtnFace;
-    cnv.Font.Color := clBtnText;
-  end;
-
-  cnv.FillRect(ARect.Left + 4, ARect.Top, ARect.Right, ARect.Bottom);
-
-  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Locked, 57, 56), bmp);
-  cnv.Draw(ARect.Left + 6, ARect.Top,bmp);
-  ilButtons.GetBitmap(iif(Objects[lvObjIndex(AItem.Index)].Hidden, 58, 59), bmp);
-  cnv.Draw(ARect.Left + 24, ARect.Top,bmp);
-  bmp.free;
-
-  cnv.Brush.Style := bsClear;
-  val := AItem.Caption;
-  cnv.TextOut(ARect.Left + 48, ARect.Top, val);
-end;
-
-procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem;
-  var AValue: string);
-begin
-  ObjectRename := false;
-  Objects[Item.Index].Name := AValue;
-  nop;
-end;
-
-procedure TfMain.lvObjectsEditing(Sender: TObject; Item: TListItem;
-  var AllowEdit: Boolean);
-begin
-  ObjectRename := true;
-  nop;
-end;
-
-// draw the document
-procedure TfMain.pbPagePaint(Sender: TObject);
-var
-  panel :     TPaintBox;
-  cnv :       TCanvas;
-  r, c :      integer;
-  pr :        TRect;
-  tmp, tmp2 : TBGRABitmap;
-  tmpreg :    TRecList;
-  i :         integer;
-  x, y :      integer;
-  cell :      TCell;
-  objnum :    integer;
-  cl1, cl2 :  TColor;
-  copyrec :   TLoc;
-
-begin
-  if bmpPage = nil then exit;
-
-  panel := TPaintBox(Sender);
-  cnv := panel.Canvas;
-
-  // clear page : todo : border
-  cnv.Brush.Color := AnsiColor[GetBits(Page.PageAttr, A_PAGE_PAGE_MASK)];
-  cnv.FillRect(0, 0, cnv.Width, cnv.Height);
-
-  // extract displayable part unscaled
-  pr.Top := PageTop * CellHeight;
-  pr.Left := PageLeft * CellWidth;
-  if PageLeft + WindowCols >= NumCols then
-    pr.Width := (NumCols - PageLeft) * CellWidth
-  else
-    pr.Width := WindowCols * CellWidth;
-
-  if PageTop + WindowRows >= NumRows then
-    pr.Height := (NumRows - PageTop) * CellHeight
-  else
-    pr.Height := WindowRows * CellHeight;
-
-  tmp := bmpPage.GetPart(pr) as TBGRABitmap;
-
-  // scale up for display
-  pr.Top := 0;
-  pr.Left := 0;
-  if PageLeft + WindowCols >= NumCols then
-    pr.Width := (NumCols - PageLeft) * CellWidthZ
-  else
-    pr.Width := WindowCols * CellWidthZ;
-
-  if PageTop + WindowRows >= NumRows then
-    pr.Height := (NumRows - PageTop) * CellHeightZ
-  else
-    pr.Height := WindowRows * CellHeightZ;
-
-  if PageZoom < 1 then
-    tmp2 := tmp.Resample(pr.Width, pr.Height, rmFineResample) as TBGRABitmap
-  else
-    tmp2 := tmp.Resample(pr.Width, pr.Height, rmSimpleStretch) as TBGRABitmap;
-
-  // display page from bitmap
-  cnv.Draw(0, 0, tmp2.Bitmap);
-  tmp.Free;
-  tmp2.free;
-
-  // draw selection information
-  tmpreg := BuildDisplayCopySelection;
-  for i := tmpreg.Count - 1 downto 0 do
-  begin
-    tmpreg.Get(@copyrec, i);
-    pr.Top := (copyrec.Row - PageTop) * CellHeightZ;
-    pr.Left := (copyrec.Col - PageLeft) * CellWidthZ;
-    pr.Width := CellWidthZ;
-    pr.Height := CellHeightZ;
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top,
-        pr.Left + CellWidthZ, pr.Top,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top + CellHeightZ - 1,
-        pr.Left + CellWidthZ, pr.Top + CellHeightZ - 1,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top,
-        pr.Left, pr.Top + CellHeightZ - 1,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
-      DrawDashLine(cnv,
-        pr.Left + CellWidthZ - 1, pr.Top,
-        pr.Left + CellWidthZ - 1, pr.Top + CellHeightZ,
-        clSelectionArea1, clSelectionArea2);
-  end;
-  tmpreg.Free;
-
-  // draw objects over top
-  for r := PageTop to PageTop + WindowRows do
-  begin
-    if r >= NumRows then break;
-
-      y := (r - PageTop) * CellHeightZ;
-      for c := PageLeft to PageLeft + WindowCols do
-      begin
-        if c >= NumCols then break;
-
-        x := (c - PageLeft) * CellWidthZ;
-        objnum := GetObjectCell(r, c, cell);
-        if cell.Chr <> EMPTYCHAR then
-        begin
-          // object here.
-          DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
-          if ObjectOutlines then
-          begin
-            if objnum = SelectedObject then
-            begin
-              cl1 := clSelectedObject1;
-              cl2 := clSelectedObject2;
-            end
-            else
-            begin
-              cl1 := clUnselectedObject1;
-              cl2 := clUnselectedObject2;
-            end;
-            if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
-              DrawDashLine(cnv,
-                x, y,
-                x + CellWidthZ, y,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
-              DrawDashLine(cnv,
-                x, y + CellHeightZ - 1,
-                x + CellWidthZ, y + CellHeightZ - 1,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
-              DrawDashLine(cnv,
-                x, y,
-                x, y + CellHeightZ,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
-              DrawDashLine(cnv,
-                x + CellWidthZ - 1, y,
-                x + CellWidthZ - 1, y + CellHeightZ,
-                cl1, cl2);
-          end;
-        end;
-    end;
-  end;
-
-  // draw page guidelines
-  r := floor((NumRows - PageTop) * CellHeightZ);
-  c := floor((NumCols - PageLeft) * CellWidthZ);
-  DrawDashLine(cnv, 0, r, pbPage.Width, r, clPageBorder1, clPageBorder2);
-  DrawDashLine(cnv, c, 0, c, pbPage.Height, clPageBorder1, clPageBorder2);
-
-end;
-
-// draw the current cell preview
-procedure TfMain.pbCurrCellPaint(Sender: TObject);
-var
-  pb :        TPaintBox;
-  cnv :       TCanvas;
-  r, rarea :  TRect;
-  bmp :       TBGRABitmap;
-  off, ch :   integer;
-  cp :        TEncoding;
-  h, w :      integer;
-  fg, bg :    integer;
-const
-  crsize = 38;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-
-  ch := CurrChar;
-  cp := Fonts[GetBits(CurrAttr, A_CELL_FONT_MASK, 28)];
-  fg := GetBits(CurrAttr, A_CELL_FG_MASK);
-  bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
-
-  // get codepage / offset for this ch
-  if cp in [ encUTF8, encUTF16 ] then
-    off := GetGlyphOff(CurrChar, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
-  else
-  begin
-    if ch > 255 then ch := 0;
-    off := CPages[cp].QuickGlyph[ch];
-  end;
-
-  // draw right side
-  rarea := pb.ClientRect;
-  rarea.left := rarea.Right - rarea.Height;
-  rarea.width := rarea.height;
-  r := rarea;
-
-  // change this to background color in VTX mode
-  cnv.Brush.Color := ANSIColor[16];
-  cnv.FillRect(r);
-
-  bmp := TBGRABitmap.Create(CellWidth, CellHeight);
-  GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, CurrAttr, false);
-  w := 40;
-  h := 80;
-  r.left := rarea.left + (rarea.Width - w) >> 1;
-  r.top :=  rarea.top + (rarea.Height - h) >> 1;
-  r.width := w;
-  r.height := h;
-  DrawStretchedBitmap(cnv, r, bmp);
-
-  // draw colors
-  rarea := pb.ClientRect;
-  w := (rarea.height >> 1);
-  h := (rarea.height >> 1);
-  rarea.width := w;
-  rarea.height := h;
-
-  // draw background color
-  r := rarea;
-  r.Left += w - crsize;
-  r.Top += h - crsize + 2;
-  r.width := crsize;
-  r.height := crsize;
-  DrawRectangle(cnv, r, clBlack);
-  r.inflate(-1,-1);
-  cnv.brush.color := AnsiColor[bg];
-  cnv.FillRect(r);
-
-  // draw foreground color
-  r := rarea;
-  r.top += 2;
-  r.width := crsize;
-  r.height := crsize;
-  cnv.brush.color := AnsiColor[fg];
-  cnv.FillRect(r);
-  DrawRectangle(cnv, r, clBlack);
-
-  // draw plain character
-  rarea := pb.ClientRect;
-  w := (rarea.height >> 1);
-  h := (rarea.height >> 1);
-  rarea.top += h;
-  rarea.width := w;
-  rarea.height := h;
-
-  GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, $000F, false);
-  w := 20;
-  h := 40;
-  r.left := rarea.left + (rarea.Width - w) >> 1;
-  r.top :=  rarea.bottom - h - 2;
-  r.width := w;
-  r.height := h;
-  DrawStretchedBitmap(cnv, r, bmp);
-  bmp.free;
-end;
-
-procedure TfMain.pbPreviewClick(Sender: TObject);
-begin
-  if fPreviewBox.Visible then
-    fPreviewBox.Hide
-  else
-    fPreviewBox.Show;
-end;
-
-procedure TfMain.pbRulerLeftPaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r, x, y : integer;
-  my : integer;
-  rect : Trect;
-  nonum : boolean;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  with cnv do
-  begin
-    Pen.Color := clBlack;
-    Brush.Style := bsClear;
-    Font.Color := clBlack;
-    Font.Size := 6;
-    rect.Left := 1;
-    for r := 0 to WindowRows - 1 do
-    begin
-      if PageTop + r > NumRows then break;
-
-      y := r * CellHeightZ;
-      x := 3;
-      nonum := true;
-      if ((PageTop + r) mod 10) = 0 then
-      begin
-        if PageTop + r > 0 then
-        begin
-          rect.Top := y - 10;
-          rect.Width := 13;
-          rect.Height := 10;
-          DrawTextRight(cnv, rect, IntToStr(PageTop + r));
-          nonum := false;
-        end;
-        x := 8
-      end
-      else if ((PageTop + r) mod 5) = 0 then
-        x := 5;
-
-      if (PageZoom > 2) and nonum then
-      begin
-        rect.Top := y - 10;
-        rect.Width := 13;
-        rect.Height := 10;
-        DrawTextRight(cnv, rect, IntToStr(PageTop + r));
-      end;
-      Line(pb.Width - x, y, pb.Width - 1, y);
-    end;
-    // draw row marker
-    if MouseRow >= 0 then
-    begin
-      Brush.Color := clBlack;
-      my := (MouseRow - PageTop) * CellHeightZ;
-      FillRect(1, my + 1, 3, my + CellHeightZ - 1);
-    end;
-  end;
-end;
-
-procedure TfMain.pbRulerTopPaint(Sender: TObject);
-var
-  pb :      TPaintBox;
-  cnv :     TCanvas;
-  c, x, y : integer;
-  mx :      integer;
-  rect :    TRect;
-  nonum :   boolean;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  with cnv do
-  begin
-    Pen.Color := clBlack;
-    Brush.Style := bsClear;
-    Font.Color := clBlack;
-    Font.Size := 6;
-    rect.Top := 1;
-    for c := 0 to WindowCols - 1 do
-    begin
-      if PageLeft + c > NumCols then break;
-
-      x := pbRulerLeft.Width + c * CellWidthZ;
-      y := 3;
-      nonum := true;
-      if ((PageLeft + c) mod 10) = 0 then
-      begin
-        if PageLeft + c > 0 then
-        begin
-          rect.Left := x - 17;
-          rect.Width := 16;
-          rect.Height := 10;
-          DrawTextRight(cnv, rect, IntToStr(PageLeft+c));
-          nonum := false;
-        end;
-        y := 8
-      end
-      else if ((PageLeft + c) mod 5) = 0 then
-        y := 5;
-
-      if (PageZoom > 2) and nonum then
-      begin
-        rect.Left := x - 17;
-        rect.Width := 16;
-        rect.Height := 10;
-        DrawTextRight(cnv, rect, IntToStr(PageLeft+c));
-      end;
-
-      Line(x, pb.Height - y, x, pb.Height - 1);
-    end;
-    // draw row marker
-    if MouseRow >= 0 then
-    begin
-      Brush.Color := clBlack;
-      mx := (MouseCol - PageLeft) * CellWidthZ;
-      FillRect(pbRulerLeft.Width + mx + 1, 1, pbRulerLeft.Width + mx + CellWidthZ - 1, 3);
-    end;
-  end;
-end;
-
-// draw cell at row, col at x, y of cnv (also copy to bmpPage)
-// draw topmost cell from any objects first. exit after blocking object cell has
-// been drawn.
-procedure TfMain.DrawCellEx(
-  cnv : TCanvas;
-  x, y,
-  row, col : integer;
-  skipUpdate : boolean = true;
-  skipDraw : boolean = false;
-  usech : uint16 = EMPTYCHAR;   // overrides
-  useattr : uint32 = $FFFF);
-var
-  bmp, bmp2 :     TBGRABitmap;
-  ch :            Uint16;
-  off :           integer;
-  attr :          Uint32;
-  rect :          TRect;
-  bslow, bfast :  boolean;
-  cp :            TEncoding;
-begin
-  if bmpPage = nil then exit; // ?!
-
-  if between(row, PageTop, PageTop + WindowRows)
-    and Between(col, PageLeft, PageLeft + WindowCols) then
-  begin
-    // on screen.
-
-    // load page cell
-    if usech = EMPTYCHAR then
-    begin
-      ch := Page.Rows[row].Cells[col].Chr;
-      attr := Page.Rows[row].Cells[col].Attr;
-    end else begin
-      ch := usech;
-      attr := useattr;
-    end;
-
-    bslow := HasBits(attr, A_CELL_BLINKSLOW);
-    bfast  := HasBits(attr, A_CELL_BLINKFAST);
-
-    // convert value in chr to unicode.
-    cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
-    if cp in [ encUTF8, encUTF16 ] then
-      off := GetGlyphOff(ch, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize)
-    else
-    begin
-      if ch > 255 then ch := 0;
-      off := CPages[CurrCodePage].QuickGlyph[ch];
-    end;
-
-    // create bmp for cell
-    bmp := TBGRABitmap.Create(8,16);
-    if not skipUpdate then
-    begin
-      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      bmpPage.Canvas.Draw(col * CellWidth, row * CellHeight, bmp.Bitmap);
-
-      bmp.ResampleFilter := rfMitchell;
-      bmp2 := bmp.Resample(CellWidth>>2, CellHeight >>2) as TBGRABitmap;
-      bmpPreview.Canvas.Draw(col * (CellWidth >> 2), row * (CellHeight >> 2), bmp2.Bitmap);
-      bmp2.free;
-
-      fPreviewBox.Invalidate;
-
-      if bslow and not BlinkSlow then
-      begin
-        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      end;
-
-      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
-      begin
-        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-      end;
-    end
-    else
-    begin
-      if bslow and not BlinkSlow then
-        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
-        SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
-    end;
-
-    // plop it down- scale if needed
-    if not skipDraw then
-    begin
-      rect.Top := y;
-      rect.Left := x;
-      rect.Width := CellWidthZ;
-      rect.Height := CellHeightZ;
-      if PageZoom < 1 then
-      begin
-        bmp.ResampleFilter:=rfMitchell;
-        BGRAReplace(bmp, bmp.Resample(CellWidthZ, CellHeightZ));
-      end;
-      DrawStretchedBitmap(cnv, rect, bmp);
-    end;
-    bmp.free;
-  end;
-end;
-
-function GetKeyAction(str : string) : integer;
-var
-  i : integer;
-begin
-  for i := 0 to length(KeyActions)-1 do
-    if str.ToUpper = KeyActions[i].ToUpper then
-      exit(i);
-  result := -1;
-end;
-
-procedure TfMain.LoadSettings;
-var
-  iin : TIniFile;
-  q : TQuad;
-  keys : TStringList;
-  subkeys : TStringArray;
-  keyval0, keyval1, tmp : string;
-  i, j, len : integer;
-  shortcut : integer;
-const
-  sect : unicodestring = 'VTXEdit';
-
-begin
-  iin := TIniFile.Create('vtxedit.ini');
-
-  q := StrToQuad(iin.ReadString(sect, 'Window','64,64 640,480'));
-  SetFormQuad(fMain, q);
-
-  q := StrToQuad(iin.ReadString(sect, 'PreviewBox', '64,64 640,480'));
-  q.v2 := 0;
-  SetFormQuad(fPreviewBox, q);
-
-  if iin.ReadBool(sect, 'PreviewBoxOpen', false) then fPreviewBox.Show;
-  if iin.ReadBool(sect, 'WindowMax', false) then fMain.WindowState := wsMaximized;
-
-  keys := TStringList.Create;
-  if iin.SectionExists('KeyBinds') then
-  begin
-    iin.ReadSectionValues('KeyBinds', keys);
-    setlength(KeyBinds, keys.Count);
-    for i := 0 to keys.Count - 1 do
-    begin
-      tmp := keys[i];
-
-      len := tmp.IndexOf('=');
-      if len = -1 then continue;
-
-      keyval0 := tmp.substring(0, len);
-      keyval1 := tmp.substring(len + 1);
-
-      KeyBinds[i].Ctrl := false;
-      KeyBinds[i].Shift := false;
-      KeyBinds[i].Alt := false;
-      KeyBinds[i].KeyStr := '';
-
-      tmp := keyval0.ToUpper;
-      subkeys := tmp.Split(['+']);
-      for j := 0 to length(subkeys) - 1 do
-      begin
-        case subkeys[j] of
-          'CTRL': Keybinds[i].Ctrl := true;
-          'SHIFT': Keybinds[i].Shift := true;
-          'ALT':   KeyBinds[i].Alt := true;
-
-          'BACK':
-            begin
-              KeyBinds[i].KeyCode := 8;
-              keybinds[i].KeyStr := 'Backspace';
-            end;
-
-          'TAB':
-            begin
-              KeyBinds[i].KeyCode := 9;
-              keybinds[i].KeyStr := 'Tab';
-            end;
-
-          'CLEAR':
-            begin
-              KeyBinds[i].KeyCode := 12;
-              keybinds[i].KeyStr := 'Clear';
-            end;
-
-          'RETURN','ENTER':
-            begin
-              KeyBinds[i].KeyCode := 13;
-              keybinds[i].KeyStr := 'Return';
-            end;
-
-          'PAUSE':
-            begin
-              KeyBinds[i].KeyCode := 19;
-              keybinds[i].KeyStr := 'Pause';
-            end;
-
-          'ESCAPE','ESC':
-            begin
-              KeyBinds[i].KeyCode := 27;
-              keybinds[i].KeyStr := 'Esc';
-            end;
-
-          'SPACE':
-            begin
-              KeyBinds[i].KeyCode := 32;
-              keybinds[i].KeyStr := 'Space';
-            end;
-
-          'PRIOR', 'PGUP':
-            begin
-              KeyBinds[i].KeyCode := 33;
-              keybinds[i].KeyStr := 'PgUp';
-            end;
-          'NEXT', 'PGDN':
-            begin
-              KeyBinds[i].KeyCode := 34;
-              keybinds[i].KeyStr := 'PgDn';
-            end;
-
-          'END':
-            begin
-              KeyBinds[i].KeyCode := 35;
-              keybinds[i].KeyStr := 'End';
-            end;
-          'HOME':
-            begin
-              KeyBinds[i].KeyCode := 36;
-              keybinds[i].KeyStr := 'Home';
-            end;
-
-          'LEFT':
-            begin
-              KeyBinds[i].KeyCode := 37;
-              keybinds[i].KeyStr := 'Left';
-            end;
-          'UP':
-            begin
-              KeyBinds[i].KeyCode := 38;
-              keybinds[i].KeyStr := 'Up';
-            end;
-          'RIGHT':
-            begin
-              KeyBinds[i].KeyCode := 39;
-              keybinds[i].KeyStr := 'Right';
-            end;
-          'DOWN':
-            begin
-              KeyBinds[i].KeyCode := 40;
-              keybinds[i].KeyStr := 'Down';
-            end;
-
-          'SNAPSHOT','PRTSCR','PRINTSCREEN':
-            begin
-              KeyBinds[i].KeyCode := 44;
-              keybinds[i].KeyStr := 'PrtScr';
-            end;
-
-          'INSERT','INS':
-            begin
-              KeyBinds[i].KeyCode := 45;
-              keybinds[i].KeyStr := 'Insert';
-            end;
-
-          'DELETE','DEL':
-            begin
-              KeyBinds[i].KeyCode := 46;
-              keybinds[i].KeyStr := 'Delete';
-            end;
-
-          '0':
-            begin
-              KeyBinds[i].KeyCode := 48;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '1':
-            begin
-              KeyBinds[i].KeyCode := 49;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '2':
-            begin
-              KeyBinds[i].KeyCode := 50;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '3':
-            begin
-              KeyBinds[i].KeyCode := 51;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '4':
-            begin
-              KeyBinds[i].KeyCode := 52;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '5':
-            begin
-              KeyBinds[i].KeyCode := 53;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '6':
-            begin
-              KeyBinds[i].KeyCode := 54;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '7':
-            begin
-              KeyBinds[i].KeyCode := 55;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '8':
-            begin
-              KeyBinds[i].KeyCode := 56;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          '9':
-            begin
-              KeyBinds[i].KeyCode := 57;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-
-
-          'A':
-            begin
-              KeyBinds[i].KeyCode := 65;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'B':
-            begin
-              KeyBinds[i].KeyCode := 66;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'C':
-            begin
-              KeyBinds[i].KeyCode := 67;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'D':
-            begin
-              KeyBinds[i].KeyCode := 68;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'E':
-            begin
-              KeyBinds[i].KeyCode := 69;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'F':
-            begin
-              KeyBinds[i].KeyCode := 70;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'G':
-            begin
-              KeyBinds[i].KeyCode := 71;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'H':
-            begin
-              KeyBinds[i].KeyCode := 72;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'I':
-            begin
-              KeyBinds[i].KeyCode := 73;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'J':
-            begin
-              KeyBinds[i].KeyCode := 74;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'K':
-            begin
-              KeyBinds[i].KeyCode := 75;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'L':
-            begin
-              KeyBinds[i].KeyCode := 76;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'M':
-            begin
-              KeyBinds[i].KeyCode := 77;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'N':
-            begin
-              KeyBinds[i].KeyCode := 78;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'O':
-            begin
-              KeyBinds[i].KeyCode := 79;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'P':
-            begin
-              KeyBinds[i].KeyCode := 80;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'Q':
-            begin
-              KeyBinds[i].KeyCode := 81;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'R':
-            begin
-              KeyBinds[i].KeyCode := 82;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'S':
-            begin
-              KeyBinds[i].KeyCode := 83;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'T':
-            begin
-              KeyBinds[i].KeyCode := 84;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'U':
-            begin
-              KeyBinds[i].KeyCode := 85;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'V':
-            begin
-              KeyBinds[i].KeyCode := 86;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'W':
-            begin
-              KeyBinds[i].KeyCode := 87;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'X':
-            begin
-              KeyBinds[i].KeyCode := 88;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'Y':
-            begin
-              KeyBinds[i].KeyCode := 89;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-          'Z':
-            begin
-              KeyBinds[i].KeyCode := 90;
-              keybinds[i].KeyStr := subkeys[j];
-            end;
-
-          'NUMPAD0':
-            begin
-              KeyBinds[i].KeyCode := 96;
-              keybinds[i].KeyStr := 'NumPad0';
-            end;
-          'NUMPAD1':
-            begin
-              KeyBinds[i].KeyCode := 97;
-              keybinds[i].KeyStr := 'NumPad1';
-            end;
-          'NUMPAD2':
-            begin
-              KeyBinds[i].KeyCode := 98;
-              keybinds[i].KeyStr := 'NumPad2';
-            end;
-          'NUMPAD3':
-            begin
-              KeyBinds[i].KeyCode := 99;
-              keybinds[i].KeyStr := 'NumPad3';
-            end;
-          'NUMPAD4':
-            begin
-              KeyBinds[i].KeyCode := 100;
-              keybinds[i].KeyStr := 'NumPad4';
-            end;
-          'NUMPAD5':
-            begin
-              KeyBinds[i].KeyCode := 101;
-              keybinds[i].KeyStr := 'NumPad5';
-            end;
-          'NUMPAD6':
-            begin
-              KeyBinds[i].KeyCode := 102;
-              keybinds[i].KeyStr := 'NumPad6';
-            end;
-          'NUMPAD7':
-            begin
-              KeyBinds[i].KeyCode := 103;
-              keybinds[i].KeyStr := 'NumPad7';
-            end;
-          'NUMPAD8':
-            begin
-              KeyBinds[i].KeyCode := 104;
-              keybinds[i].KeyStr := 'NumPad8';
-            end;
-          'NUMPAD9':
-            begin
-              KeyBinds[i].KeyCode := 105;
-              keybinds[i].KeyStr := 'NumPad9';
-            end;
-          'MULTIPLY':
-            begin
-              KeyBinds[i].KeyCode := 106;
-              keybinds[i].KeyStr := 'NumPad*';
-            end;
-          'ADD':
-            begin
-              KeyBinds[i].KeyCode := 107;
-              keybinds[i].KeyStr := 'NumPad+';
-            end;
-          'SUBTRACT':
-            begin
-              KeyBinds[i].KeyCode := 109;
-              keybinds[i].KeyStr := 'NumPad-';
-            end;
-          'DECIMAL':
-            begin
-              KeyBinds[i].KeyCode := 110;
-              keybinds[i].KeyStr := 'NumPad.';
-            end;
-          'DIVIDE':
-            begin
-              KeyBinds[i].KeyCode := 111;
-              keybinds[i].KeyStr := 'NumPad/';
-            end;
-
-          'F1':
-            begin
-              KeyBinds[i].KeyCode := 112;
-              keybinds[i].KeyStr := 'F1';
-            end;
-          'F2':
-            begin
-              KeyBinds[i].KeyCode := 113;
-              keybinds[i].KeyStr := 'F2';
-            end;
-          'F3':
-            begin
-              KeyBinds[i].KeyCode := 114;
-              keybinds[i].KeyStr := 'F3';
-            end;
-          'F4':
-            begin
-              KeyBinds[i].KeyCode := 115;
-              keybinds[i].KeyStr := 'F4';
-            end;
-          'F5':
-            begin
-              KeyBinds[i].KeyCode := 116;
-              keybinds[i].KeyStr := 'F5';
-            end;
-          'F6':
-            begin
-              KeyBinds[i].KeyCode := 117;
-              keybinds[i].KeyStr := 'F6';
-            end;
-          'F7':
-            begin
-              KeyBinds[i].KeyCode := 118;
-              keybinds[i].KeyStr := 'F7';
-            end;
-          'F8':
-            begin
-              KeyBinds[i].KeyCode := 119;
-              keybinds[i].KeyStr := 'F8';
-            end;
-          'F9':
-            begin
-              KeyBinds[i].KeyCode := 120;
-              keybinds[i].KeyStr := 'F9';
-            end;
-          'F10':
-            begin
-              KeyBinds[i].KeyCode := 121;
-              keybinds[i].KeyStr := 'F10';
-            end;
-          'F11':
-            begin
-              KeyBinds[i].KeyCode := 122;
-              keybinds[i].KeyStr := 'F11';
-            end;
-          'F12':
-            begin
-              KeyBinds[i].KeyCode := 123;
-              keybinds[i].KeyStr := 'F12';
-            end;
-
-          'SEMICOLON':
-            begin
-              KeyBinds[i].KeyCode := $BA;
-              KeyBinds[i].KeyStr := ';';
-            end;
-
-          'PLUS':
-            begin
-              KeyBinds[i].KeyCode := $BB;
-              KeyBinds[i].KeyStr := '+';
-            end;
-
-          'COMMA':
-            begin
-              KeyBinds[i].KeyCode := $BC;
-              KeyBinds[i].KeyStr := ',';
-            end;
-
-          'MINUS':
-            begin
-              KeyBinds[i].KeyCode := $BD;
-              KeyBinds[i].KeyStr := '-';
-            end;
-
-          'PERIOD':
-            begin
-              KeyBinds[i].KeyCode := $BE;
-              KeyBinds[i].KeyStr := '.';
-            end;
-
-          'SLASH':
-            begin
-              KeyBinds[i].KeyCode := $BF;
-              KeyBinds[i].KeyStr := ',';
-            end;
-
-          'ACCENT':
-            begin
-              KeyBinds[i].KeyCode := $C0;
-              KeyBinds[i].KeyStr := '`';
-            end;
-
-          'LEFTSQUARE':
-            begin
-              KeyBinds[i].KeyCode := $DB;
-              KeyBinds[i].KeyStr := '[';
-            end;
-
-          'BACKSLASH':
-            begin
-              KeyBinds[i].KeyCode := $DC;
-              KeyBinds[i].KeyStr := '\';
-            end;
-
-          'RIGHTSQUARE':
-            begin
-              KeyBinds[i].KeyCode := $DD;
-              KeyBinds[i].KeyStr := ']';
-            end;
-
-          'QUOTE':
-            begin
-              KeyBinds[i].KeyCode := $DE;
-              KeyBinds[i].KeyStr := '''';
-            end;
-          else
-          begin
-            ShowMessage('Unknown Key in .INI file: ' + subkeys[j]);
-            break;
-          end;
-        end;
-      end;
-
-      if KeyBinds[i].Ctrl then KeyBinds[i].KeyStr := 'Ctrl+' + KeyBinds[i].KeyStr;
-      if KeyBinds[i].Shift then KeyBinds[i].KeyStr := 'Shift+' + KeyBinds[i].KeyStr;
-      if KeyBinds[i].Alt then KeyBinds[i].KeyStr := 'Alt+' + KeyBinds[i].KeyStr;
-
-      // action is first word of val
-      tmp := keyval1;
-      len := tmp.IndexOf(' ');
-      if len = -1 then
-      begin
-        KeyBinds[i].Action := GetKeyAction(tmp);
-        KeyBinds[i].Val := '';
-      end
-      else
-      begin
-        KeyBinds[i].Action := GetKeyAction(tmp.substring(0,len));
-        KeyBinds[i].Val := tmp.Substring(len + 1);
-      end;
-
-      // load hints and menu items shortcuts
-      shortcut := Keybinds[i].KeyCode;
-      if Keybinds[i].Shift then shortcut := (shortcut or $2000);
-      if Keybinds[i].Ctrl then shortcut := (shortcut or $4000);
-      if Keybinds[i].Alt then shortcut := (shortcut or $8000);
-      case KeyBinds[i].Action of
-        KA_MODECHARS:
-          tbModeCharacter.Hint := tbModeCharacter.Hint + ' ' + KeyBinds[i].KeyStr;
-
-        KA_MODELEFTRIGHTBLOCKS:
-          tbModeLeftRights.Hint := tbModeLeftRights.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_MODETOPBOTTOMBLOCKS:
-          tbModeTopBottoms.Hint := tbModeTopBottoms.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_MODEQUARTERBLOCKS:
-          tbModeQuarters.Hint := tbModeQuarters.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_MODESIXELS:
-          tbModeSixels.Hint := tbModeSixels.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLSELECT:
-          tbToolSelect.Hint := tbToolSelect.Hint+ ' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLDRAW:
-          tbToolDraw.Hint := tbToolDraw.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLFILL:
-          tbToolFill.Hint := tbToolFill.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLLINE:
-          tbToolLine.Hint := tbToolLine.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLRECTANGLE:
-          tbToolRect.Hint := tbToolRect.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLELLIPSE:
-          tbToolEllipse.Hint := tbToolEllipse.Hint + ' ' + KeyBinds[i].KeyStr;
-
-        KA_TOOLEYEDROPPER:  tbToolEyedropper.Hint := tbToolEyedropper.Hint+' ' + KeyBinds[i].KeyStr;
-
-        KA_FILENEW:           miFileNew.ShortCut := shortcut;
-        KA_FILEOPEN:          miFileOpen.ShortCut := shortcut;
-        KA_FILESAVE:          miFileSave.ShortCut := shortcut;
-        KA_FILEEXIT:          miFileExit.ShortCut := shortcut;
-
-        KA_EDITREDO:          miEditRedo.ShortCut := shortcut;
-        KA_EDITUNDO:          miEditUndo.ShortCut := shortcut;
-        KA_EDITCUT:           miEditCut.ShortCut := shortcut;
-        KA_EDITCOPY:          miEditCopy.ShortCut := shortcut;
-        KA_EDITPASTE:         miEditPaste.ShortCut := shortcut;
-
-        KA_OBJECTMOVEBACK:    miObjBackOne.ShortCut := shortcut;
-        KA_OBJECTMOVEFORWARD: miObjForwardOne.ShortCut := shortcut;
-        KA_OBJECTMOVETOBACK:  miObjToBack.ShortCut := shortcut;
-        KA_OBJECTMOVETOFRONT: miObjToFront.ShortCut := shortcut;
-        KA_OBJECTFLIPHORZ:    miObjFlipHorz.ShortCut := shortcut;
-        KA_OBJECTFLIPVERT:    miObjFlipVert.ShortCut := shortcut;
-        KA_OBJECTMERGE:       miObjMerge.ShortCut := shortcut;
-        KA_OBJECTMERGEALL:    miObjMergeAll.ShortCut := shortcut;
-        KA_OBJECTNEXT:        miObjNext.ShortCut := shortcut;
-        KA_OBJECTPREV:        miObjPrev.ShortCut := shortcut;
-
-        KA_SHOWPREVIEW:       miViewPreview.ShortCut := shortcut;
-
-      end;
-    end;
-  end;
-  keys.free;
-
-  iin.free;
-end;
-
-procedure TfMain.SaveSettings;
-var
-  iin : TIniFile;
-const
-  sect : unicodestring = 'VTXEdit';
-begin
-  iin := TIniFile.Create('vtxedit.ini');
-
-  // window positions
-  iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
-  iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
-  iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
-
-  iin.WriteBool(sect, 'WindowMax', fMain.WindowState = wsMaximized);
-
-  iin.free;
-end;
-
-function TfMain.GetNextCell(r, c : integer) : TRowCol;
-var
-  c1, r1 : integer;
-begin
-  c1 := c;
-  r1 := r;
-  while (Page.Rows[r1].Cells[c1].Chr = _SPACE)
-    and (GetBits(Page.Rows[r1].Cells[c1].Attr, A_CELL_BG_MASK, 8) = 0)
-    and (r1 < NumRows) do
-  begin
-    c1 += 1;
-    if (c1 >= NumCols) then
-    begin
-      c1 := 0;
-      if r1 = NumRows - 1 then break;
-      r1 += 1;
-    end;
-  end;
-  result.row := r1;
-  result.col := c1;
-end;
-
-
-procedure TfMain.SaveANSIFile(fname : unicodestring; ansi : unicodestring; enc : TEncoding);
-var
-  fout : TFileStream;
-  l : integer;
-  tmp : TBytes;
-begin
-
-  fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
-
-  // save ansi - mind codepage
-  if enc = encUTF8 then
-    tmp := ansi.toUTF8Bytes
-  else if enc = encUTF16 then
-    tmp := ansi.toUTF16Bytes
-  else
-    tmp := ansi.toCPBytes;
-
-  l := length(tmp);
-  fout.WriteBuffer(tmp[0], l);
-  setlength(tmp, 0);
-  fout.free;
-end;
-
-function TfMain.BuildANSI : unicodestring;
-var
-  ansi :          unicodestring;
-  r, c :          integer;      // current r/c
-  dc :            integer;      // col delta
-  pt :            TRowCol;
-  cell :          TCell;
-  attr :          integer;
-  cattr :         integer;
-  fg,bg :         uint32;
-  sgr :           unicodestring;
-
-begin
-  // for now, save everthing on screen as is
-
-  // reset / home / clear screen.
-  ansi := CSI + '0m' + CSI + '2J';
-  cattr := $0007;
-  r := 0;
-  c := 0;
-
-  while r < NumRows do
-  begin
-    pt := GetNextCell(r,c);
-
-    if pt.row >= NumRows then
-      break;
-
-    dc := pt.col - c;
-    if pt.row = r then
-    begin
-      // same row.
-      if dc > 0 then
-      begin
-        if (GetBits(cattr, A_CELL_BG_MASK, 8) = 0) and (dc < 4) then
-          ansi += space(dc)
-        else
-          ansi += CSI + inttostr(dc) + 'C';
-        c += dc;
-      end
-      else
-      begin
-
-        // character here. output.
-        cell :=   Page.Rows[r].Cells[c];
-        attr :=   cell.attr;
-
-        // adjust bold/FG - blink/BG
-        fg := GetBits(attr, A_CELL_FG_MASK);
-        bg := GetBits(attr, A_CELL_BG_MASK, 8);
-        if ColorScheme <> COLORSCHEME_256 then
-        begin
-          if fg > 7 then
-          begin
-            fg -= 8;
-            SetBit(attr, A_CELL_BOLD, true);
-          end;
-          if bg > 7 then
-          begin
-            bg -= 8;
-            SetBit(attr, A_CELL_BLINKFAST, true);
-          end;
-        end;
-
-        if cattr <> attr then
-        begin
-
-          sgr := CSI;
-          // need to reset ?
-          if (not HasBits(attr, A_CELL_BOLD) and HasBits(cattr, A_CELL_BOLD))
-            or (not HasBits(attr, A_CELL_FAINT) and HasBits(cattr, A_CELL_FAINT))
-            or (not HasBits(attr, A_CELL_ITALICS) and HasBits(cattr, A_CELL_ITALICS))
-            or (not HasBits(attr, A_CELL_UNDERLINE) and HasBits(cattr, A_CELL_UNDERLINE))
-            or (not HasBits(attr, A_CELL_BLINKFAST) and HasBits(cattr, A_CELL_BLINKFAST))
-            or (not HasBits(attr, A_CELL_BLINKSLOW) and HasBits(cattr, A_CELL_BLINKSLOW))
-            or (not HasBits(attr, A_CELL_REVERSE) and HasBits(cattr, A_CELL_REVERSE))
-            or (not HasBits(attr, A_CELL_STRIKETHROUGH) and HasBits(cattr, A_CELL_STRIKETHROUGH))
-            or (not HasBits(attr, A_CELL_DOUBLESTRIKE) and HasBits(cattr, A_CELL_DOUBLESTRIKE))
-            or (not HasBits(attr, A_CELL_SHADOW) and HasBits(cattr, A_CELL_SHADOW))
-            or ((GetBits(attr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_CONCEAL)
-              and (GetBits(cattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_CONCEAL))
-            or ((GetBits(attr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_TOP)
-              and (GetBits(cattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_TOP))
-            or ((GetBits(attr, A_CELL_DISPLAY_MASK) <> A_CELL_DISPLAY_BOTTOM)
-              and (GetBits(cattr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_BOTTOM)) then
-            begin
-              sgr += '0;';    // reset. use shortest.
-              cattr := $0007;
-            end;
-
-          // mind the color mode! - besure colors are cleaned up on
-          if fg <> GetBits(cattr, A_CELL_FG_MASK) then
-          begin
-            if fg < 8 then
-              sgr += inttostr(30 + integer(fg)) + ';'
-            else
-              sgr += '38;5;' + inttostr(fg) + ';';
-          end;
-
-          if bg <> GetBits(cattr, A_CELL_BG_MASK, 8) then
-          begin
-            if bg < 8 then
-              sgr += inttostr(40 + integer(bg)) + ';'
-            else
-              sgr += '48;5;' + inttostr(bg) + ';';
-          end;
-
-          if HasBits(attr, A_CELL_BOLD) then            sgr += '1;';
-          if HasBits(attr, A_CELL_FAINT) then           sgr += '2;';
-          if HasBits(attr, A_CELL_ITALICS) then         sgr += '3;';
-          if HasBits(attr, A_CELL_UNDERLINE) then       sgr += '4;';
-          if HasBits(attr, A_CELL_BLINKSLOW) then       sgr += '5;';
-          if HasBits(attr, A_CELL_BLINKFAST) then       sgr += '6;';
-          if HasBits(attr, A_CELL_REVERSE) then         sgr += '7;';
-          if HasBits(attr, A_CELL_STRIKETHROUGH) then   sgr += '9;';
-          if HasBits(attr, A_CELL_DOUBLESTRIKE) then    sgr += '56;';
-          if HasBits(attr, A_CELL_SHADOW) then          sgr += '57;';
-
-          if GetBits(attr, A_CELL_DISPLAY_MASK) = A_CELL_DISPLAY_CONCEAL then sgr += '8;';
-          if GetBits(attr, A_CELL_DISPLAY_TOP) = A_CELL_DISPLAY_TOP then sgr += '8;';
-          if GetBits(attr, A_CELL_DISPLAY_BOTTOM) = A_CELL_DISPLAY_BOTTOM then sgr += '8;';
-
-          sgr := leftstr(sgr, length(sgr) - 1) + 'm';
-          ansi += sgr;
-          cattr := attr;
-        end;
-
-        if c = NumCols - 1 then
-          ansi += #13#10#27'[A'#27'['+inttostr(NumCols-1)+'C'#27'[s' + WideChar(cell.chr) + #27'[u'#13#10
-        else
-          ansi += WideChar(cell.chr);
-
-        c += 1;
-        if c >= NumCols then
-        begin
-          c := 0;
-          r += 1;
-        end;
-      end;
-    end
-    else
-    begin
-      // another row.
-      ansi += CRLF;
-      inc(r);
-      c := 0;
-    end;
-  end;
-  result := ansi;
-end;
-
-
-// append a cell to an undo cell delta reclist
-procedure TfMain.RecordUndoCell(row, col : uint16; newcell : TCell);
-var
-  rec :   TUndoCells;
-  i, l :  integer;
-begin
-  // look for this cell in undo data
-  l := CurrUndoData.Count;
-  for i := 0 to l - 1 do
-  begin
-    CurrUndoData.Get(@rec, i);
-    if (rec.Row = row) and (rec.Col = col) then
-    begin
-      // if exists, update the new cell - if different
-      if (newcell.Chr <> rec.NewCell.Chr)
-        or (newcell.Attr <> rec.NewCell.Attr) then
-      begin
-        rec.NewCell := newcell;
-        CurrUndoData.Put(@rec, i);
-      end;
-      exit;
-    end;
-  end;
-  // new record - if different
-  if (newcell.Chr <> Page.Rows[row].Cells[col].Chr)
-    or (newcell.Attr <> Page.Rows[row].Cells[col].Attr) then
-  begin
-    rec.Row := row;
-    rec.Col := col;
-    rec.NewCell := newcell;
-    rec.OldCell := Page.Rows[row].Cells[col];
-    CurrUndoData.Add(@rec);
-  end;
-end;
-
-// clear all data from pos to end of list. move list count down.
-procedure TfMain.UndoTruncate(pos : integer);
-var
-  i : integer;
-  undoblk : TUndoBlock;
-begin
-  for i := pos to Undo.Count - 1 do
-  begin
-    Undo.Get(@undoblk, i);
-    case undoblk.UndoType of
-
-      utCells:      undoblk.CellData.Free;
-
-      utObjAdd:     undoblk.Obj.Data.Free;
-      utObjRemove:  undoblk.Obj.Data.Free;
-
-      utObjMerge:
-        begin
-          undoblk.Obj.Data.Free;
-          undoblk.CellData.Free;
-        end;
-    end;
-  end;
-  Undo.Count := pos;
-end;
-
-// truncate if needed. add undo block to undo list at undopos.
-procedure TfMain.UndoAdd(undoblk : TUndoBlock);
-begin
-  // don't add empty cell deltas
-  if (undoblk.UndoType = utCells) and (undoblk.CellData.Count = 0) then exit;
-
-  UndoTruncate(UndoPos);
-  Undo.Add(@undoblk);
-  UndoPos += 1;
-end;
-
-// undo stuff at this pos
-procedure TfMain.UndoPerform(pos : integer);
-var
-  undocell :  TUndoCells;
-  i :         integer;
-  undoblk :   TUndoBlock;
-  tmpobj :    TObj;
-begin
-  Undo.Get(@undoblk, pos);
-  case undoblk.UndoType of
-    utCells:
-      begin
-        for i := 0 to undoblk.CellData.Count - 1 do
-        begin
-          undoblk.CellData.Get(@undocell, i);
-          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
-        end;
-        GenerateBmpPage;
-        pbPage.Invalidate;
-        CurrFileChanged := true;
-      end;
-
-    utObjMove:
-      begin
-        // move from oldrow/col/num to newrow/col/num
-        if undoblk.OldNum <> undoblk.NewNum then
-        begin
-          // move forward / back
-          tmpobj := Objects[undoblk.NewNum];
-          RemoveObject(undoblk.NewNum);
-          InsertObject(tmpobj, undoblk.OldNum);
-        end;
-        if (undoblk.OldRow <> undoblk.NewRow)
-          or (undoblk.OldCol <> undoblk.NewCol) then
-        begin
-          Objects[undoblk.OldNum].Row := undoblk.OldRow;
-          Objects[undoblk.OldNum].Col := undoblk.OldCol;
-        end;
-        pbPage.Invalidate;
-      end;
-
-    utObjAdd:
-      begin
-        // an added object on top. remove it.
-        SelectedObject := -1;
-        RemoveObject(length(Objects) - 1);
-        LoadlvObjects;
-        pbPage.Invalidate;
-      end;
-
-    utObjRemove:
-      begin
-        // readd at oldnum
-        SelectedObject := -1;
-        InsertObject(undoblk.Obj, undoblk.OldNum);
-        LoadlvObjects;
-        pbPage.Invalidate;
-      end;
-
-    utObjMerge:
-      begin
-        for i := 0 to undoblk.CellData.Count - 1 do
-        begin
-          undoblk.CellData.Get(@undocell, i);
-          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.OldCell;
-        end;
-        SelectedObject := -1;
-        InsertObject(undoblk.Obj, undoblk.OldNum);
-        LoadlvObjects;
-        GenerateBmpPage;
-        pbPage.Invalidate;
-        CurrFileChanged := true;
-      end;
-
-    utObjFlipHorz:
-      begin
-        DoObjFlipHorz(undoblk.OldNum);
-      end;
-
-    utObjFlipVert:
-      begin
-        DoObjFlipVert(undoblk.OldNum);
-      end;
-
-  end;
-  CurrFileChanged := true;
-end;
-
-// redo
-procedure TfMain.RedoPerform(pos : integer);
-var
-  undocell :  TUndoCells;
-  i, l :      integer;
-  undoblk :   TUndoBlock;
-  tmpobj :    TObj;
-begin
-  Undo.Get(@undoblk, pos);
-  case undoblk.UndoType of
-    utCells:
-      begin
-        for i := 0 to undoblk.CellData.Count - 1 do
-        begin
-          undoblk.CellData.Get(@undocell, i);
-          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
-        end;
-        GenerateBmpPage;
-        pbPage.Invalidate;
-        CurrFileChanged := true;
-      end;
-
-    utObjMove:
-      begin
-        // move from oldrow/col/num to newrow/col/num
-        if undoblk.OldNum <> undoblk.NewNum then
-        begin
-          // move forward / back
-          tmpobj := Objects[undoblk.OldNum];
-          RemoveObject(undoblk.OldNum);
-          InsertObject(tmpobj, undoblk.NewNum);
-        end;
-        if (undoblk.OldRow <> undoblk.NewRow)
-          or (undoblk.OldCol <> undoblk.NewCol) then
-        begin
-          Objects[undoblk.NewNum].Row := undoblk.NewRow;
-          Objects[undoblk.NewNum].Col := undoblk.NewCol;
-        end;
-        pbPage.Invalidate;
-      end;
-
-    utObjAdd:
-      // readd object
-      begin
-        SelectedObject := -1;
-        l := length(Objects);
-        setlength(Objects, l + 1);
-        CopyObject(undoblk.Obj, Objects[l]);
-        Objects[l].Row := undoblk.OldRow;
-        Objects[l].Col := undoblk.OldCol;
-        LoadlvObjects;
-        pbPage.Invalidate;
-      end;
-
-    utObjRemove:
-      begin
-        // reremove object
-        SelectedObject := -1;
-        RemoveObject(undoblk.OldNum);
-        LoadlvObjects;
-        pbPage.Invalidate;
-      end;
-
-    utObjMerge:
-      begin
-        for i := 0 to undoblk.CellData.Count - 1 do
-        begin
-          undoblk.CellData.Get(@undocell, i);
-          Page.Rows[undocell.Row].Cells[undocell.Col] := undocell.NewCell;
-        end;
-        SelectedObject := -1;
-        RemoveObject(undoblk.OldNum);
-        LoadlvObjects;
-        GenerateBmpPage;
-        pbPage.Invalidate;
-        CurrFileChanged := true;
-      end;
-
-    utObjFlipHorz:
-      begin
-        DoObjFlipHorz(undoblk.OldNum);
-      end;
-
-    utObjFlipVert:
-      begin
-        DoObjFlipVert(undoblk.OldNum);
-      end;
-
-  end;
-end;
-
-procedure TfMain.ClearAllUndo;
-begin
-  // clear any UndoData left over.
-  UndoTruncate(0);
-  UndoPos:=0;
-end;
+}
 
 procedure nop; begin end;
 
@@ -7269,6 +7837,7 @@ begin
   nop;
 
 end;
+
 
 initialization
 {$I vtxcursors.lrs}

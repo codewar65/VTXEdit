@@ -107,12 +107,12 @@ type
 
   // http://www.acid.org/info/sauce/sauce.htm
   TSauceHeader = packed record
-    ID:             array [1..5] of char;   // "SAUCE"
-    Version:        array [1..2] of char;
-    Title:          array [1..35] of char;
-    Author:         array [1..20] of char;
-    Group:          array [1..20] of char;
-    Date:           array [1..8] of char;
+    ID:             array [0..4] of byte;   // "SAUCE"
+    Version:        array [0..1] of byte;
+    Title:          array [0..34] of byte;
+    Author:         array [0..19] of byte;
+    Group:          array [0..19] of byte;
+    Date:           array [0..7] of byte;   // YYMMDD
     FileSIze :      Uint32;
 
     DataFileType :  UInt16;
@@ -194,7 +194,9 @@ type
     encWIN1255, encWIN1256, encWIN1257,
     encUTF8, encUTF16 );
 
-  TToolModes = ( tmSelect, tmDraw, tmFill, tmLine, tmRect, tmEllipse, tmEyedropper );
+  TToolModes = (
+    tmSelect, tmDraw, tmPaint, tmFill,
+    tmLine, tmRect, tmEllipse, tmEyedropper );
 
   TDrawModes = ( dmChars, dmLeftRights, dmTopBottoms, dmQuarters, dmSixels );
 
@@ -375,15 +377,6 @@ const
   A_ROW_PATTERN_SOLID =   %00000000000000010000000000000000;
   A_ROW_PATTERN_HORZ =    %00000000000000100000000000000000;
   A_ROW_PATTERN_VERT =    %00000000000000110000000000000000;
-  A_ROW_HEIGHT_MASK =     %00000000000111000000000000000000;
-  A_ROW_HEIGHT_25 =       %00000000000000000000000000000000;
-  A_ROW_HEIGHT_50 =       %00000000000001000000000000000000;
-  A_ROW_HEIGHT_75 =       %00000000000010000000000000000000;
-  A_ROW_HEIGHT_100 =      %00000000000011000000000000000000;
-  A_ROW_HEIGHT_125 =      %00000000000100000000000000000000;
-  A_ROW_HEIGHT_150 =      %00000000000101000000000000000000;
-  A_ROW_HEIGHT_175 =      %00000000000110000000000000000000;
-  A_ROW_HEIGHT_200 =      %00000000000111000000000000000000;
   A_ROW_WIDTH_MASK =      %00000000011000000000000000000000;
   A_ROW_WIDTH_50 =        %00000000000000000000000000000000;
   A_ROW_WIDTH_100 =       %00000000001000000000000000000000;
@@ -7861,38 +7854,44 @@ const
   KA_MODESIXELS =           18;
   KA_TOOLSELECT =           19;
   KA_TOOLDRAW =             20;
-  KA_TOOLFILL =             21;
-  KA_TOOLLINE =             22;
-  KA_TOOLRECTANGLE =        23;
-  KA_TOOLELLIPSE =          24;
-  KA_TOOLEYEDROPPER =       25;
-  KA_FILENEW =              26;
-  KA_FILEOPEN =             27;
-  KA_FILESAVE =             28;
-  KA_FILEEXIT =             29;
-  KA_EDITREDO =             30;
-  KA_EDITUNDO =             31;
-  KA_EDITCUT =              32;
-  KA_EDITCOPY =             33;
-  KA_EDITPASTE =            34;
+  KA_TOOLPAINT =            21;
+  KA_TOOLFILL =             22;
+  KA_TOOLLINE =             23;
+  KA_TOOLRECTANGLE =        24;
+  KA_TOOLELLIPSE =          25;
+  KA_TOOLEYEDROPPER =       26;
 
-  KA_OBJECTMOVEBACK =       35;
-  KA_OBJECTMOVEFORWARD =    36;
-  KA_OBJECTMOVETOBACK =     37;
-  KA_OBJECTMOVETOFRONT =    38;
-  KA_OBJECTFLIPHORZ =       39;
-  KA_OBJECTFLIPVERT =       40;
-  KA_OBJECTMERGE =          41;
-  KA_OBJECTMERGEALL =       42;
-  KA_OBJECTNEXT =           43;
-  KA_OBJECTPREV =           44;
-  KA_OBJECTDELETE =         45;
+  KA_FILENEW =              27;
+  KA_FILEOPEN =             28;
+  KA_FILESAVE =             29;
+  KA_FILESAVEAS =           30;
+  KA_FILEIMPORT =           31;
+  KA_FILEEXPORT =           32;
+  KA_FILEEXIT =             33;
 
-  KA_DELETE =               46;   // delete selection, object, etc
-  KA_ESCAPE =               47;   // clear selection, unselect object, etc
+  KA_EDITREDO =             34;
+  KA_EDITUNDO =             35;
+  KA_EDITCUT =              36;
+  KA_EDITCOPY =             37;
+  KA_EDITPASTE =            38;
 
-  KA_SHOWPREVIEW =          48;
-  KA_EOL =                  49;
+  KA_OBJECTMOVEBACK =       39;
+  KA_OBJECTMOVEFORWARD =    40;
+  KA_OBJECTMOVETOBACK =     41;
+  KA_OBJECTMOVETOFRONT =    42;
+  KA_OBJECTFLIPHORZ =       43;
+  KA_OBJECTFLIPVERT =       44;
+  KA_OBJECTMERGE =          45;
+  KA_OBJECTMERGEALL =       46;
+  KA_OBJECTNEXT =           47;
+  KA_OBJECTPREV =           48;
+  KA_OBJECTDELETE =         49;
+
+  KA_DELETE =               50;   // delete selection, object, etc
+  KA_ESCAPE =               51;   // clear selection, unselect object, etc
+
+  KA_SHOWPREVIEW =          52;
+  KA_EOL =                  53;
 
   KeyActions : array [0..KA_EOL] of string = (
 
@@ -7911,10 +7910,13 @@ const
     'ModeChars','ModeLeftRightBlocks','ModeTopBottomBlocks','ModeQuarterBlocks',
     'ModeSixels',
 
-    'ToolSelect','ToolDraw','ToolFill','ToolLine','ToolRectangle','ToolEllipse',
+    'ToolSelect','ToolDraw','ToolPaint','ToolFill',
+    'ToolLine','ToolRectangle','ToolEllipse',
     'ToolEyeDropper',
 
-    'FileNew','FileOpen','FileSave','FileExit',
+    'FileNew','FileOpen','FileSave',
+    'FileSaveAs', 'FileImport','FileExport',
+    'FileExit',
 
     'EditRedo', 'EditUndo','EditCut','EditCopy','EditPaste',
 
@@ -7942,6 +7944,18 @@ const
   DRAG_REMOVE = 2;
 
   UNDO_LEVELS = 50;
+
+  // editing cursors
+  CURSOR_ARROW =      2;
+  CURSOR_ARROWPLUS =  3;
+  CURSOR_ARROWMINUS = 4;
+  CURSOR_DRAW =       5;
+  CURSOR_FILL =       6;
+  CURSOR_LINE =       7;
+  CURSOR_RECT =       8;
+  CURSOR_ELLIPSE =    9;
+  CURSOR_EYEDROPPER = 10;
+  CURSOR_PAINT =      11;
 
 implementation
 

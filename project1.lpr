@@ -36,7 +36,8 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, VTXEdit;
+  Forms,
+  VTXEdit;
 
 {$R *.res}
 

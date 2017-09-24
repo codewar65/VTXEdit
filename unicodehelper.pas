@@ -71,6 +71,8 @@ type
       function toUTF16Bytes : TBytes;
       function toCPBytes : TBytes;
 
+      function toEncodedCPBytes(table : PWord) : TBytes;
+
       function getUTF8BytesLength : integer;                  // varies
       function getUTF16BytesLength : integer;                 // length * 2
       function getCPBytesLength : integer;                    // length
@@ -310,7 +312,7 @@ function TUnicodeStringHelper.toCPBytes : TBytes;
 var
   len, i, cv : integer;
 begin
-  len := self.getUTF8BytesLength;
+  len := self.length;
   setlength(Result, len);
   for i := 1 to len do
   begin
@@ -318,6 +320,34 @@ begin
     if cv > 255 then
       cv := 0;
     Result[i - 1] := cv;
+  end;
+end;
+
+{
+  toEncodedCPBytes : convert unicodestring to 8 bit ascii using mapping table
+}
+function TUnicodeStringHelper.toEncodedCPBytes(table : PWord) : TBytes;
+var
+  len, i, cv : integer;
+  ascii, j : integer;
+begin
+  len := self.length;
+  setlength(Result, len);
+  for i := 1 to len do
+  begin
+    cv := self[i].toCharCode;
+
+    ascii := 0;
+    // skip control codes
+    for j := 32 to 255 do
+    begin
+      if cv = table[j] then
+      begin
+        ascii := j;
+        break;
+      end;
+    end;
+    Result[i - 1] := ascii;
   end;
 end;
 

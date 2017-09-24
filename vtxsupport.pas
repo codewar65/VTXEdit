@@ -46,6 +46,7 @@ uses
   BGRABitmapTypes,
   Types,
   RecList,
+  Memory,
   {$ifdef WINDOWS}
   Windows,
   {$else}
@@ -100,8 +101,8 @@ var
   PageType :                integer;  // from cbPageType  PAGETYPE_
   ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_
 
-  bmpPage     : TBGRABitmap;  // copy of page.
-  bmpPreview  : TBGRABitmap;  // copy of page.
+  bmpPage     :             TBGRABitmap;  // the page.
+  bmpPreview  :             TBGRABitmap;
   PageZoom :                double;     // 1.0 = 100%
   XScale :                  double;     // horizontal stretch. 1.0 = 100%
   CellWidth, CellHeight :   integer;    // pixels
@@ -389,7 +390,7 @@ begin
         Move(s[0], bmp.ScanLine[dl + 1][0], 32);
       end;
     end;
-
+    bmp.InvalidateBitmap;
   end;
 end;
 
