@@ -2762,7 +2762,7 @@ begin
     x := x * CELL_WIDTH + 2;
     y := y * CELL_HEIGHT + 2;
 
-    // draw simple glyph in cell (8x16) zzzzzzzz
+    // draw simple glyph in cell (8x16)
     //GetGlyphBmp(cell, CPages[CurrCodePage].GlyphTable, off, 15, false);
     GetGlyphBmp(cell, CPages[cp].GlyphTable, off, 15, false);
 
@@ -3135,7 +3135,7 @@ begin
 
   SetBits(CurrAttr, A_CELL_FONT_MASK, CurrFont, 28);
 
-  // update character palette here. zzzzzzzz
+  // update character palette here.
   CodePageChange;
   pbChars.Invalidate;
   tbModeClick(tbModeCharacter);
@@ -5381,7 +5381,7 @@ begin
     bslow := HasBits(attr, A_CELL_BLINKSLOW);
     bfast  := HasBits(attr, A_CELL_BLINKFAST);
 
-    // convert value in chr to unicode. zzzzzzzzzzz
+    // convert value in chr to unicode.
     cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
     if cp in [ encUTF8, encUTF16 ] then
       off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
@@ -6900,6 +6900,43 @@ begin
   result := sgr;
 end;
 
+function GetSauceFontName(enc : TEncoding) : string;
+begin
+  case enc of
+    encCP437:   result := 'IBM VGA 437';
+    encWIN1256: result := 'IBM VGA 720'; // aka 720
+    encCP737:   result := 'IBM VGA 737';
+    encCP775:   result := 'IBM VGA 775';
+    encCP819:   result := 'IBM VGA 819';
+    encCP850:   result := 'IBM VGA 850';
+    encCP852:   result := 'IBM VGA 852';
+    encCP855:   result := 'IBM VGA 855';
+    encCP857:   result := 'IBM VGA 857';
+    encCP858:   result := 'IBM VGA 858';
+    encCP860:   result := 'IBM VGA 860';
+    encCP861:   result := 'IBM VGA 861';
+    encCP862:   result := 'IBM VGA 862';
+    encCP863:   result := 'IBM VGA 863';
+    encCP864:   result := 'IBM VGA 864';
+    encCP865:   result := 'IBM VGA 865';
+    encCP866:   result := 'IBM VGA 866';
+    encCP869:   result := 'IBM VGA 869';
+    encCP872:   result := 'IBM VGA 872';
+    encCP867:   result := 'IBM VGA KAM';
+    encCPMIK:   result := 'IBM VGA MIK';
+    encTopaz:               result := 'Amiga Topaz 1';
+    encTopazPlus:           result := 'Amiga Topaz 1+';
+    encP0T_NOoDLE:          result := 'Amiga P0T-NOoDLE';
+    encMicroKnight:         result := 'Amiga MicroKnight';
+    encMicroKnightPlus:     result := 'Amiga MicroKnight+';
+    encmOsOul:              result := 'Amiga mOsOul';
+    encCBM64U, encCBM128U:  result := 'C64 PETSCII unshifted';
+    encCBM64L, encCBM128L:  result := 'C64 PETSCII shifted';
+    encAtari:               result := 'Atari ATASCII';
+    else                    result := '';
+  end;
+end;
+
 // export contents of Page to fname using CurrCodePage encoding
 // if maxlen = -1, no max length check
 // append sauce if usesauce
@@ -7228,9 +7265,9 @@ begin
     Page.Sauce.DataFileType := SAUCE_CHR_ANSI;
     if ColorScheme = COLORSCHEME_ICE then
       Page.Sauce.TFlags := SAUCE_FLAG_ICE;
-    Page.Sauce.TInfo1 := NumRows;
-    Page.Sauce.TInfo2 := NumCols;
-    // skip the font info for now.
+    Page.Sauce.TInfo1 := NumCols;
+    Page.Sauce.TInfo2 := NumRows;
+    StrToChars(unicodestring(GetSauceFontName(Fonts[0])), @Page.Sauce.TInfoS, sizeof(Page.Sauce.TInfoS));
     fout.WriteByte(_CPMEOF);
     fout.write(Page.Sauce, sizeof(TSauceHeader));
   end;
@@ -7359,9 +7396,9 @@ begin
     Page.Sauce.DataFileType := SAUCE_CHR_ASCII;
     if ColorScheme = COLORSCHEME_ICE then
       Page.Sauce.TFlags := SAUCE_FLAG_ICE;
-    Page.Sauce.TInfo1 := NumRows;
-    Page.Sauce.TInfo2 := NumCols;
-    // skip the font info for now.
+    Page.Sauce.TInfo1 := NumCols;
+    Page.Sauce.TInfo2 := NumRows;
+    StrToChars(unicodestring(GetSauceFontName(Fonts[0])), @Page.Sauce.TInfoS, sizeof(Page.Sauce.TInfoS));
     fout.WriteByte(_CPMEOF);
     fout.write(Page.Sauce, sizeof(TSauceHeader));
   end;
@@ -7402,21 +7439,24 @@ var
   ValidSauce : boolean;
   Sauce :     TSauceHeader;
   chars :     TWords;
-  chr : WORD;
-  charslen : longint;
+  chr :       WORD;
+  charslen :  longint;
   i, j, k,
-  state : integer;
+  state :     integer;
   docsi,
   dochar,
-  doeof : boolean;
-  SaveAttr : DWord;
-  fg, bg : integer;
+  doeof :     boolean;
+  SaveAttr :  DWord;
+  fg, bg :    integer;
   bold,
-  blink : boolean;
+  blink :     boolean;
+  fontname,
   parms,
-  inter: string;
-  pvals :             TStringArray;
-  SaveRow, SaveCol : integer;
+  inter:      string;
+  pvals :     TStringArray;
+  SaveRow,
+  SaveCol :   integer;
+  cp :        TEncoding;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
@@ -7442,6 +7482,38 @@ var
     end
     else
       result := defval;
+  end;
+
+  // see if last three characters match an encoding spec
+  function GetSauceEncoding(fname : string) : TEncoding;
+  var
+    l3 : string;
+  begin
+    l3 := RightStr(fname, 3);
+    case l3 of
+      '437':  result := encCP437;
+      '720':  result := encWIN1256; // aka 720
+      '737':  result := encCP737;
+      '775':  result := encCP775;
+      '819':  result := encCP819;
+      '850':  result := encCP850;
+      '852':  result := encCP852;
+      '855':  result := encCP855;
+      '857':  result := encCP857;
+      '858':  result := encCP858;
+      '860':  result := encCP860;
+      '861':  result := encCP861;
+      '862':  result := encCP862;
+      '863':  result := encCP863;
+      '864':  result := encCP864;
+      '865':  result := encCP865;
+      '866':  result := encCP866;
+      '869':  result := encCP869;
+      '872':  result := encCP872;
+      'KAM':  result := encCP867;
+      'MIK':  result := encCPMIK;
+      else    result := encCP437; // default
+    end;
   end;
 
 begin
@@ -7524,9 +7596,9 @@ begin
       begin
         Page.Sauce := Sauce;
         if Sauce.TInfo1 > 0 then
-          NumCols := Sauce.TInfo1;
+          seCols.Value := Sauce.TInfo1;
         if Sauce.TInfo2 > 0 then
-          NumRows := Sauce.TInfo2;
+          seRows.Value := Sauce.TInfo2;
         if HasBits(Sauce.TFlags, SAUCE_FLAG_ICE) then
         begin
           PageType := PAGETYPE_CTERM;
@@ -7539,19 +7611,108 @@ begin
         tbSauceGroup.Text := CharsToStr(Sauce.Group, sizeof(Sauce.Group));
         tbSauceDate.Text := CharsToStr(Sauce.Date, sizeof(Sauce.Date));
         ResizePage;
+
         //    TInfoS = Font name (from SauceFonts pattern)
+        fontname := CharsToStr(Sauce.TInfoS, sizeof(Sauce.TInfoS));
+        fontname := fontname.Trim;
+
+        if LeftStr(fontname, 9) = 'IBM VGA50' then
+        begin
+          cp := GetSauceEncoding(fontname);
+          seXScale.Value := 2.0;
+        end
+        else if LeftStr(fontname, 7) = 'IBM VGA' then
+        begin
+          cp := GetSauceEncoding(fontname);
+          seXScale.Value := 1.0;
+        end
+        else if LeftStr(fontname, 9) = 'IBM EGA43' then
+        begin
+          cp := GetSauceEncoding(fontname);
+          seXScale.Value := 2.0;
+        end
+        else if LeftStr(fontname,  7) = 'IBM EGA' then
+        begin
+          cp := GetSauceEncoding(fontname);
+          seXScale.Value := 1.0;
+        end
+        else
+        begin
+          case fontname of
+            'Amiga Topaz 1',
+            'Amiga Topaz 2':
+              begin
+                cp := encTopaz;
+                seXScale.Value := 2.0;
+              end;
+
+            'Amiga Topaz 1+',
+            'Amiga Topaz 2+':
+              begin
+                cp := encTopazPlus;
+                seXScale.Value := 2.0;
+              end;
+
+            'Amiga P0T-NOoDLE':
+              begin
+                cp := encP0T_NOoDLE;
+                seXScale.Value := 2.0;
+              end;
+
+            'Amiga MicroKnight':
+              begin
+                cp := encMicroKnight;
+                seXScale.Value := 2.0;
+              end;
+
+            'Amiga MicroKnight+':
+              begin
+                cp := encMicroKnightPlus;
+                seXScale.Value := 2.0;
+              end;
+
+            'C64 PETSCII unshifted':
+              begin
+                cp := encCBM64U;
+                seXScale.Value := 2.0;
+              end;
+
+            'C64 PETSCII shifted':
+              begin
+                cp := encCBM64L;
+                seXScale.Value := 2.0;
+              end;
+
+            'Atari ATASCII':
+              begin
+                cp := encAtari;
+                seXScale.Value := 2.0;
+              end;
+
+            else
+              begin
+                cp := encCP437;
+                seXScale.Value := 1.0;
+              end;
+          end;
+        end;
+
+        cbCodePage.ItemIndex := ord(cp);
+        Fonts[0] := cp;
       end;
     end;
 
-    // assume CP437 if not UTF8/16
-    if CurrCodePage <> encCP437 then
+    if not ValidSauce then
     begin
-      // detect from SAUCE
-      CurrCodePage := encCP437;
-      cbCodePage.ItemIndex := ord(CurrCodePage);
-      cbCodePageChange(cbCodePage);
-      BuildCharacterPalette;
+      cp := encCP437;
+      seXScale.Value := 1.0;
+      cbCodePage.ItemIndex := ord(cp);
+      Fonts[0] := cp;
+      CurrFont := 0;
     end;
+    CodePageChange;
+    BuildCharacterPalette;
+
     ansi := ansi.fromCPBytes(buff);
   end;
   setlength(buff, 0);
