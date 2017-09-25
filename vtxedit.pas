@@ -94,6 +94,7 @@ uses
   VTXSupport,
   VTXEncDetect,
   VTXExportOptions,
+  VTXFontConfig,
   UnicodeHelper,
   RecList,
   LResources,
@@ -166,6 +167,7 @@ type
     miEditCopy: TMenuItem;
     miEditPaste: TMenuItem;
     odObject: TOpenDialog;
+    odImage: TOpenDialog;
     PageControl1: TPageControl;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
@@ -271,12 +273,14 @@ type
     ToolButton2: TToolButton;
     bObjMergeAll: TToolButton;
     tbToolPaint: TToolButton;
+    tbFontConfig: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
     procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
+    procedure tbFontConfigClick(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
     procedure tbSauceDateEditingDone(Sender: TObject);
     procedure tbSauceGroupEditingDone(Sender: TObject);
@@ -352,7 +356,7 @@ type
       x, y, row, col : integer;
       skipUpdate : boolean = true;
       skipDraw : boolean = false;
-      usech : uint16 = EMPTYCHAR;
+      usech : uint16 = _EMPTY;
       useattr : uint32 = $FFFF);
     procedure SetAttrButtons(attr : Uint32);
     procedure cbCodePageChange(Sender: TObject);
@@ -555,7 +559,7 @@ begin
       objc := col - po^.Col;
       p := objr * po^.Width + objc;
       po^.Data.Get(@cellrec, p);
-      if cellrec.Chr <> EMPTYCHAR then
+      if cellrec.Chr <> _EMPTY then
       begin
         cell := cellrec;
         exit(i);
@@ -585,7 +589,7 @@ begin
       objc := col - po^.Col;
       p := objr * po^.Width + objc;
       po^.Data.Get(@cellrec, p);
-      if cellrec.Chr <> EMPTYCHAR then
+      if cellrec.Chr <> _EMPTY then
         exit(i);
     end;
   end;
@@ -908,12 +912,15 @@ begin
     CPages[cp].CanDrawMode[dmSixels] := false;
 
     // build glyph luts
+    if CPages[cp].Name = 'CBM64U' then
+      nop;
+
+    gt := CPages[cp].GlyphTable;
+    gts := CPages[cp].GlyphTableSize;
     if not (cp in [ encUTF8, encUTF16 ]) then
     begin
       for i := 0 to 255 do
       begin
-        gt := CPages[cp].GlyphTable;
-        gts := CPages[cp].GlyphTableSize;
         enc := CPages[cp].EncodingLUT[i];
         CPages[cp].QuickGlyph[i] := GetGlyphOff(enc, gt, gts);
       end;
@@ -1035,6 +1042,65 @@ begin
   bmpPreview.Free;
   bmpCharPalette.Free;
   bmpCharPalette := nil;
+end;
+
+procedure TfMain.tbFontConfigClick(Sender: TObject);
+var
+  fc : TfFontConfig;
+  i : integer;
+  str : string;
+begin
+  // config fonts
+  fc := TfFontConfig.Create(self);
+
+  fc.cbFont1.Items.Clear;
+  fc.cbFont2.Items.Clear;
+  fc.cbFont3.Items.Clear;
+  fc.cbFont4.Items.Clear;
+  fc.cbFont5.Items.Clear;
+  fc.cbFont6.Items.Clear;
+  fc.cbFont7.Items.Clear;
+  fc.cbFont8.Items.Clear;
+  fc.cbFont9.Items.Clear;
+  for i := 0 to length(FontSelectFonts) - 1 do
+  begin
+    str := CPages[FontSelectFonts[i].CodePage].Name;
+    fc.cbFont1.Items.Add(str);
+    fc.cbFont2.Items.Add(str);
+    fc.cbFont3.Items.Add(str);
+    fc.cbFont4.Items.Add(str);
+    fc.cbFont5.Items.Add(str);
+    fc.cbFont6.Items.Add(str);
+    fc.cbFont7.Items.Add(str);
+    fc.cbFont8.Items.Add(str);
+    fc.cbFont9.Items.Add(str);
+
+   if Fonts[1] = FontSelectFonts[i].CodePage then fc.cbFont1.ItemIndex := i;
+   if Fonts[2] = FontSelectFonts[i].CodePage then fc.cbFont2.ItemIndex := i;
+   if Fonts[3] = FontSelectFonts[i].CodePage then fc.cbFont3.ItemIndex := i;
+   if Fonts[4] = FontSelectFonts[i].CodePage then fc.cbFont4.ItemIndex := i;
+   if Fonts[5] = FontSelectFonts[i].CodePage then fc.cbFont5.ItemIndex := i;
+   if Fonts[6] = FontSelectFonts[i].CodePage then fc.cbFont6.ItemIndex := i;
+   if Fonts[7] = FontSelectFonts[i].CodePage then fc.cbFont7.ItemIndex := i;
+   if Fonts[8] = FontSelectFonts[i].CodePage then fc.cbFont8.ItemIndex := i;
+   if Fonts[9] = FontSelectFonts[i].CodePage then fc.cbFont9.ItemIndex := i;
+  end;
+
+  if fc.ShowModal = mrOK then
+  begin
+    // get any changes
+    Fonts[1] := FontSelectFonts[fc.cbFont1.ItemIndex].CodePage;
+    Fonts[2] := FontSelectFonts[fc.cbFont2.ItemIndex].CodePage;
+    Fonts[3] := FontSelectFonts[fc.cbFont3.ItemIndex].CodePage;
+    Fonts[4] := FontSelectFonts[fc.cbFont4.ItemIndex].CodePage;
+    Fonts[5] := FontSelectFonts[fc.cbFont5.ItemIndex].CodePage;
+    Fonts[6] := FontSelectFonts[fc.cbFont6.ItemIndex].CodePage;
+    Fonts[7] := FontSelectFonts[fc.cbFont7.ItemIndex].CodePage;
+    Fonts[8] := FontSelectFonts[fc.cbFont8.ItemIndex].CodePage;
+    Fonts[9] := FontSelectFonts[fc.cbFont9.ItemIndex].CodePage;
+    nop;
+  end;
+  fc.Free;
 end;
 
 procedure StrToChars(str : unicodestring; buff : PByte; len : integer);
@@ -2267,6 +2333,8 @@ begin
   attr := attr and (not mask);
   attr := attr or (CurrAttr and mask);
 
+  SetBits(attr, A_CELL_FONT_MASK, CurrFont, 28);
+
   cell.Chr := ch;
   cell.Attr := attr;
   RecordUndoCell(CursorRow, CursorCol, cell);
@@ -2976,60 +3044,9 @@ var
   tb : TToolButton;
 begin
   tb := TToolButton(Sender);
-  case tb.Name of
-    'tbFont0':
-      begin
-        CurrFont := 0;
-      end;
-    'tbFont1':
-      begin
-        CurrFont := 1;
-      end;
-    'tbFont2':
-      begin
-        CurrFont := 2;
-      end;
-    'tbFont3':
-      begin
-        CurrFont := 3;
-      end;
-    'tbFont4':
-      begin
-        CurrFont := 4;
-      end;
-    'tbFont5':
-      begin
-        CurrFont := 5;
-      end;
-    'tbFont6':
-      begin
-        CurrFont := 6;
-      end;
-    'tbFont7':
-      begin
-        CurrFont := 7;
-      end;
-    'tbFont8':
-      begin
-        CurrFont := 8;
-      end;
-    'tbFont9':
-      begin
-        CurrFont := 9;
-      end;
-    'tbFont10':
-      begin
-        CurrFont := 10;
-      end;
-    'tbFont11':
-      begin
-        CurrFont := 11;
-      end;
-    'tbFont12':
-      begin
-        CurrFont := 12;
-      end;
-  end;
+
+  // buttons are named tbFont__. get number from name
+  CurrFont := strtoint(tb.Name.Substring(6));
 
   tbFont0.Down := (tb.Name = 'tbFont0');
   tbFont1.Down := (tb.Name = 'tbFont1');
@@ -4064,7 +4081,7 @@ begin
   for i := 0 to (w * h) - 1 do
   begin
     cellrec.Attr := $0007;
-    cellrec.Chr := EMPTYCHAR;
+    cellrec.Chr := _EMPTY;
     result.Data.Add(@cellrec);
   end;
 
@@ -4093,28 +4110,28 @@ begin
       if r > 0 then
       begin
         result.Data.Get(@cellrec, p - w);
-        if cellrec.Chr <> EMPTYCHAR then
+        if cellrec.Chr <> _EMPTY then
           n := n or NEIGHBOR_NORTH;
       end;
 
       if r < h - 1 then
       begin
         result.Data.Get(@cellrec, p + w);
-        if cellrec.Chr <> EMPTYCHAR then
+        if cellrec.Chr <> _EMPTY then
           n := n or NEIGHBOR_SOUTH;
       end;
 
       if c > 0 then
       begin
         result.Data.Get(@cellrec, p - 1);
-        if cellrec.Chr <> EMPTYCHAR then
+        if cellrec.Chr <> _EMPTY then
           n := n or NEIGHBOR_WEST;
       end;
 
       if c < w - 1 then
       begin
         result.Data.Get(@cellrec, p + 1);
-        if cellrec.Chr <> EMPTYCHAR then
+        if cellrec.Chr <> _EMPTY then
           n := n or NEIGHBOR_EAST;
       end;
 
@@ -4131,7 +4148,6 @@ begin
   result.Col := 0;
   result.Locked:=false;
   result.Hidden:=false;
-  result.Page:=false;
   result.Data.Trim;
   result.Name := '[Clipboard]';
 end;
@@ -4551,7 +4567,7 @@ begin
       begin
         po^.Data.Get(@cellrec, p);
         if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-          if cellrec.Chr <> EMPTYCHAR then
+          if cellrec.Chr <> _EMPTY then
           begin
             RecordUndoCell(r, c, cellrec);
             Page.Rows[r].Cells[c] := cellrec;
@@ -4605,7 +4621,7 @@ begin
         begin
           po^.Data.Get(@cellrec, p);
           if between(r, 0, NumRows - 1) and between(c, 0, NumCols - 1) then
-            if cellrec.Chr <> EMPTYCHAR then
+            if cellrec.Chr <> _EMPTY then
             begin
               RecordUndoCell(r, c, cellrec);
               Page.Rows[r].Cells[c] := cellrec;
@@ -4711,10 +4727,10 @@ end;
 
 procedure TfMain.bObjLoadClick(Sender: TObject);
 var
-  fin : TFileStream;
-  head : TVTXObjHeader;
-  i, l : integer;
-  obj : TObj;
+  fin :     TFileStream;
+  head :    TVTXObjHeader;
+  i, l :    integer;
+  obj :     TObj;
   cellrec : TCell;
 const
   ID = 'VTXEDIT';
@@ -4748,9 +4764,9 @@ begin
     obj.Name := ExtractFileNameOnly(odObject.FileName);
     obj.Width := head.Width;
     obj.Height := head.Height;
+    obj.Image := false;
     obj.Locked := false;
     obj.Hidden := false;
-    obj.Page := false;
 
     obj.Data.Create(sizeof(TCell), rleDoubles);
     for i := 0 to head.Width * head.Height - 1 do
@@ -4977,7 +4993,7 @@ begin
 
         x := (c - PageLeft) * CellWidthZ;
         objnum := GetObjectCell(r, c, cell);
-        if (objnum <> -1) and (cell.Chr <> EMPTYCHAR) then
+        if (objnum <> -1) and (cell.Chr <> _EMPTY) then
         begin
           // object here.
           DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
@@ -5259,7 +5275,7 @@ procedure TfMain.DrawCellEx(
   row, col : integer;
   skipUpdate : boolean = true;
   skipDraw : boolean = false;
-  usech : uint16 = EMPTYCHAR;   // overrides
+  usech : uint16 = _EMPTY;   // overrides
   useattr : uint32 = $FFFF);
 var
   bmp, bmp2 :     TBGRABitmap;
@@ -5278,7 +5294,7 @@ begin
     // on screen.
 
     // load page cell
-    if usech = EMPTYCHAR then
+    if usech = _EMPTY then
     begin
       ch := Page.Rows[row].Cells[col].Chr;
       attr := Page.Rows[row].Cells[col].Attr;
@@ -5290,21 +5306,21 @@ begin
     bslow := HasBits(attr, A_CELL_BLINKSLOW);
     bfast  := HasBits(attr, A_CELL_BLINKFAST);
 
-    // convert value in chr to unicode.
+    // convert value in chr to unicode. zzzzzzzzzzz
     cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
     if cp in [ encUTF8, encUTF16 ] then
-      off := GetGlyphOff(ch, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize)
+      off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
     else
     begin
       if ch > 255 then ch := 0;
-      off := CPages[CurrCodePage].QuickGlyph[ch];
+      off := CPages[cp].QuickGlyph[ch];
     end;
 
     // create bmp for cell
     bmp := TBGRABitmap.Create(8,16);
     if not skipUpdate then
     begin
-      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
       bmpPage.Canvas.Draw(col * CellWidth, row * CellHeight, bmp.Bitmap);
 
       bmp.ResampleFilter := rfMitchell;
@@ -5317,13 +5333,13 @@ begin
       if bslow and not BlinkSlow then
       begin
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+        GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
       end;
 
       if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
       begin
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-        GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+        GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
       end;
     end
     else
@@ -5332,7 +5348,7 @@ begin
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
       if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
     end;
 
     // plop it down- scale if needed
@@ -6398,7 +6414,6 @@ begin
     Objects[i].Col := fin.ReadWord;
     Objects[i].Width := fin.ReadWord;
     Objects[i].Height := fin.ReadWord;
-    Objects[i].Page := (fin.ReadByte = 1);
     Objects[i].Locked := (fin.ReadByte = 1);
     Objects[i].Hidden := (fin.ReadByte = 1);
 
@@ -6470,7 +6485,6 @@ begin
     fout.WriteWord(Objects[i].Col);
     fout.WriteWord(Objects[i].Width);
     fout.WriteWord(Objects[i].Height);
-    fout.WriteByte(iif(Objects[i].Page, 1, 0));
     fout.WriteByte(iif(Objects[i].Locked, 1, 0));
     fout.WriteByte(iif(Objects[i].Hidden, 1, 0));
 
@@ -6625,7 +6639,7 @@ begin
   if r1 < obj.Height then
   begin
     Obj.Data.Get(@cell, r1 * obj.Width + c1);
-    while (cell.Chr = EMPTYCHAR) and (r1 < obj.Height) do
+    while (cell.Chr = _EMPTY) and (r1 < obj.Height) do
     begin
       c1 += 1;
       if c1 >= obj.Width then

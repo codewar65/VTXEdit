@@ -145,7 +145,7 @@ begin
         x := floor((c << 1) * XScale);
         objnum := GetObjectCell(r, c, cell);
         if (objnum >= 0) and (not Objects[objnum].Hidden) then
-          if cell.Chr <> EMPTYCHAR then
+          if cell.Chr <> _EMPTY then
           begin
             // object here.
             cp := Fonts[GetBits(cell.Attr, A_CELL_FONT_MASK, 28)];

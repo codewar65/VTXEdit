@@ -157,14 +157,14 @@ begin
       p := objr * Objects[i].Width + objc;
 
       Objects[i].Data.Get(@cellrec, p);
-      if cellrec.Chr <> EMPTYCHAR then
+      if cellrec.Chr <> _EMPTY then
       begin
         cell := cellrec;
         exit(i);
       end;
     end;
   end;
-  cell.Chr := EMPTYCHAR;
+  cell.Chr := _EMPTY;
   cell.Attr := $0007;
   result := -1;
 end;
@@ -214,7 +214,7 @@ var
 begin
   recs := size div 18;
 
-  // do binary search for codepoint in UVGA16
+  // do binary search for codepoint in glyphtable
   min := 0;
   max := recs;
   repeat
