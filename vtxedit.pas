@@ -1183,7 +1183,7 @@ begin
         off := CPages[cp].QuickGlyph[ch];
       end;
 
-      GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, attr, false);
+      GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
       tmp.Canvas.Draw(x, y, bmp.Bitmap);
 
       x += CellWidth;
@@ -2637,17 +2637,20 @@ var
   cell : TBGRABitmap;
   rect : TRect;
   NumChars : integer;
-
+  cp : TEncoding;
 const
   PALCOLS = 16;
   CELL_WIDTH = 21;
   CELL_HEIGHT = 40;
 
 begin
+  cp := Fonts[CurrFont];
+
   // build palette
   seCharacter.Enabled := false;
   cell := TBGRABitmap.Create(8,16);
-  if CurrCodePage in [ encUTF8, encUTF16 ] then
+  //if CurrCodePage in [ encUTF8, encUTF16 ] then
+  if cp in [ encUTF8, encUTF16 ] then
   begin
     NumChars := math.floor(length(UVGA16) / 18) - 1;
     seCharacter.MinValue := $0020;
@@ -2685,10 +2688,11 @@ begin
   for i := 0 to NumChars - 1 do
   begin
 
-    if CurrCodePage in [ encUTF8, encUTF16 ]then
+    //if CurrCodePage in [ encUTF8, encUTF16 ]then
+    if cp in [ encUTF8, encUTF16 ]then
       off := (i + 1) * 18 + 2
     else
-      off := CPages[CurrCodePage].QuickGlyph[i];
+      off := CPages[cp].QuickGlyph[i];
 
     y := i div PALCOLS;
     x := i - (y * PALCOLS);
@@ -2696,8 +2700,9 @@ begin
     x := x * CELL_WIDTH + 2;
     y := y * CELL_HEIGHT + 2;
 
-    // draw simple glyph in cell (8x16)
-    GetGlyphBmp(cell, CPages[CurrCodePage].GlyphTable, off, 15, false);
+    // draw simple glyph in cell (8x16) zzzzzzzz
+    //GetGlyphBmp(cell, CPages[CurrCodePage].GlyphTable, off, 15, false);
+    GetGlyphBmp(cell, CPages[cp].GlyphTable, off, 15, false);
 
     rect.Left := 2 + x;
     rect.Top := 2 + y;
@@ -2718,13 +2723,15 @@ procedure TfMain.pbCharsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   off, i : integer;
-
+  cp : TEncoding;
 const
   PALCOLS = 16;
   CELL_WIDTH = 21;
   CELL_HEIGHT = 40;
 
 begin
+  cp := Fonts[CurrFont];
+
   // click to select
   y := (y - 4) div CELL_HEIGHT;
   x := (x - 4) div CELL_WIDTH;
@@ -2732,7 +2739,8 @@ begin
   if between(x, 0, 15) and (y >= 0) then
   begin
     i := y * PALCOLS + x;
-    if CurrCodePage in [ encUTF8, encUTF16 ] then
+    //if CurrCodePage in [ encUTF8, encUTF16 ] then
+    if cp in [ encUTF8, encUTF16 ] then
     begin
       off := (i + 1) * 18;
       i := (UVGA16[off] << 8) or UVGA16[off+1];
@@ -2744,7 +2752,8 @@ begin
     begin
       CurrChar := i;
       seCharacter.value := i;
-      tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[i]);
+      tbUnicode.Text := IntToStr(CPages[cp].EncodingLUT[i]);
+//    tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[i]);
     end;
   end;
   seCharacter.Enabled := true;
@@ -3062,8 +3071,11 @@ begin
   tbFont11.Down := (tb.Name = 'tbFont11');
   tbFont12.Down := (tb.Name = 'tbFont12');
 
-  // update character palette here.
+  SetBits(CurrAttr, A_CELL_FONT_MASK, CurrFont, 28);
 
+  // update character palette here. zzzzzzzz
+  CodePageChange;
+  pbChars.Invalidate;
 end;
 
 procedure TfMain.tbModeClick(Sender: TObject);
