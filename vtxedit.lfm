@@ -468,6 +468,7 @@ object fMain: TfMain
       ButtonHeight = 21
       ButtonWidth = 21
       Caption = 'tbFontPalette'
+      DisabledImages = ilDisabledButtons
       EdgeBorders = []
       EdgeInner = esNone
       EdgeOuter = esNone

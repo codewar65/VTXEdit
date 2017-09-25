@@ -994,7 +994,8 @@ begin
   Clipboard.Height := 0;
   Clipboard.Data.Create(sizeof(TCell), rleDoubles);
 
-  DebugStart;
+  // set font 0
+  tbFontClick(tbFont0);
 
   tbSauceDate.Text := Format('%04.4d%02.2d%02.2d',
     [ YearOf(now), MonthOf(now), DayOf(now) ]);
@@ -2425,7 +2426,7 @@ begin
   cb := TComboBox(Sender);
   PageType := cb.ItemIndex;
   case PageType of
-    PAGETYPE_BBS, PAGETYPE_CTERM: // BBS / CTerm
+    PAGETYPE_BBS:
       begin
         tbAttrBold.Enabled := false;
         tbAttrFaint.Enabled := false;
@@ -2437,9 +2438,55 @@ begin
         tbAttrShadow.Enabled := false;
         tbAttrTop.Enabled := false;
         tbAttrBottom.Enabled := false;
+
+        // no fonts
+        tbFontClick(tbFont0);
+        tbFont0.Enabled:=false;
+        tbFont1.Enabled:=false;
+        tbFont2.Enabled:=false;
+        tbFont3.Enabled:=false;
+        tbFont4.Enabled:=false;
+        tbFont5.Enabled:=false;
+        tbFont6.Enabled:=false;
+        tbFont7.Enabled:=false;
+        tbFont8.Enabled:=false;
+        tbFont9.Enabled:=false;
+        tbFont10.Enabled:=false;
+        tbFont11.Enabled:=false;
+        tbFont12.Enabled:=false;
+        tbFontConfig.Enabled:=false;
       end;
 
-    PAGETYPE_VTX: // VTX
+    PAGETYPE_CTERM:
+      begin
+        tbAttrBold.Enabled := false;
+        tbAttrFaint.Enabled := false;
+        tbAttrItalics.Enabled := false;
+        tbAttrUnderline.Enabled := false;
+        tbAttrBlinkSlow.Enabled := false;
+        tbAttrStrikethrough.Enabled := false;
+        tbAttrDoublestrike.Enabled := false;
+        tbAttrShadow.Enabled := false;
+        tbAttrTop.Enabled := false;
+        tbAttrBottom.Enabled := false;
+
+        tbFont0.Enabled:=true;
+        tbFont1.Enabled:=true;
+        tbFont2.Enabled:=true;
+        tbFont3.Enabled:=true;
+        tbFont4.Enabled:=true;
+        tbFont5.Enabled:=true;
+        tbFont6.Enabled:=true;
+        tbFont7.Enabled:=true;
+        tbFont8.Enabled:=true;
+        tbFont9.Enabled:=true;
+        tbFont10.Enabled:=true;
+        tbFont11.Enabled:=true;
+        tbFont12.Enabled:=true;
+        tbFontConfig.Enabled:=true;
+      end;
+
+    PAGETYPE_VTX:
       begin
         tbAttrBold.Enabled := true;
         tbAttrFaint.Enabled := true;
@@ -2451,6 +2498,21 @@ begin
         tbAttrShadow.Enabled := true;
         tbAttrTop.Enabled := true;
         tbAttrBottom.Enabled := true;
+
+        tbFont0.Enabled:=true;
+        tbFont1.Enabled:=true;
+        tbFont2.Enabled:=true;
+        tbFont3.Enabled:=true;
+        tbFont4.Enabled:=true;
+        tbFont5.Enabled:=true;
+        tbFont6.Enabled:=true;
+        tbFont7.Enabled:=true;
+        tbFont8.Enabled:=true;
+        tbFont9.Enabled:=true;
+        tbFont10.Enabled:=true;
+        tbFont11.Enabled:=true;
+        tbFont12.Enabled:=true;
+        tbFontConfig.Enabled:=true;
       end;
   end;
 
@@ -3076,6 +3138,7 @@ begin
   // update character palette here. zzzzzzzz
   CodePageChange;
   pbChars.Invalidate;
+  tbModeClick(tbModeCharacter);
 end;
 
 procedure TfMain.tbModeClick(Sender: TObject);
@@ -6830,6 +6893,10 @@ begin
   if GetBits(targetattr, A_CELL_DISPLAY_BOTTOM) = A_CELL_DISPLAY_BOTTOM then sgr += '59;';
 
   sgr := leftstr(sgr, length(sgr) - 1) + 'm';
+
+  // nothing changed. probably a font change
+  if sgr = #27'm' then sgr := '';
+
   result := sgr;
 end;
 
@@ -6847,8 +6914,8 @@ var
   sgr,
   rowansi:      unicodestring;
   cell :        TCell;
-  i :           integer;
-  r, c :        integer;
+  i, j :        integer;
+  o, r, c :     integer;
   ro, co,
   wo, ho :      integer;
   objr, objc :  integer;
@@ -6858,8 +6925,12 @@ var
   fg, bg :      integer;
   tmp :         TObj;
   p :           longint;
+  fontsused :   array [0..15] of byte;
+  fnt, cfnt :   integer;
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
+
+  cfnt := 0; // start with font 0
 
   if useBOM then
     case CurrCodePage of
@@ -6881,6 +6952,33 @@ begin
   cell := BLANK;
   cattr := BLANK.Attr;
   rowansi := CSI + '0m' + CSI + '0;0H' + CSI + '2J';
+
+  // gather up the fonts needed for export.
+  MemZero(@fontsused[0], 15);
+  for r := 0 to NumRows - 1 do
+    for c := 0 to NumCols - 1 do
+      fontsused[(Page.Rows[r].Cells[c].Attr and A_CELL_FONT_MASK) >> 28] := 1;
+  for o := 0 to length(Objects) - 1 do
+    for r := 0 to Objects[o].Height - 1 do
+      for c := 0 to Objects[o].Width - 1 do
+      begin
+        Objects[o].Data.Get(@cell, r * Objects[i].Width + c);
+        fontsused[(GetBits(cell.Attr, A_CELL_FONT_MASK, 28) and $0F)] := 1;
+      end;
+
+  if (PageType = PAGETYPE_CTERM) or (PageType = PAGETYPE_VTX) then
+    // don't send font 0
+    for i := 1 to 13 do
+      if fontsused[i] <> 0 then
+        // find the font select for this font
+        for j := 0 to length(FontSelectFonts) - 1 do
+          if FontSelectFonts[j].CodePage = Fonts[i] then
+          begin
+            ansi := CSI + inttostr(i) + ';' + inttostr(FontSelectFonts[j].SGR) + ' D';
+            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+            break;
+          end;
+
   r := 0;
   c := 0;
   // do page first
@@ -6930,9 +7028,19 @@ begin
 
         if cattr <> cell.attr then
         begin
-          sgr := ComputeSGR(cattr, cell.attr);
-          ansi := sgr;
-          WriteANSIChunk(fout, maxlen, rowansi, ansi);
+          ansi := ComputeSGR(cattr, cell.attr);
+          if ansi <> '' then
+            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+
+          // font change?
+          fnt := (cell.attr and A_CELL_FONT_MASK) >> 28;
+          if fnt <> cfnt then
+          begin
+            ansi := CSI + inttostr(10 + fnt) + 'm';
+            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+            cfnt := fnt;
+          end;
+
           cattr := cell.attr;
         end;
 
@@ -7068,9 +7176,19 @@ begin
 
             if cattr <> cell.attr then
             begin
-              sgr := ComputeSGR(cattr, cell.attr);
-              ansi := sgr;
-              WriteANSIChunk(fout, maxlen, rowansi, ansi);
+              ansi := ComputeSGR(cattr, cell.attr);
+              if ansi <> '' then
+                WriteANSIChunk(fout, maxlen, rowansi, ansi);
+
+              // font change?
+              fnt := (cell.attr and A_CELL_FONT_MASK) >> 28;
+              if fnt <> cfnt then
+              begin
+                ansi := CSI + inttostr(10 + fnt) + 'm';
+                WriteANSIChunk(fout, maxlen, rowansi, ansi);
+                cfnt := fnt;
+              end;
+
               cattr := cell.attr;
             end;
 
@@ -7990,108 +8108,4 @@ initialization
 {$I vtxcursors.lrs}
 
 end.
-
-{
-// LOAD BINARY FONT FILE 8x16
-// load raw file. 8x8
-//  fn := 'MicroKnightPlus_v1.0.raw';
-//  fn := 'MicroKnight_v1.0.raw';
-//  fn := 'P0T-NOoDLE_v1.0.raw';
-//  fn := 'TopazPlus_a1200_v1.0.raw';
-//fn := 'Topaz_a1200_v1.0.raw';
-var
-  fin : TFileStream;
-  fout : Text;
-
-  fn : string;
-  fsize : integer;
-  chars : integer;
-  c, b, v : integer;
-  enc : integer;
-  h : integer = 16;
-
-
-fn := 'mO''sOul_v1.0.raw';
-if fileexists(fn) then
-begin
-
-  fin := TFileStream.Create(fn, fmOpenRead or fmShareDenyNone);
-  fsize := fin.Size;
-  chars := fsize div h;
-
-  system.assign(fout, fn + '.pas');
-  rewrite(fout);
-  writeln(fout, 'cont SomeFont : array [0..' + inttostr(
-    chars * (h + 2)) + '] = ('); // unicode char
-
-  enc := 0;
-  for c := 0 to chars - 1 do
-  begin
-    write(fout, format(' $%2.2x, $%2.2x, | ', [ (enc and $ff00) shr 8, enc and $FF ] ));
-    for b := 0 to h - 1 do
-    begin
-      v := fin.readbyte;
-      if (c = chars - 1) and (b = h - 1) then
-        write(fout, format('$%2.2x', [ v, v ]))
-      else
-        write(fout, format('$%2.2x, ', [ v, v ]));
-    end;
-    writeln(fout, '');
-    enc += 1;
-  end;
-  writeln(fout, ');');
-  closefile(fout);
-  fin.free;
-end;
-}
-
-{
-// LOAD BDF
-  // will need this for other fonts to be brought in.
-var
-  fin : Text;
-  fout : Text;
-  lin, key, val : string;
-  i, spos, enc : integer;
-  img : array [0..15] of byte;
-
-   // load UVGA.bdf save in PASCAL format
-  system.assign(fin, 'u_vga16.bdf');
-  reset(fin);
-  system.assign(fout, 'uvga.pas');
-  rewrite(fout);
-  writeln(fout, 'cont UVGA16 : array [0.999] of byte = [');
-
-  while not eof(fin) do
-  begin
-    readln(fin, lin);
-
-    spos := lin.IndexOf(' ');
-    key := lin;
-    val := '';
-    if spos > -1 then
-    begin
-      key := lin.substring(0, spos);
-      val := lin.substring(spos + 1);
-    end;
-
-    if key = 'ENCODING' then
-      enc := strtoint(val);
-
-    if key = 'BITMAP' then
-    begin
-      write(fout, format('  $%2.2x, $%2.2x, | ', [ (enc and $ff00) shr 8, enc and $FF ] ));
-      for i := 0 to 15 do
-      begin
-        readln(fin, val);
-        write(fout, format(' $%2.2x,', [ Hex2Dec(val) ] ));
-      end;
-      writeln(fout, format('  // char %d', [ enc ]));
-    end;
-  end;
-  writeln(fout, '];');
-  closefile(fin);
-  closefile(fout);
-}
-
 

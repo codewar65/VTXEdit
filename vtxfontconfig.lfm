@@ -1,7 +1,7 @@
 object fFontConfig: TfFontConfig
-  Left = 637
+  Left = 721
   Height = 257
-  Top = 413
+  Top = 489
   Width = 232
   Caption = 'Font Select Config'
   ClientHeight = 257
@@ -17,7 +17,7 @@ object fFontConfig: TfFontConfig
   end
   object cbFont1: TComboBox
     Left = 56
-    Height = 23
+    Height = 21
     Top = 6
     Width = 162
     Font.Height = -11
