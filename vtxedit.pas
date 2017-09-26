@@ -49,12 +49,12 @@ UTF 8 nas no characters in the  128-191 range
 
     paint / line / rectangle / ellipse / fill tools
 
-    Font Palette.
-      Font 0-15 selectable (0=default codepage)
-      Fonts 1-9 are programmable.
+    fonts 10-12 in VTX only
+      Mode Char / Block (sixels in Teletext font)
 
-    Mode Char / Block (sixels in Teletext font)
+    export as bitmap, rtf, html
 
+    import xbin
 }
 
 unit VTXEdit;

@@ -13,6 +13,7 @@
 fp.ini
 fp.cfg
 fp.dsk
+
 ### Lazarus ###
 # Lazarus compiler-generated binaries (safe to delete)
 *.dll
@@ -29,6 +30,7 @@ fp.dsk
 *.lrt
 
 # Lazarus local files (user-specific info)
+*.lps
 
 # Lazarus backups and unit output folders.
 # These can be changed by user in Lazarus/project options.
