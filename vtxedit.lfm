@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 255
+  Left = 314
   Height = 647
-  Top = 208
+  Top = 234
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627

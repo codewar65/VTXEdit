@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 {
 
-UTF 8 nas no characters in the  128-191 range
+  UTF 8 nas no characters in the  128-191 range
 
   https://gist.github.com/NuSkooler/a235339cf383759c49c57ee30d34876c?fref=gc&dti=254577004687053
 
@@ -39,22 +39,24 @@ UTF 8 nas no characters in the  128-191 range
 
   TODO :
 
-    row attributes
+    ImportANSI needs font select code
 
-    page / border / cursor attributes
+    VTX specific
+      row attributes
+      page / border / cursor attributes
+      transparent black in vtx mode
+      fonts 10-12 in VTX only
+        Mode Char / Block (sixels in Teletext font)
 
-    transparent black in vtx mode
 
     border on display / center document on window
 
     paint / line / rectangle / ellipse / fill tools
 
-    fonts 10-12 in VTX only
-      Mode Char / Block (sixels in Teletext font)
-
     export as bitmap, rtf, html
 
     import xbin
+
 }
 
 unit VTXEdit;
@@ -410,6 +412,7 @@ type
     function GetColors2x1(cell : TCell) : TColors2;
     function GetColors1x2(cell : TCell) : TColors2;
     function GetColors2x2(cell : TCell) : TColors4;
+    function GetColors2x3(cell : TCell) : TColors6;
     function GetBlockColor(cell : TCell; xsize, ysize, x, y : integer) : integer;
     function SetBlockColor(clr: integer; cell : TCell; xsize, ysize, x, y : integer) : TCell;
     procedure GenerateBmpPage;
@@ -482,7 +485,7 @@ var
 
   // straighten this out . need one as default.
   CurrFont :                integer;      // current font selected.
-  CurrCodePage :            TEncoding;
+//  CurrCodePage :            TEncoding;  // use Fonts[CurrFont]
 
   MouseLeft,
   MouseMiddle,
@@ -906,15 +909,12 @@ begin
   begin
     // interigate for drawmodes
     CPages[cp].CanDrawMode[dmChars] := true;
-    CPages[cp].CanDrawMode[dmLeftRights] := true;
-    CPages[cp].CanDrawMode[dmTopBottoms] := true;
-    CPages[cp].CanDrawMode[dmQuarters] := true;
+    CPages[cp].CanDrawMode[dmLeftRights] := false;
+    CPages[cp].CanDrawMode[dmTopBottoms] := false;
+    CPages[cp].CanDrawMode[dmQuarters] := false;
     CPages[cp].CanDrawMode[dmSixels] := false;
 
     // build glyph luts
-    if CPages[cp].Name = 'CBM64U' then
-      nop;
-
     gt := CPages[cp].GlyphTable;
     gts := CPages[cp].GlyphTableSize;
     if not (cp in [ encUTF8, encUTF16 ]) then
@@ -924,32 +924,42 @@ begin
         enc := CPages[cp].EncodingLUT[i];
         CPages[cp].QuickGlyph[i] := GetGlyphOff(enc, gt, gts);
       end;
+      if gt = @UVGA16 then
+      begin
+        CPages[cp].CanDrawMode[dmLeftRights] :=
+          HasUnicodes(cp, [
+            GFX_HALFLEFT, GFX_HALFRIGHT, GFX_BLOCK ]);
 
-      CPages[cp].CanDrawMode[dmLeftRights] :=
-        HasUnicodes(cp, [
-          GFX_HALFLEFT, GFX_HALFRIGHT, GFX_BLOCK ]);
+        CPages[cp].CanDrawMode[dmTopBottoms] :=
+          HasUnicodes(cp, [
+            GFX_HALFTOP, GFX_HALFBOTTOM, GFX_BLOCK ]);
 
-      CPages[cp].CanDrawMode[dmTopBottoms] :=
-        HasUnicodes(cp, [
-          GFX_HALFTOP, GFX_HALFBOTTOM, GFX_BLOCK ]);
+        CPages[cp].CanDrawMode[dmQuarters] :=
+          HasUnicodes(cp, [
+            GFX_HALFLEFT, GFX_HALFRIGHT, GFX_HALFTOP, GFX_HALFBOTTOM,
+            GFX_BLOCK, GFX_QUARTER4, GFX_QUARTER8, GFX_QUARTER1,
+            GFX_QUARTER13, GFX_QUARTER9, GFX_QUARTER7, GFX_QUARTER11,
+            GFX_QUARTER2, GFX_QUARTER6, GFX_QUARTER14 ]);
+      end;
 
-      CPages[cp].CanDrawMode[dmQuarters] :=
-        HasUnicodes(cp, [
-          GFX_HALFLEFT, GFX_HALFRIGHT, GFX_HALFTOP, GFX_HALFBOTTOM,
-          GFX_BLOCK, GFX_QUARTER4, GFX_QUARTER8, GFX_QUARTER1,
-          GFX_QUARTER13, GFX_QUARTER9, GFX_QUARTER7, GFX_QUARTER11,
-          GFX_QUARTER2, GFX_QUARTER6, GFX_QUARTER14 ]);
+      if cp in [ encTeletextBlock, encTeletextSeparated ] then
+        CPages[cp].CanDrawMode[dmSixels] := true;
 
-//      if cp = encTELETEXT1 then CPages[cp].CanDrawMode[dmSixels] := true;
+    end
+    else
+    begin
+      CPages[cp].CanDrawMode[dmLeftRights] := true;
+      CPages[cp].CanDrawMode[dmTopBottoms] := true;
+      CPages[cp].CanDrawMode[dmQuarters] := true;
     end;
   end;
 
   // set default fonts
   for i := 0 to 15 do
-    Fonts[0] := encCP437;
-//  Fonts[10] := encTeletext;
-//  Fonts[11] := encTeletextBlock;
-//  Fonts[12] := encTeletextSeparated;
+    Fonts[i] := encCP437;
+  Fonts[10] := encTeletext;
+  Fonts[11] := encTeletextBlock;
+  Fonts[12] := encTeletextSeparated;
 
   // clear undo stuff
   CurrUndoData.Create(sizeof(TUndoCells), rleDoubles);
@@ -963,9 +973,8 @@ begin
   NewFile;
 
   CurrFont := 0;
-  CurrCodePage := Fonts[CurrFont];
   cbCodePage.enabled := false;
-  cbCodePage.ItemIndex := ord(CurrCodePage);
+  cbCodePage.ItemIndex := ord(Fonts[CurrFont]);
   cbCodePage.enabled := true;
   tbFont0.Down := true;
   BuildCharacterPalette;
@@ -1110,7 +1119,7 @@ var
   i : integer;
 begin
   MemZero(buff, len);
-  b := str.toEncodedCPBytes(CPages[CurrCodePage].EncodingLUT);
+  b := str.toEncodedCPBytes(CPages[Fonts[0]].EncodingLUT);
   for i := 0 to len - 1 do
     if i < length(b) then
       buff[i] := b[i];
@@ -1299,6 +1308,28 @@ begin
   if HasBits(i, %1000) then result[3] := fg;
 end;
 
+function TfMain.GetColors2x3(cell : TCell) : TColors6;
+var
+  uni, i : integer;
+  fg, bg : byte;
+begin
+  // convert chr to unicode
+  uni := cell.Chr;  // special for teletext
+  fg := GetBits(cell.attr, A_CELL_FG_MASK);
+  bg := GetBits(cell.attr, A_CELL_BG_MASK, 8);
+  for i := 63 downto 0 do
+    if uni = Blocks2x3[i] then
+      break;
+
+  MemFill(@result, 6, bg);
+  if HasBits(i, %000001) then result[0] := fg;
+  if HasBits(i, %000010) then result[1] := fg;
+  if HasBits(i, %000100) then result[2] := fg;
+  if HasBits(i, %001000) then result[3] := fg;
+  if HasBits(i, %010000) then result[4] := fg;
+  if HasBits(i, %100000) then result[5] := fg;
+end;
+
 // return color of a subblock
 function TfMain.GetBlockColor(
   cell :        TCell;              // the character we are looking for block in
@@ -1322,6 +1353,7 @@ function TfMain.SetBlockColor(
 var
   c2 :      TColors2;
   c4 :      TColors4;
+  c6 :      TColors6;
   cp :      TEncoding;
   fg, bg :  integer;
   g, i, tot :   integer;
@@ -1468,9 +1500,69 @@ begin
     SetBits(cell.Attr, A_CELL_FG_MASK, clr);
     SetBits(cell.Attr, A_CELL_BG_MASK, mclr, 8);
     cell.Chr := GetCPChar(cp, Blocks2x2[g]);
+  end
+
+  else if (xsize = 2) and (ysize = 3) then
+  begin
+    c6 := GetColors2x3(cell);
+    c6[x + (y << 1)] := clr;
+
+    if Fonts[CurrFont] = encTeletextSeparated then
+//    if GetBits(cell.Attr, A_CELL_FONT_MASK, 28) = 12 then
+      for i := 0 to 5 do
+        if c6[i] <> clr then
+          c6[i] := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
+
+    // reduce other 5 blocks to 1 color + this color
+    // get color count.
+    setlength(count, 256);
+    MemZero(@count[0], 256);
+    tot := 0;
+    mval := 0;
+    mclr := -1;     // other color with highest count
+    for i := 0 to 5 do
+    begin
+      count[c6[i]] += 1;
+      if count[c6[i]] = 1 then
+        tot += 1;
+      if (c6[i] <> clr) and (count[c6[i]] > mval) then
+      begin
+        mval := count[c6[i]];
+        mclr := c6[i];
+      end;
+    end;
+
+    if tot > 2 then
+    begin
+      // reduce other 5 blocks to 1 color + this color
+      for i := 0 to 5 do
+        if ((c6[i] <> clr) and
+            (c6[i] <> mclr)) then
+          c6[i] := mclr;
+    end;
+
+    if mclr = -1 then
+    begin
+      if Fonts[CurrFont] = encTeletextSeparated then
+//      if GetBits(cell.Attr, A_CELL_FONT_MASK, 28) = 12 then
+        mclr := GetBits(CurrAttr, A_CELL_BG_MASK, 8)
+      else
+        mclr := clr;
+    end;
+
+    // convert c6 to cell
+    g := 0;
+    for i := 0 to 5 do
+      if c6[i] = clr then
+        g := g or (1 << i);
+
+    SetBits(cell.Attr, A_CELL_FG_MASK, clr);
+    SetBits(cell.Attr, A_CELL_BG_MASK, mclr, 8);
+    cell.Chr := Blocks2x3[g];
   end;
   result := cell;
 end;
+
 
 function TfMain.HasUnicodes(cp : TEncoding; chars : array of UInt16) : boolean;
 var
@@ -1858,8 +1950,8 @@ begin
           if KeyValue.IndexOf(tmp) <> -1 then
           begin
             ch := FKeys[CurrFKeySet][i];
-            if CurrCodePage in [encUTF8, encUTF16 ] then
-              ch := CPages[CurrCodePage].EncodingLUT[ch];
+            if Fonts[CurrFont] in [encUTF8, encUTF16 ] then
+              ch := CPages[Fonts[CurrFont]].EncodingLUT[ch];
 
             KeyValue := KeyValue.Replace(tmp, char(ch));
           end;
@@ -2355,7 +2447,6 @@ begin
   if cbCodePage.Enabled then
   begin
     Fonts[0] := TEncoding(cbCodePage.ItemIndex);
-    CurrCodePage := Fonts[CurrFont];
     tbCodePage.Text := CPages[Fonts[CurrFont]].Name;
 
     // rebuild page
@@ -2364,10 +2455,10 @@ begin
     BuildCharacterPalette;
 
     // enable / disable Modes
-    tbModeLeftRights.Enabled := CPages[CurrCodePage].CanDrawMode[dmLeftRights];
-    tbModeTopBottoms.Enabled := CPages[CurrCodePage].CanDrawMode[dmTopBottoms];
-    tbModeQuarters.Enabled := CPages[CurrCodePage].CanDrawMode[dmQuarters];
-    tbModeSixels.Enabled := CPages[CurrCodePage].CanDrawMode[dmSixels];
+    tbModeLeftRights.Enabled := CPages[Fonts[CurrFont]].CanDrawMode[dmLeftRights];
+    tbModeTopBottoms.Enabled := CPages[Fonts[CurrFont]].CanDrawMode[dmTopBottoms];
+    tbModeQuarters.Enabled := CPages[Fonts[CurrFont]].CanDrawMode[dmQuarters];
+    tbModeSixels.Enabled := CPages[Fonts[CurrFont]].CanDrawMode[dmSixels];
   end;
 end;
 
@@ -2480,9 +2571,9 @@ begin
         tbFont7.Enabled:=true;
         tbFont8.Enabled:=true;
         tbFont9.Enabled:=true;
-        tbFont10.Enabled:=true;
-        tbFont11.Enabled:=true;
-        tbFont12.Enabled:=true;
+        tbFont10.Enabled:=false;
+        tbFont11.Enabled:=false;
+        tbFont12.Enabled:=false;
         tbFontConfig.Enabled:=true;
       end;
 
@@ -2606,8 +2697,8 @@ begin
     r.left += cnv.TextWidth(str) + 2;
     ch := FKeys[CurrFKeySet][i];  // 437 char
     u := CP437[ch];               // unicode char
-    off := GetGlyphOff(u, CPages[CurrCodePage].GlyphTable, CPages[CurrCodePage].GlyphTableSize);
-    GetGlyphBmp(bmp, CPages[CurrCodePage].GlyphTable, off, $0007, false);
+    off := GetGlyphOff(u, CPages[Fonts[0]].GlyphTable, CPages[Fonts[CurrFont]].GlyphTableSize);
+    GetGlyphBmp(bmp, CPages[Fonts[0]].GlyphTable, off, $0007, false);
     cnv.Draw(r.left, 4, bmp.Bitmap);
     r.left += 12;
   end;
@@ -2711,7 +2802,6 @@ begin
   // build palette
   seCharacter.Enabled := false;
   cell := TBGRABitmap.Create(8,16);
-  //if CurrCodePage in [ encUTF8, encUTF16 ] then
   if cp in [ encUTF8, encUTF16 ] then
   begin
     NumChars := math.floor(length(UVGA16) / 18) - 1;
@@ -2749,8 +2839,6 @@ begin
   bmpCharPalette.Canvas.FillRect(0, 0, bmpCharPalette.Width, bmpCharPalette.Height);
   for i := 0 to NumChars - 1 do
   begin
-
-    //if CurrCodePage in [ encUTF8, encUTF16 ]then
     if cp in [ encUTF8, encUTF16 ]then
       off := (i + 1) * 18 + 2
     else
@@ -2763,7 +2851,6 @@ begin
     y := y * CELL_HEIGHT + 2;
 
     // draw simple glyph in cell (8x16)
-    //GetGlyphBmp(cell, CPages[CurrCodePage].GlyphTable, off, 15, false);
     GetGlyphBmp(cell, CPages[cp].GlyphTable, off, 15, false);
 
     rect.Left := 2 + x;
@@ -2801,7 +2888,6 @@ begin
   if between(x, 0, 15) and (y >= 0) then
   begin
     i := y * PALCOLS + x;
-    //if CurrCodePage in [ encUTF8, encUTF16 ] then
     if cp in [ encUTF8, encUTF16 ] then
     begin
       off := (i + 1) * 18;
@@ -2815,7 +2901,6 @@ begin
       CurrChar := i;
       seCharacter.value := i;
       tbUnicode.Text := IntToStr(CPages[cp].EncodingLUT[i]);
-//    tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[i]);
     end;
   end;
   seCharacter.Enabled := true;
@@ -2845,12 +2930,12 @@ begin
   cnv.Draw(0, 0, bmpCharPalette);
 
   // hilight the selected char
-  if CurrCodePage in [ encUTF8, encUTF16 ] then
+  if Fonts[CurrFont] in [ encUTF8, encUTF16 ] then
     // convert unicode to offset
     i := (GetGlyphOff(
       CurrChar,
-      CPages[CurrCodePage].GlyphTable,
-      CPages[CurrCodePage].GlyphTableSize) - 2) div 18 - 1
+      CPages[Fonts[CurrFont]].GlyphTable,
+      CPages[Fonts[CurrFont]].GlyphTableSize) - 2) div 18 - 1
   else
     i := CurrChar;
 
@@ -2996,7 +3081,7 @@ begin
   if TSpinEdit(sender).enabled then
   begin
     chr := seCharacter.Value;
-    if CurrCodePage in [ encUTF8, encUTF16 ] then
+    if Fonts[CurrFont] in [ encUTF8, encUTF16 ] then
     begin
       // code to skip to char
       if GetGlyphOff(chr, @UVGA16, sizeof(UVGA16)) <> 2 then
@@ -3025,7 +3110,7 @@ begin
     else
     begin
       CurrChar := seCharacter.Value;
-      tbUnicode.Text := IntToStr(CPages[CurrCodePage].EncodingLUT[CurrChar]);
+      tbUnicode.Text := IntToStr(CPages[Fonts[CurrFont]].EncodingLUT[CurrChar]);
     end;
     LastCharNum := CurrChar;
     pbChars.Invalidate;
@@ -3688,8 +3773,8 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 1, SubX, SubY);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
-
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol, false);
                   CurrFileChanged := true;
@@ -3706,6 +3791,7 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     1, 2, SubX, SubY);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -3724,6 +3810,27 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 2, SubX, SubY);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                  RecordUndoCell(MouseRow, MouseCol, dcell);
+
+                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
+                  DrawCell(MouseRow, MouseCol,false);
+                  CurrFileChanged := true;
+                  UpdateTitles;
+                end;
+
+              // teletext mosaic blocks
+              dmSixels:
+                begin
+                  bcolor := iif(Button = mbLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[MouseRow].Cells[MouseCol],
+                    2, 3, SubX, SubY);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -3856,6 +3963,7 @@ begin
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         2, 1, sx, sy);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -3882,6 +3990,7 @@ begin
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         1, 2, sx, sy);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -3908,6 +4017,34 @@ begin
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         2, 2, sx, sy);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+
+                      RecordUndoCell(mr, mc, dcell);
+                      Page.Rows[mr].Cells[mc] := dcell;
+                      DrawCell(mr, mc,false);
+                      CurrFileChanged := true;
+                      UpdateTitles;
+                    until done;
+                  end;
+
+                dmSixels:
+                  begin
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(LastDrawX, LastDrawY);
+                      mr := LastDrawY div SubYSize;
+                      mc := LastDrawX div SubXSize;
+                      sx := LastDrawX mod SubXSize;
+                      sy := LastDrawY mod SubYSize;
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        Page.Rows[mr].Cells[mc],
+                        2, 3, sx, sy);
+SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -4352,7 +4489,7 @@ begin
           flipchr := CPages[cp].MirrorTable[i + 1];
 
           // convert flip unicode back to this codepage
-          if CurrCodePage in [ encUTF8, encUTF16] then
+          if Fonts[CurrFont] in [ encUTF8, encUTF16] then
             cellrec.Chr := flipchr
           else
             for j := 0 to 255 do
@@ -6671,7 +6808,7 @@ begin
   //    append SAUCE
 
   xo := TfExportOptions.Create(self);
-  xo.cbUseSauce.Enabled := not (CurrCodePage in [ encUTF8, encUTF16 ]);
+  xo.cbUseSauce.Enabled := not (Fonts[CurrFont] in [ encUTF8, encUTF16 ]);
 
   if xo.ShowModal = mrOK then
   begin
@@ -6772,7 +6909,7 @@ var
   l :     longint;
 begin
   // save ansi - mind codepage
-  case CurrCodePage of
+  case Fonts[CurrFont] of
     encUTF8:    buff := str.toUTF8Bytes;
     encUTF16:   buff := str.toUTF16Bytes;
     else        buff := str.toCPBytes;
@@ -6970,7 +7107,7 @@ begin
   cfnt := 0; // start with font 0
 
   if useBOM then
-    case CurrCodePage of
+    case Fonts[0] of
       encUTF16:
         begin   // little endian
           fout.writebyte($FF);
@@ -7004,8 +7141,8 @@ begin
       end;
 
   if (PageType = PAGETYPE_CTERM) or (PageType = PAGETYPE_VTX) then
-    // don't send font 0
-    for i := 1 to 13 do
+    // don't send font 0. font 10+ don't need to be allocated in VTX mode
+    for i := 1 to 9 do
       if fontsused[i] <> 0 then
         // find the font select for this font
         for j := 0 to length(FontSelectFonts) - 1 do
@@ -7073,7 +7210,10 @@ begin
           fnt := (cell.attr and A_CELL_FONT_MASK) >> 28;
           if fnt <> cfnt then
           begin
-            ansi := CSI + inttostr(10 + fnt) + 'm';
+            if fnt < 10 then
+              ansi := CSI + inttostr(10 + fnt) + 'm'
+            else
+              ansi := CSI + inttostr(70 + fnt) + 'm';
             WriteANSIChunk(fout, maxlen, rowansi, ansi);
             cfnt := fnt;
           end;
@@ -7298,7 +7438,7 @@ begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
 
   if useBOM then
-    case CurrCodePage of
+    case Fonts[0] of
       encUTF16:
         begin   // little endian
           fout.writebyte($FF);
@@ -7424,8 +7564,6 @@ begin
     UpdateTitles;
   end;
 end;
-
-
 
 procedure TfMain.ImportANSIFile(fname : string; force8bit : boolean);
 var
@@ -7563,11 +7701,11 @@ begin
   if FileEnc = encUTF8 then
   begin
     // UTF8
-    if CurrCodePage <> encUTF8 then
+    if Fonts[0] <> encUTF8 then
     begin
-      CurrCodePage := encUTF8;
-      cbCodePage.ItemIndex := ord(CurrCodePage);
-      cbCodePageChange(cbCodePage);
+      Fonts[0] := encUTF8;
+      cbCodePage.ItemIndex := ord(Fonts[0]);
+      CodePageChange;
       BuildCharacterPalette;
     end;
     ansi := ansi.fromUTF8Bytes(buff);
@@ -7575,10 +7713,10 @@ begin
   else if FileEnc = encUTF16 then
   begin
     // UTF16
-    if CurrCodePage <> encUTF16 then
+    if Fonts[0] <> encUTF16 then
     begin
-      CurrCodePage := encUTF16;
-      cbCodePage.ItemIndex := ord(CurrCodePage);
+      Fonts[0] := encUTF16;
+      cbCodePage.ItemIndex := ord(Fonts[0]);
       cbCodePageChange(cbCodePage);
       BuildCharacterPalette;
     end;
@@ -8206,6 +8344,9 @@ begin
 
                 78, 79:
                   SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+
+                80..85: // VTX fonts. TODO
+                  ;
 
                 90..97: // aixterm fg color
                   SetBits(CurrAttr, A_CELL_FG_MASK, j - 90 + 8);
