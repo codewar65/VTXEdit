@@ -1194,7 +1194,8 @@ var
   off :     integer;
   bmp :     TBGRABitmap;
   w, h :    integer;
-  tmp : TBitmap;
+  tmp :     TBitmap;
+  fntnum :  integer;
 begin
 
   // create new
@@ -1221,13 +1222,23 @@ begin
       ch := Page.Rows[row].Cells[col].Chr;
       attr := Page.Rows[row].Cells[col].Attr;
 
-      // get codepage / offset for this ch
-      cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
+      if PageType in [ PAGETYPE_CTERM, PAGETYPE_VTX ] then
+      begin
+        fntnum := GetBits(attr, A_CELL_FONT_MASK, 28);
+        if (fntnum >= 10) and (PageType <> PAGETYPE_VTX) then
+          fntnum := 0;
+        cp := Fonts[fntnum];
+      end
+      else
+      begin
+        cp := Fonts[0];
+      end;
       if cp in [ encUTF8, encUTF16 ] then
         off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
       else
       begin
-        if ch > 255 then ch := 0;
+        if ch > 255 then
+          ch := 0;
         off := CPages[cp].QuickGlyph[ch];
       end;
 
@@ -2646,6 +2657,9 @@ begin
         tbFontConfig.Enabled:=true;
       end;
   end;
+
+  GenerateBmpPage;
+  pbPage.Invalidate;
 
   SetBits(CurrAttr, A_CELL_BOLD or A_CELL_FAINT or A_CELL_ITALICS
       or A_CELL_UNDERLINE or A_CELL_BLINKSLOW or A_CELL_STRIKETHROUGH
@@ -5550,6 +5564,7 @@ var
   rect :          TRect;
   bslow, bfast :  boolean;
   cp :            TEncoding;
+  fntnum :        integer;
 begin
   if bmpPage = nil then exit; // ?!
 
@@ -5572,12 +5587,23 @@ begin
     bfast  := HasBits(attr, A_CELL_BLINKFAST);
 
     // convert value in chr to unicode.
-    cp := Fonts[GetBits(attr, A_CELL_FONT_MASK, 28)];
+    if PageType in [ PAGETYPE_CTERM, PAGETYPE_VTX ] then
+    begin
+      fntnum := GetBits(attr, A_CELL_FONT_MASK, 28);
+      if (fntnum >= 10) and (PageType <> PAGETYPE_VTX) then
+        fntnum := 0;
+      cp := Fonts[fntnum];
+    end
+    else
+    begin
+      cp := Fonts[0];
+    end;
     if cp in [ encUTF8, encUTF16 ] then
       off := GetGlyphOff(ch, CPages[cp].GlyphTable, CPages[cp].GlyphTableSize)
     else
     begin
-      if ch > 255 then ch := 0;
+      if ch > 255 then
+        ch := 0;
       off := CPages[cp].QuickGlyph[ch];
     end;
 
@@ -7184,18 +7210,19 @@ begin
 
   // gather up the fonts needed for export.
   MemZero(@fontsused[0], 15);
-  for r := 0 to NumRows - 1 do
-    for c := 0 to NumCols - 1 do
-      fontsused[(Page.Rows[r].Cells[c].Attr and A_CELL_FONT_MASK) >> 28] := 1;
-  for o := 0 to length(Objects) - 1 do
-    for r := 0 to Objects[o].Height - 1 do
-      for c := 0 to Objects[o].Width - 1 do
-      begin
-        Objects[o].Data.Get(@cell, r * Objects[i].Width + c);
-        fontsused[(GetBits(cell.Attr, A_CELL_FONT_MASK, 28) and $0F)] := 1;
-      end;
+  if PageType in [ PAGETYPE_CTERM, PAGETYPE_VTX ] then
+  begin
+    for r := 0 to NumRows - 1 do
+      for c := 0 to NumCols - 1 do
+        fontsused[(Page.Rows[r].Cells[c].Attr and A_CELL_FONT_MASK) >> 28] := 1;
+    for o := 0 to length(Objects) - 1 do
+      for r := 0 to Objects[o].Height - 1 do
+        for c := 0 to Objects[o].Width - 1 do
+        begin
+          Objects[o].Data.Get(@cell, r * Objects[i].Width + c);
+          fontsused[(GetBits(cell.Attr, A_CELL_FONT_MASK, 28) and $0F)] := 1;
+        end;
 
-  if (PageType = PAGETYPE_CTERM) or (PageType = PAGETYPE_VTX) then
     // don't send font 0. font 10+ don't need to be allocated in VTX mode
     for i := 1 to 9 do
       if fontsused[i] <> 0 then
@@ -7207,6 +7234,7 @@ begin
             WriteANSIChunk(fout, maxlen, rowansi, ansi);
             break;
           end;
+  end;
 
   r := 0;
   c := 0;
@@ -7263,13 +7291,18 @@ begin
 
           // font change?
           fnt := (cell.attr and A_CELL_FONT_MASK) >> 28;
-          if fnt <> cfnt then
+          if (fnt <> cfnt) and (PageType in [ PAGETYPE_CTERM, PAGETYPE_VTX ]) then
           begin
             if fnt < 10 then
-              ansi := CSI + inttostr(10 + fnt) + 'm'
-            else
+            begin
+              ansi := CSI + inttostr(10 + fnt) + 'm';
+              WriteANSIChunk(fout, maxlen, rowansi, ansi);
+            end
+            else if (fnt >= 10) and (PageType = PAGETYPE_VTX) then
+            begin
               ansi := CSI + inttostr(70 + fnt) + 'm';
-            WriteANSIChunk(fout, maxlen, rowansi, ansi);
+              WriteANSIChunk(fout, maxlen, rowansi, ansi);
+            end;
             cfnt := fnt;
           end;
 
@@ -7414,10 +7447,18 @@ begin
 
               // font change?
               fnt := (cell.attr and A_CELL_FONT_MASK) >> 28;
-              if fnt <> cfnt then
+              if (fnt <> cfnt) and (PageType in [ PAGETYPE_CTERM, PAGETYPE_VTX ]) then
               begin
-                ansi := CSI + inttostr(10 + fnt) + 'm';
-                WriteANSIChunk(fout, maxlen, rowansi, ansi);
+                if fnt < 10 then
+                begin
+                  ansi := CSI + inttostr(10 + fnt) + 'm';
+                  WriteANSIChunk(fout, maxlen, rowansi, ansi);
+                end
+                else if (fnt >= 10) and (PageType = PAGETYPE_VTX) then
+                begin
+                  ansi := CSI + inttostr(70 + fnt) + 'm';
+                  WriteANSIChunk(fout, maxlen, rowansi, ansi);
+                end;
                 cfnt := fnt;
               end;
 
@@ -7489,22 +7530,13 @@ end;
 procedure TfMain.ExportTextFile(fname : string; useBOM, usesauce : boolean);
 var
   fout :        TFileStream;
-  po :          PObj;
-  ansi,
-  sgr,
-  rowansi:      unicodestring;
+  ansi :        unicodestring;
   cell :        TCell;
-  i :           integer;
   r, c :        integer;
-  ro, co,
-  wo, ho :      integer;
-  objr, objc :  integer;
-  cattr :       DWORD;
   pt :          TRowCol;
   delta :       integer;
   fg, bg :      integer;
-  tmp :         TObj;
-  p :           longint;
+
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
 
@@ -7667,6 +7699,9 @@ var
   SaveCol :   integer;
   cp :        TEncoding;
   sauceComment : array[0..63] of char;
+  ptype,
+  pcolors :   integer;
+  p1, p2 :      integer;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
@@ -7735,6 +7770,9 @@ begin
   setlength(buff, len);
   fin.Read(buff[0], len);
   fin.free;
+
+  ptype := PAGETYPE_BBS;
+  pcolors := COLORSCHEME_BBS;
 
   // convert to string
   // CODEPAGE - no way of knowing unless from sauce
@@ -7811,10 +7849,8 @@ begin
           seRows.Value := Sauce.TInfo2;
         if HasBits(Sauce.TFlags, SAUCE_FLAG_ICE) then
         begin
-          PageType := PAGETYPE_CTERM;
-          cbPageType.ItemIndex := PAGETYPE_CTERM;
-          ColorScheme := COLORSCHEME_ICE;
-          cbColorScheme.ItemIndex := COLORSCHEME_ICE;
+          ptype := max(ptype, PAGETYPE_CTERM);
+          pcolors := max(pcolors, COLORSCHEME_ICE);
         end;
         tbSauceTitle.Text := Trim(CharsToStr(Sauce.Title, sizeof(Sauce.Title)));
         tbSauceAuthor.Text := Trim(CharsToStr(Sauce.Author, sizeof(Sauce.Author)));
@@ -7842,7 +7878,6 @@ begin
 
         //    TInfoS = Font name (from SauceFonts pattern)
         fontname := CharsToStr(Sauce.TInfoS, sizeof(Sauce.TInfoS));
-        fontname := fontname.Trim;
 
         if LeftStr(fontname, 9) = 'IBM VGA50' then
         begin
@@ -7951,8 +7986,6 @@ begin
   chars := ansi.toWordArray;
   charslen := length(chars);
   ansi := '';
-
-
 
   // populate page.
   SkipScroll := true;
@@ -8181,11 +8214,20 @@ begin
               CursorCol := NumCols - 1;
           end;
 
-        'D':  // CUB - back n
+        'D':  // CUB - back n | Font Select defintions
           begin
-            CursorCol -= GetIntCSIVal(0, 1);
-            if CursorCol < 0 then
-              CursorCol := 0;
+            if inter = ' ' then
+            begin
+              p1 := GetIntCSIVal(0, 1);
+              p2 := GetIntCSIVal(1, 0);
+              Fonts[p1] := FontSelectFonts[p2].CodePage;
+            end
+            else
+            begin
+              CursorCol -= GetIntCSIVal(0, 1);
+              if CursorCol < 0 then
+                CursorCol := 0;
+            end
           end;
 
         'E':  // CNL - col 0 down n lines
@@ -8224,7 +8266,8 @@ begin
               CursorCol := NumCols - 1;
           end;
 
-        'I':  ;
+        'I':  ; //Cursor Horizontal Tabulation (CHT). Move cursor forward n tab stops. Stops at last tab stop.
+
         'J':  // ED - erase screen 1=sos,0=eos,2=all
           begin
             case GetIntCSIVal(0, 0) of
@@ -8280,26 +8323,26 @@ begin
             end;
           end;
 
-        'L':  ;
-        'M':  ;
+        'L':  ; // Insert Lines (IL). Insert n rows at current row. {1}
+        'M':  ; // Delete Lines (DL). Delete n rows at current row. {1}
+
         'N':  ;
         'O':  ;
-        'P':  ;
+
+        'P':  ; // Delete Character (DCH). Delete n characters at cursor position. {1}
+
         'Q':  ;
         'R':  ;
 
-        'S':  // SU - scroll up n
-          ;
-
-        'T':  // ST - scroll down n
-          ;
+        'S':  ; // SU - scroll up n
+        'T':  ; // ST - scroll down n
 
         'U':  ;
         'V':  ;
         'W':  ;
-        'X':  ;
+        'X':  ; // Erase Character (ECH). Erase next n characters {1}
         'Y':  ;
-        'Z':  ;
+        'Z':  ; // Cursor Back Tab (CBT). Move cursor backwards n tab stops. Stops at left of page {1}
         '[':  ;
         '\':  ;
         ']':  ;
@@ -8307,16 +8350,16 @@ begin
         '_':  ;
         '`':  ;
         'a':  ;
-        'b':  ;
-        'c':  ;
+        'b':  ; // Repeat last printed character n times. {1}
+        'c':  ; // Device Attributes.
         'd':  ;
         'e':  ;
         'g':  ;
-        'h':  ;
+        'h':  ; // Set Mode (SM).
         'i':  ;
         'j':  ;
         'k':  ;
-        'l':  ;
+        'l':  ; // Reset Mode (RM).
 
         'm':  // SGR - set attributes
           begin
@@ -8332,13 +8375,21 @@ begin
                   SetBit(CurrAttr, A_CELL_BOLD, true);
 
                 2:  // faint
-                  SetBit(CurrAttr, A_CELL_FAINT, true);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_FAINT, true);
+                  end;
 
                 3:  // italics
-                  SetBit(CurrAttr, A_CELL_ITALICS, true);
+                  begin
+                    SetBit(CurrAttr, A_CELL_ITALICS, true);
+                  end;
 
                 4:  // underline
-                  SetBit(CurrAttr, A_CELL_UNDERLINE, true);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_UNDERLINE, true);
+                  end;
 
                 5:  // blink slow
                   SetBit(CurrAttr, A_CELL_BLINKSLOW, true);
@@ -8353,34 +8404,64 @@ begin
                   SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL);
 
                 9:  // strikethrough
-                  SetBit(CurrAttr, A_CELL_STRIKETHROUGH, true);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_STRIKETHROUGH, true);
+                  end;
 
                 10..19: // font - skip for now
-                  ;
+                  begin
+                    ptype := max(ptype, PAGETYPE_CTERM);
+                    SetBits(CurrAttr, A_CELL_FONT_MASK, j - 10, 28);
+                  end;
 
                 21: // bold off
-                  SetBit(CurrAttr, A_CELL_BOLD, false);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_BOLD, false);
+                  end;
 
                 22: // faint off
-                  SetBit(CurrAttr, A_CELL_FAINT, false);
+                  begin
+                    cbPageType.ItemIndex := PAGETYPE_CTERM;
+                    SetBit(CurrAttr, A_CELL_FAINT, false);
+                  end;
 
                 23: // italics off
-                  SetBit(CurrAttr, A_CELL_ITALICS, false);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_ITALICS, false);
+                  end;
 
                 24: // underline off
-                  SetBit(CurrAttr, A_CELL_UNDERLINE, false);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_UNDERLINE, false);
+                  end;
 
                 25, 26: // blink off
-                  SetBits(CurrAttr, A_CELL_BLINKSLOW or A_CELL_BLINKFAST, 0);
+                  begin
+                    cbPageType.ItemIndex := PAGETYPE_CTERM;
+                    SetBits(CurrAttr, A_CELL_BLINKSLOW or A_CELL_BLINKFAST, 0);
+                  end;
 
                 27: // reverse off
-                  SetBit(CurrAttr, A_CELL_REVERSE, false);
+                  begin
+                    cbPageType.ItemIndex := PAGETYPE_CTERM;
+                    SetBit(CurrAttr, A_CELL_REVERSE, false);
+                  end;
 
-                28: // concear off
-                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+                28: // conceal off
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+                  end;
 
                 29: // strikethrough off
-                  SetBit(CurrAttr, A_CELL_STRIKETHROUGH, false);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_STRIKETHROUGH, false);
+                  end;
 
                 30..37: // fg color
                   SetBits(CurrAttr, A_CELL_FG_MASK, j - 30);
@@ -8391,6 +8472,7 @@ begin
                     if GetIntCSIVal(k, 0) = 5 then
                     begin
                       k += 1;
+                      pcolors := max(color, COLORSCHEME_256);
                       SetBits(CurrAttr, A_CELL_FG_MASK, GetIntCSIVal(k, 0));
                     end;
                   end;
@@ -8407,6 +8489,7 @@ begin
                     if GetIntCSIVal(k, 0) = 5 then
                     begin
                       k += 1;
+                      pcolors := max(color, COLORSCHEME_256);
                       SetBits(CurrAttr, A_CELL_BG_MASK, GetIntCSIVal(k, 0), 8);
                     end;
                   end;
@@ -8415,45 +8498,74 @@ begin
                   SetBits(CurrAttr, A_CELL_BG_MASK, 0, 8);
 
                 56: // doublestrike
-                  SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, true);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, true);
+                  end;
 
                 57: // shadow
-                  SetBit(CurrAttr, A_CELL_SHADOW, true);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_SHADOW, true);
+                  end;
 
                 58: // top half
-                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_TOP);
+                  end;
 
                 59: // bottom half
-                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_BOTTOM);
+                  end;
 
-                76:
-                  SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, false);
+                76: // double strike off
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_DOUBLESTRIKE, false);
+                  end;
 
-                77:
-                  SetBit(CurrAttr, A_CELL_SHADOW, false);
+                77: // shadow off
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBit(CurrAttr, A_CELL_SHADOW, false);
+                  end;
 
-                78, 79:
-                  SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+                78, 79: // normal
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_NORMAL);
+                  end;
 
                 80..85: // VTX fonts. TODO
-                  ;
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_FONT_MASK, j - 70, 28);
+                  end;
 
                 90..97: // aixterm fg color
-                  SetBits(CurrAttr, A_CELL_FG_MASK, j - 90 + 8);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_FG_MASK, j - 90 + 8);
+                  end;
 
                 100..107: // aixterm bg color
-                  SetBits(CurrAttr, A_CELL_BG_MASK, j - 100 + 8);
-
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_BG_MASK, j - 100 + 8);
+                  end;
               end;
               k += 1;
             end;
           end;
 
-        'n':  ;
+        'n':  ; // Device Status Report. {0}
         'o':  ;
         'p':  ;
         'q':  ;
-        'r':  ;
+        'r':  ; // '*r' : Baud rate emulation.| 'r' : Set scroll window (DECSTBM).
 
         's':  // SCP - save cursor pos
           begin
@@ -8484,6 +8596,12 @@ begin
     if doeof then
       break;
   end;
+
+  PageType := ptype;
+  cbPageType.ItemIndex := ptype;
+  ColorScheme := pcolors;
+  cbColorScheme.ItemIndex := pcolors;
+
 end;
 
 procedure nop; begin end;
