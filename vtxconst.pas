@@ -135,11 +135,11 @@ type
     TInfoS:         array [1..22] of char;  // null terminated - FontName
   end;
 
-  TSauseCommentHeader = packed record
+  TSauceCommentHeader = packed record
     ID:         array [1..5] of char;   // "COMNT"
   end;
 
-  TSauseComment = packed record
+  TSauceComment = packed record
     ID:         array [1..64] of char;
   end;
 
@@ -180,6 +180,7 @@ type
     PageAttr :  UInt32;     // page / border color
     CrsrAttr :  UInt32;     // cursor size / color
     Sauce :     TSauceHeader;
+    SauceComments            : TStringList;
   end;
 
   TEncoding = (

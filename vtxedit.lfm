@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 314
+  Left = 345
   Height = 647
-  Top = 234
+  Top = 185
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 627
@@ -637,11 +637,11 @@ object fMain: TfMain
       TabOrder = 0
       TabStop = True
       object Panel2: TPanel
-        Left = 6
-        Height = 132
+        Left = 8
+        Height = 228
         Top = 308
         Width = 162
-        ClientHeight = 132
+        ClientHeight = 228
         ClientWidth = 162
         TabOrder = 0
         object Label7: TLabel
@@ -703,24 +703,55 @@ object fMain: TfMain
           Caption = 'Date:'
           ParentColor = False
         end
-        object tbSauceDate: TEdit
-          Left = 46
-          Height = 23
-          Top = 102
-          Width = 112
-          MaxLength = 8
-          OnEditingDone = tbSauceDateEditingDone
-          TabOrder = 3
-        end
         object Label11: TLabel
           Left = 2
           Height = 15
           Top = 2
-          Width = 110
-          Caption = 'SAUCE Information:'
+          Width = 37
+          Caption = 'SAUCE'
           Font.Style = [fsBold]
           ParentColor = False
           ParentFont = False
+        end
+        object dtpSauceDate: TDateTimePicker
+          Left = 46
+          Height = 23
+          Top = 104
+          Width = 83
+          CenturyFrom = 1941
+          MaxDate = 2958465
+          MinDate = -53780
+          TabOrder = 3
+          TrailingSeparator = False
+          TextForNullDate = 'NULL'
+          LeadingZeros = True
+          Kind = dtkDate
+          TimeFormat = tf24
+          TimeDisplay = tdHMS
+          DateMode = dmComboBox
+          Date = 43004
+          Time = 0.637461435188015
+          UseDefaultSeparators = True
+          HideDateTimeParts = []
+          MonthNames = 'Long'
+          OnEditingDone = dtpSauceDateEditingDone
+        end
+        object memSauceComments: TMemo
+          Left = 4
+          Height = 74
+          Top = 144
+          Width = 150
+          MaxLength = 6120
+          OnEditingDone = memSauceCommentsEditingDone
+          TabOrder = 4
+        end
+        object Label18: TLabel
+          Left = 4
+          Height = 15
+          Top = 128
+          Width = 62
+          Caption = 'Comments:'
+          ParentColor = False
         end
       end
       object Panel3: TPanel

@@ -76,7 +76,7 @@ uses
   Classes,
   SysUtils,
   strutils,
-  FileUtil,
+  FileUtil, DateTimePicker,
   Forms,
   Controls,
   Dialogs,
@@ -99,7 +99,7 @@ uses
   VTXFontConfig,
   UnicodeHelper,
   RecList,
-  LResources,
+  LResources, EditBtn,
   Memory,
   dateutils,
   Inifiles;
@@ -119,6 +119,7 @@ type
     cbColorScheme: TComboBox;
     cbPageType: TComboBox;
     CoolBar1: TCoolBar;
+    dtpSauceDate: TDateTimePicker;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
     ilCursors: TImageList;
@@ -131,6 +132,7 @@ type
     Label15: TLabel;
     Label16: TLabel;
     Label17: TLabel;
+    Label18: TLabel;
     Label2: TLabel;
     Label3: TLabel;
     Label4: TLabel;
@@ -140,6 +142,7 @@ type
     Label8: TLabel;
     Label9: TLabel;
     lvObjects: TListView;
+    memSauceComments: TMemo;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
     MenuItem5: TMenuItem;
@@ -212,7 +215,6 @@ type
     TabSheet3: TTabSheet;
     tbCodePage: TEdit;
     tbSauceAuthor: TEdit;
-    tbSauceDate: TEdit;
     tbSauceGroup: TEdit;
     tbSauceTitle: TEdit;
     tbToolPalette: TToolBar;
@@ -279,12 +281,13 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure dtpSauceDateEditingDone(Sender: TObject);
     procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
+    procedure memSauceCommentsEditingDone(Sender: TObject);
     procedure tbFontConfigClick(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
-    procedure tbSauceDateEditingDone(Sender: TObject);
     procedure tbSauceGroupEditingDone(Sender: TObject);
     procedure tbSauceTitleEditingDone(Sender: TObject);
     procedure WriteANSI(fs : TFileStream; str : unicodestring);
@@ -421,6 +424,7 @@ type
     function GetNextObjectCell(Obj : TObj; r, c : integer; var cell : TCell) : TRowCol;
     Procedure LoadSettings;
     Procedure SaveSettings;
+    procedure InitSauce;
     procedure NewFile;
     procedure DoBlink;
 
@@ -1006,9 +1010,9 @@ begin
   // set font 0
   tbFontClick(tbFont0);
 
-  tbSauceDate.Text := Format('%04.4d%02.2d%02.2d',
-    [ YearOf(now), MonthOf(now), DayOf(now) ]);
+  dtpSauceDate.Date := now;
 
+  Page.SauceComments := TStringList.Create;
 end;
 
 procedure TfMain.LoadlvObjects;
@@ -1052,6 +1056,8 @@ begin
   bmpPreview.Free;
   bmpCharPalette.Free;
   bmpCharPalette := nil;
+
+  Page.SauceComments.Free;
 end;
 
 procedure TfMain.tbFontConfigClick(Sender: TObject);
@@ -1125,24 +1131,56 @@ begin
       buff[i] := b[i];
 end;
 
-procedure TfMain.tbSauceAuthorEditingDone(Sender: TObject);
+procedure StrToSauce(str : unicodestring; sauceBuff : PByte; len : integer);
+var
+  b : TBytes;
+  i : integer;
 begin
-  StrToChars(unicodestring(tbSauceAuthor.Text), @Page.Sauce.Author[0], sizeof(Page.Sauce.Author));
+  (*
+    "The Character type is a string of characters encoded according to code
+    page 437 (IBM PC / OEM ASCII). It is neither a pascal type string with a
+    leading length byte nor is it a C-style string with a trailing terminator
+    character. Any value shorter than the available length should be padded
+    with spaces."
+  *)
+  FillChar(sauceBuff^, len, ' ');
+  b := str.toEncodedCPBytes(CPages[Fonts[0]].EncodingLUT);
+    for i := 0 to len - 1 do
+      if i < length(b) then
+        sauceBuff[i] := b[i];
 end;
 
-procedure TfMain.tbSauceDateEditingDone(Sender: TObject);
+procedure TfMain.tbSauceAuthorEditingDone(Sender: TObject);
 begin
-  StrToChars(unicodestring(tbSauceDate.Text), @Page.Sauce.Date[0], sizeof(Page.Sauce.Date));
+  StrToSauce(unicodestring(tbSauceAuthor.Text), @Page.Sauce.Author[0], sizeof(Page.Sauce.Author));
 end;
 
 procedure TfMain.tbSauceGroupEditingDone(Sender: TObject);
 begin
-  StrToChars(unicodestring(tbSauceGroup.Text), @Page.Sauce.Group[0], sizeof(Page.Sauce.Group));
+  StrToSauce(unicodestring(tbSauceGroup.Text), @Page.Sauce.Group[0], sizeof(Page.Sauce.Group));
 end;
 
 procedure TfMain.tbSauceTitleEditingDone(Sender: TObject);
 begin
-  StrToChars(unicodestring(tbSauceTitle.Text), @Page.Sauce.Title[0], sizeof(Page.Sauce.Title));
+  StrToSauce(unicodestring(tbSauceTitle.Text), @Page.Sauce.Title[0], sizeof(Page.Sauce.Title));
+end;
+
+procedure TfMain.dtpSauceDateEditingDone(Sender: TObject);
+var
+  dateStr : string;
+begin
+  dateStr := FormatDateTime('YYYYMMDD', dtpSauceDate.Date);
+  StrToChars(unicodestring(dateStr), @Page.Sauce.Date[0], sizeof(Page.Sauce.Date));
+end;
+
+procedure TfMain.memSauceCommentsEditingDone(Sender : TObject);
+var
+  i : byte;
+begin
+  Page.Sauce.Comments := Min(255, memSauceComments.Lines.Count);
+  Page.SauceComments.Clear;
+  for i := 0 to Page.Sauce.Comments - 1 do
+    Page.SauceComments.Add(memSauceComments.Lines[i]);
 end;
 
 // create new bmpPage of page at zoom 1
@@ -1804,7 +1842,8 @@ begin
     or seXScale.Focused
     or seCharacter.Focused
     or tbSauceAuthor.Focused
-    or tbSauceDate.Focused
+    or dtpSauceDate.Focused
+    or memSauceComments.Focused
     or tbSauceGroup.Focused
     or tbSauceTitle.Focused
     or ObjectRename then
@@ -2312,7 +2351,8 @@ begin
     or seXScale.Focused
     or seCharacter.Focused
     or tbSauceAuthor.Focused
-    or tbSauceDate.Focused
+    or dtpSauceDate.Focused
+    or memSauceComments.Focused
     or tbSauceGroup.Focused
     or tbSauceTitle.Focused
     or ObjectRename then
@@ -2716,6 +2756,16 @@ begin
   ResizeScrolls;
 end;
 
+procedure TfMain.InitSauce;
+begin
+  MemZero(@Page.Sauce, sizeof(TSauceHeader));
+
+  StrToSauce('', @Page.Sauce.Title, sizeof(Page.Sauce.Title));
+  StrToSauce('', @Page.Sauce.Author, sizeof(Page.Sauce.Author));
+  StrToSauce('', @Page.Sauce.Group, sizeof(Page.Sauce.Group));
+  StrToSauce(FormatDateTime('YYYYMMDD', now), @Page.Sauce.Date, sizeof(Page.Sauce.Date));
+end;
+
 procedure TfMain.NewFile;
 var
   i :       integer;
@@ -2742,13 +2792,16 @@ begin
   for r := 0 to NumRows - 1 do
     for c := 0 to NumCols - 1 do
       Page.Rows[r].Cells[c] := BLANK;
-  MemZero(@Page.Sauce, sizeof(TSauceHeader));
+
+  InitSauce;
+
   CurrFileName := '';
   CurrFileChanged := false;
   tbSauceAuthor.Text:='';
-  tbSauceDate.Text:='';
+  dtpSauceDate.Date := now;
   tbSauceGroup.Text:='';
   tbSauceTitle.Text:='';
+  memSauceComments.Lines.Clear;
   ResizePage;
   GenerateBmpPage;
   UpdateTitles;
@@ -7101,6 +7154,8 @@ var
   p :           longint;
   fontsused :   array [0..15] of byte;
   fnt, cfnt :   integer;
+  sauceCommentHdr : TSauceCommentHeader;
+  commentBuf : TSauceComment;
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
 
@@ -7409,6 +7464,22 @@ begin
     Page.Sauce.TInfo2 := NumRows;
     StrToChars(unicodestring(GetSauceFontName(Fonts[0])), @Page.Sauce.TInfoS, sizeof(Page.Sauce.TInfoS));
     fout.WriteByte(_CPMEOF);
+
+    //
+    // Write out any SAUCE comments
+    // Up to 255 lines of 64 space-padded blocks each
+    //
+    if(Page.Sauce.Comments > 0) then
+    begin
+      StrToSauce('COMNT', @sauceCommentHdr, sizeof(sauceCommentHdr));
+      fout.WriteBuffer(sauceCommentHdr, sizeof(sauceCommentHdr));
+      for i := 0 to Page.Sauce.Comments - 1 do
+      begin
+        StrToSauce(Page.SauceComments[i], @commentBuf, sizeof(commentBuf));
+        fout.WriteBuffer(commentBuf, sizeof(commentBuf));
+      end;
+    end;
+
     fout.write(Page.Sauce, sizeof(TSauceHeader));
   end;
 
@@ -7595,6 +7666,7 @@ var
   SaveRow,
   SaveCol :   integer;
   cp :        TEncoding;
+  sauceComment : array[0..63] of char;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
@@ -7744,10 +7816,28 @@ begin
           ColorScheme := COLORSCHEME_ICE;
           cbColorScheme.ItemIndex := COLORSCHEME_ICE;
         end;
-        tbSauceTitle.Text := CharsToStr(Sauce.Title, sizeof(Sauce.Title));
-        tbSauceAuthor.Text := CharsToStr(Sauce.Author, sizeof(Sauce.Author));
-        tbSauceGroup.Text := CharsToStr(Sauce.Group, sizeof(Sauce.Group));
-        tbSauceDate.Text := CharsToStr(Sauce.Date, sizeof(Sauce.Date));
+        tbSauceTitle.Text := Trim(CharsToStr(Sauce.Title, sizeof(Sauce.Title)));
+        tbSauceAuthor.Text := Trim(CharsToStr(Sauce.Author, sizeof(Sauce.Author)));
+        tbSauceGroup.Text := Trim(CharsToStr(Sauce.Group, sizeof(Sauce.Group)));
+        dtpSauceDate.Date := ScanDateTime('YYYYMMDD', CharsToStr(Sauce.Date, sizeof(Sauce.Date)));
+
+        //
+        // Read in comments, if any
+        //
+        if(Sauce.Comments > 0) then
+        begin
+          j := length(buff) - 128 - (Sauce.Comments * 64) -5;
+          if 'COMNT' = CharsToStr(Copy(buff, j, 5), 5) then
+          begin
+            j += 5;
+            for i := 1 to Sauce.Comments do
+            begin
+              memSauceComments.Lines.Add(Trim(CharsToStr(Copy(buff, j, 64), 64)));
+              j += 64;
+            end;
+          end;
+        end;
+
         ResizePage;
 
         //    TInfoS = Font name (from SauceFonts pattern)
