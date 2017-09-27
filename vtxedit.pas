@@ -1312,6 +1312,7 @@ begin
       break;
 
   MemFill(@result, 2, bg);
+
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1332,6 +1333,7 @@ begin
       break;
 
   MemFill(@result, 2, bg);
+
   if HasBits(i, %01) then result[0] := fg;
   if HasBits(i, %10) then result[1] := fg;
 end;
@@ -1351,6 +1353,7 @@ begin
       break;
 
   MemFill(@result, 4, bg);
+
   if HasBits(i, %0001) then result[0] := fg;
   if HasBits(i, %0010) then result[1] := fg;
   if HasBits(i, %0100) then result[2] := fg;
@@ -1515,7 +1518,9 @@ begin
     // reduce other 3 blocks to 1 color + this color
     // get color count.
     setlength(count, 256);
+
     MemZero(@count[0], 256);
+
     tot := 0;
     mval := 0;
     mclr := -1;     // other color with highest count
@@ -4892,7 +4897,6 @@ begin
     SaveUndoKeys;
     for objnum := 0 to length(Objects) - 1 do
     begin
-
       po := @Objects[objnum];
       p := 0;
       for r := po^.Row to po^.Row + po^.Height - 1 do
