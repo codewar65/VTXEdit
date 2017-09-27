@@ -270,6 +270,7 @@ const
 
   SauceID : array [1..5] of char = 'SAUCE';
 
+{
   SauceFonts : array [0..20] of unicodestring = (
     'IBM VGA',
     'IBM VGA50',
@@ -293,6 +294,7 @@ const
     'C64 PETSCII shifted',
     'Atari ATASCII'
   );
+}
 
   SAUCE_NIL_NIL =         $0000;
   SAUCE_CHR_ASCII =       $0100;

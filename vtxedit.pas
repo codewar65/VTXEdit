@@ -7459,22 +7459,13 @@ end;
 procedure TfMain.ExportTextFile(fname : string; useBOM, usesauce : boolean);
 var
   fout :        TFileStream;
-  po :          PObj;
-  ansi,
-  sgr,
-  rowansi:      unicodestring;
+  ansi :        unicodestring;
   cell :        TCell;
-  i :           integer;
   r, c :        integer;
-  ro, co,
-  wo, ho :      integer;
-  objr, objc :  integer;
-  cattr :       DWORD;
   pt :          TRowCol;
   delta :       integer;
   fg, bg :      integer;
-  tmp :         TObj;
-  p :           longint;
+
 begin
   fout := TFileStream.Create(fname, fmCreate or fmOpenWrite or fmShareDenyNone);
 
@@ -7638,6 +7629,7 @@ var
   cp :        TEncoding;
   ptype,
   pcolors :   integer;
+  p1, p2 :      integer;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
@@ -8132,11 +8124,20 @@ begin
               CursorCol := NumCols - 1;
           end;
 
-        'D':  // CUB - back n
+        'D':  // CUB - back n | Font Select defintions
           begin
-            CursorCol -= GetIntCSIVal(0, 1);
-            if CursorCol < 0 then
-              CursorCol := 0;
+            if inter = ' ' then
+            begin
+              p1 := GetIntCSIVal(0, 1);
+              p2 := GetIntCSIVal(1, 0);
+              Fonts[p1] := FontSelectFonts[p2].CodePage;
+            end
+            else
+            begin
+              CursorCol -= GetIntCSIVal(0, 1);
+              if CursorCol < 0 then
+                CursorCol := 0;
+            end
           end;
 
         'E':  // CNL - col 0 down n lines
@@ -8319,8 +8320,10 @@ begin
                   end;
 
                 10..19: // font - skip for now
-                  // promote to CTERM
-                  cbPageType.ItemIndex := PAGETYPE_CTERM;
+                  begin
+                    ptype := max(ptype, PAGETYPE_CTERM);
+                    SetBits(CurrAttr, A_CELL_FONT_MASK, j - 10, 28);
+                  end;
 
                 21: // bold off
                   begin
@@ -8447,8 +8450,10 @@ begin
                   end;
 
                 80..85: // VTX fonts. TODO
-                  // promote to VTX
-                  ptype := max(ptype, PAGETYPE_VTX);
+                  begin
+                    ptype := max(ptype, PAGETYPE_VTX);
+                    SetBits(CurrAttr, A_CELL_FONT_MASK, j - 70, 28);
+                  end;
 
                 90..97: // aixterm fg color
                   begin
