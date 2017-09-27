@@ -478,6 +478,7 @@ var
   MousePanX, MousePanY :    integer;    // current mouse xy
   SubXSize, SubYSize :      integer;    // coords subdivision size
   DrawX, DrawY :            integer;    // drawing position in draw mode coors
+  FirstDrawX, FirstDrawY:   integer;    // starting pos for lines, rec, ellipse
   SubX, SubY :              integer;    // sub pos inside character
   MousePanT, MousePanL :    integer;    // current mouse rc
   CursorRow, CursorCol :    integer;    // cursor location.
@@ -3568,52 +3569,157 @@ procedure TfMain.pbPageMouseUp(Sender: TObject; Button: TMouseButton;
 var
   undoblk :   TUndoBlock;
   tmp :       TRecList;
+  dcell :     TCell;
+  fx, fy :    integer;
+  done2,
+  done :      boolean;
+  bcolor :    integer;
+  mr, mc :  integer;
+  sx, sy : integer;
 begin
+
+  if Button = mbMiddle then
+    MousePan := false
+  else
+  begin
+
+    DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
+    DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
+    SubX := DrawX mod SubXSize;
+    SubY := DrawY mod SubYSize;
+
+    case ToolMode of
+      tmSelect:
+        begin
+          if drag then
+          begin
+            // add / remove selection
+            tmp := BuildDisplayCopySelection;
+            CopySelection.Free;
+            CopySelection := tmp;
+            drag := false;
+            pbPage.invalidate;
+          end
+          else if dragObj then
+          begin
+            // move object (dragrow/dragcol = initial pos)
+            SaveUndoKeys;
+            undoblk.UndoType := utObjMove;
+            undoblk.NewRow := Objects[SelectedObject].Row;
+            undoblk.NewCol := Objects[SelectedObject].Col;
+            undoblk.OldRow := dragObjRow;
+            undoblk.OldCol := dragObjCol;
+            undoblk.OldNum := SelectedObject;
+            undoblk.NewNum := SelectedObject;
+            UndoAdd(undoblk);
+
+            dragObj := false;
+            fPreviewBox.Invalidate;
+          end
+        end;
+
+      tmDraw:
+        begin
+          // save CurrUndoData to undolist
+          if CurrUndoData.Count > 0 then
+          begin
+            undoblk.UndoType := utCells;
+            undoblk.CellData := CurrUndoData.Copy;
+            undoblk.CellData.Trim;
+            UndoAdd(undoblk);
+            CurrUndoData.Clear;
+          end;
+        end;
+
+      tmLine:
+        begin
+          // commit new line from FirstDrawX,Y to DrawX,Y
+          // draw line
+          case DrawMode of
+            dmChars:
+              begin
+                SaveUndoKeys;
+
+                dcell.chr := iif(MouseLeft, CurrChar, $20);
+                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                fx := FirstDrawX;
+                fy := FirstDrawY;
+                x := (fx - PageLeft) * CellWidthZ;
+                y := (fy - PageTop) * CellHeightZ;
+                RecordUndoCell(fy, fx, dcell);
+                Page.Rows[fy].Cells[fx] := dcell;
+
+                DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, dcell.chr, dcell.Attr);
+                LineCalcInit(fx, fy, DrawX, DrawY);
+                repeat
+                  done := LineCalcNext(fx, fy);
+                  x := (fx - PageLeft) * CellWidthZ;
+                  y := (fy - PageTop) * CellHeightZ;
+                  RecordUndoCell(fy, fx, dcell);
+                  Page.Rows[fy].Cells[fx] := dcell;
+
+                  DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, dcell.chr, dcell.Attr);
+                until done;
+
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
+              end;
+
+            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+              begin
+                SaveUndoKeys;
+
+                // get color to draw in
+                bcolor := iif(MouseLeft,
+                  GetBits(CurrAttr, A_CELL_FG_MASK),
+                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                // blocks skip if on same cell. need to build some sort
+                // of object of drawn line.
+                // draw proposed line
+                fx := FirstDrawX;
+                fy := FirstDrawY;
+                LineCalcInit(fx, fy, DrawX, DrawY);
+                done := false;
+                done2 := false;
+                repeat
+                  done2 := done;
+                  mr := fy div SubYSize;
+                  mc := fx div SubXSize;
+                  sx := fx mod SubXSize;
+                  sy := fy mod SubYSize;
+                  x := (mc - PageLeft) * CellWidthZ;
+                  y := (mr - PageTop) * CellHeightZ;
+
+                  // add cell at mr, mc to drawdata if not there
+                  dcell := SetBlockColor(
+                    bcolor,
+                    Page.Rows[mr].Cells[mc],
+                    SubXSize, SubYSize,
+                    sx, sy);
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+
+                  RecordUndoCell(mr, mc, dcell);
+                  Page.Rows[mr].Cells[mc] := dcell;
+                  DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+                  done := LineCalcNext(fx, fy);
+                until done2;
+              end;
+          end;
+          drag := false;
+        end;
+    end;
+  end;
+
   case Button of
     mbLeft : MouseLeft := false;
     mbMiddle : MouseMiddle := false;
     mbRight : MouseRight := false;
   end;
 
-  if Button = mbMiddle then
-    MousePan := false
-  else if drag then
-  begin
-    // add / remove selection
-    tmp := BuildDisplayCopySelection;
-    CopySelection.Free;
-    CopySelection := tmp;
-    drag := false;
-    pbPage.invalidate;
-  end
-  else if dragObj then
-  begin
-    // move object (dragrow/dragcol = initial pos)
-    SaveUndoKeys;
-    undoblk.UndoType := utObjMove;
-    undoblk.NewRow := Objects[SelectedObject].Row;
-    undoblk.NewCol := Objects[SelectedObject].Col;
-    undoblk.OldRow := dragObjRow;
-    undoblk.OldCol := dragObjCol;
-    undoblk.OldNum := SelectedObject;
-    undoblk.NewNum := SelectedObject;
-    UndoAdd(undoblk);
-
-    dragObj := false;
-    fPreviewBox.Invalidate;
-  end
-  else
-  begin
-    // save CurrUndoData to undolist
-    if CurrUndoData.Count > 0 then
-    begin
-      undoblk.UndoType := utCells;
-      undoblk.CellData := CurrUndoData.Copy;
-      undoblk.CellData.Trim;
-      UndoAdd(undoblk);
-      CurrUndoData.Clear;
-    end;
-  end;
 end;
 
 procedure TfMain.pbPageMouseWheel(Sender: TObject; Shift: TShiftState;
@@ -3737,6 +3843,11 @@ begin
 
     SaveUndoKeys;
 
+    DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
+    DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
+    SubX := DrawX mod SubXSize;
+    SubY := DrawY mod SubYSize;
+
     case ToolMode of
       tmSelect:
         begin
@@ -3820,10 +3931,6 @@ begin
           if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
             and between(MouseCol, 0, NumCols-1) then
           begin
-            DrawX := ((PageLeft * SubXSize) +  Floor((X / CellWidthZ) * SubXSize)) ;
-            DrawY := ((PageTop * SubYSize) +  Floor((Y / CellHeightZ) * SubYSize));
-            SubX := DrawX mod SubXSize;
-            SubY := DrawY mod SubYSize;
 
             case DrawMode of
               dmChars:
@@ -3845,7 +3952,7 @@ begin
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 1, SubX, SubY);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol, false);
@@ -3863,7 +3970,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     1, 2, SubX, SubY);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -3882,7 +3989,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 2, SubX, SubY);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -3902,7 +4009,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                     bcolor,
                     Page.Rows[MouseRow].Cells[MouseCol],
                     2, 3, SubX, SubY);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
@@ -3913,18 +4020,75 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
             end;
           end;
         end;
+
+      tmLine, tmRect, tmEllipse:
+        begin
+          // left click = draw, right click = erase
+          if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
+            and between(MouseCol, 0, NumCols-1) then
+          begin
+
+            case DrawMode of
+              dmChars, dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin
+                  // save starting pos
+                  FirstDrawX := DrawX;
+                  FirstDrawY := DrawY;
+                  LastDrawX := DrawX;
+                  LastDrawY := DrawY;
+                  drag := true;
+                end;
+            end;
+          end;
+        end;
     end;
   end;
+end;
+
+function DrawDataAddOrGet(
+  var DrawData : TRecList;
+  var DrawDataRec : TUndoCells;
+  mr, mc : integer) : integer;
+var
+  i :           integer;
+  found :       boolean;
+begin
+  // add cell at mr, mc to drawdata if not there
+  found := false;
+  for i := 0 to DrawData.Count - 1 do
+  begin
+    DrawData.Get(@DrawDataRec, i);
+    if (DrawDataRec.Row = mr) and (DrawDataRec.Col = mc) then
+    begin
+      found := true;
+      break;
+    end;
+  end;
+  if not found then
+  begin
+    DrawDataRec.Row := mr;
+    DrawDataRec.Col := mc;
+    DrawDataRec.OldCell := Page.Rows[mr].Cells[mc];
+    i := DrawData.Count;
+    DrawData.Add(@DrawDataRec);
+  end;
+  result := i;
 end;
 
 procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   i, dx, dy :       integer;
+  fx, fy :          integer;
+  done2,
   done :            boolean;
   mr, mc, sx, sy :  integer;
   bcolor :          integer;
   dcell :           TCell;
+  DrawData :        TRecList; // of TUndoCells;
+  DrawDataRec :     TundoCells;
+  found :           boolean;
+
 //  dattr, dchar :    integer;
 begin
 
@@ -3979,25 +4143,29 @@ begin
       sbVert.Position := i;
     end;
   end
-  else if drag then
-  begin
-    // dragging copy selection
-    // let paint draw selection information
-    if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
-      dragType := DRAG_ADD;
-
-    pbPage.Invalidate;
-  end
-  else if dragObj then
-  begin
-    // moving an object
-    Objects[SelectedObject].Row := MouseRow - DragRow;
-    Objects[SelectedObject].Col := MouseCol - DragCol;
-    pbPage.Invalidate;
-  end
   else
   begin
     case ToolMode of
+      tmSelect:
+        begin
+          if drag then
+          begin
+            // dragging copy selection
+            // let paint draw selection information
+            if (dragType = DRAG_NEW) and ((MouseRow <> dragRow) or (MouseCol <> dragCol)) then
+              dragType := DRAG_ADD;
+
+            pbPage.Invalidate;
+          end;
+          if dragObj then
+          begin
+            // moving an object
+            Objects[SelectedObject].Row := MouseRow - DragRow;
+            Objects[SelectedObject].Col := MouseCol - DragCol;
+            pbPage.Invalidate;
+          end;
+        end;
+
       tmDraw:
         begin
           if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
@@ -4035,7 +4203,7 @@ begin
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         2, 1, sx, sy);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -4062,7 +4230,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         1, 2, sx, sy);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -4089,7 +4257,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         2, 2, sx, sy);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -4116,7 +4284,7 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                         bcolor,
                         Page.Rows[mr].Cells[mc],
                         2, 3, sx, sy);
-SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
@@ -4135,13 +4303,133 @@ SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
             DrawCell(LastDrawRow, LastDrawCol);
         end;
 
-      tmLine: ;
+      tmLine:
+        begin
+          // draw without effecting document
+          // erase previous line, draw new line from FirstDrawX, FirstDrawY to
+          // DrawX, DrawY
+          if drag then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase old proposed line
+                    fx := FirstDrawX;
+                    fy := FirstDrawY;
+                    LineCalcInit(fx, fy, LastDrawX, LastDrawY);
+                    x := (fx - PageLeft) * CellWidthZ;
+                    y := (fy - PageTop) * CellHeightZ;
+                    DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false);
+                    repeat
+                      done := LineCalcNext(fx, fy);
+                      x := (fx - PageLeft) * CellWidthZ;
+                      y := (fy - PageTop) * CellHeightZ;
+                      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false);
+                    until done;
+
+                    // draw proposed line
+                    dcell.chr := iif(MouseLeft, CurrChar, $20);
+                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                    fx := FirstDrawX;
+                    fy := FirstDrawY;
+                    x := (fx - PageLeft) * CellWidthZ;
+                    y := (fy - PageTop) * CellHeightZ;
+                    DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, dcell.chr, dcell.Attr);
+                    LineCalcInit(fx, fy, DrawX, DrawY);
+                    repeat
+                      done := LineCalcNext(fx, fy);
+                      x := (fx - PageLeft) * CellWidthZ;
+                      y := (fy - PageTop) * CellHeightZ;
+                      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, dcell.chr, dcell.Attr);
+                    until done;
+
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                  end;
+                end;
+
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin;
+                  // erase old proposed line
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase previous line
+                    fx := FirstDrawX;
+                    fy := FirstDrawY;
+                    mr := fy div SubYSize;
+                    mc := fx div SubXSize;
+                    x := (mc - PageLeft) * CellWidthZ;
+                    y := (mr - PageTop) * CellHeightZ;
+                    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+                    LineCalcInit(fx, fy, LastDrawX, LastDrawY);
+                    repeat
+                      done := LineCalcNext(fx, fy);
+                      mr := fy div SubYSize;
+                      mc := fx div SubXSize;
+                      x := (mc - PageLeft) * CellWidthZ;
+                      y := (mr - PageTop) * CellHeightZ;
+                      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+                    until done;
+
+                    // get color to draw in
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                    // keep track of cells drawn on.
+                    DrawData.Create(sizeof(TUndoCells), rleAdds);
+
+                    // blocks skip if on same cell. need to build some sort
+                    // of object of drawn line.
+                    // draw proposed line
+                    fx := FirstDrawX;
+                    fy := FirstDrawY;
+                    LineCalcInit(fx, fy, DrawX, DrawY);
+                    done := false;
+                    done2 := false;
+                    repeat
+                      done2 := done;
+                      mr := fy div SubYSize;
+                      mc := fx div SubXSize;
+                      sx := fx mod SubXSize;
+                      sy := fy mod SubYSize;
+                      x := (mc - PageLeft) * CellWidthZ;
+                      y := (mr - PageTop) * CellHeightZ;
+
+                      // add cell at mr, mc to drawdata if not there
+                      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+
+                      dcell := SetBlockColor(
+                        bcolor,
+                        DrawDataRec.OldCell,
+                        SubXSize, SubYSize,
+                        sx, sy);
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                      DrawDataRec.OldCell := dcell;
+                      DrawData.Put(@DrawDataRec, i);
+                      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+                      done := LineCalcNext(fx, fy);
+                    until done2;
+
+                    DrawData.Free;
+
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                  end;
+                end;
+            end;
+          end;
+        end;
+
       tmRect:  ;
       tmEllipse: ;
     end
   end;
 end;
 
+// draw mouse drawing box retinal cursor thingamabob
 procedure TfMain.DrawMouseBox;
 var
   x, y : integer;
@@ -7604,14 +7892,7 @@ begin
           end;
         end;
 
-        // check block characters for reverse, etc
-//        if cattr <> cell.attr then
-//        begin
-//          sgr := ComputeSGR(cattr, cell.attr);
-//          ansi := sgr;
-//          WriteANSI(fout, ansi);
-//          cattr := cell.attr;
-//        end;
+        // check block characters for reverse, etc TODO
 
         ansi := WideChar(cell.chr);
         WriteANSI(fout, ansi);
@@ -7705,7 +7986,7 @@ var
   sauceComment : array[0..63] of char;
   ptype,
   pcolors :   integer;
-  p1, p2 :      integer;
+  p1, p2 :    integer;
 
   function GetIntCSIVal(num : integer; defval : integer) : integer;
   var
