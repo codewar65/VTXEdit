@@ -131,7 +131,15 @@ begin
 
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
-  cnv.Draw(0, 0, bmpPreview.Bitmap);
+  if XScale = 1 then
+    cnv.Draw(0, 0, bmpPreview.Bitmap)
+  else
+  begin
+    bmpPreview.ResampleFilter := rfMitchell;
+    bmp2 := bmpPreview.Resample(pb.Width, pb.Height, rmFineResample) as TBGRABitmap;
+    cnv.Draw(0, 0, bmp2.Bitmap);
+    bmp2.Free;
+  end;
 
   // draw objects over top
   // from topmost to bottommost

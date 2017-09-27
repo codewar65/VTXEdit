@@ -391,7 +391,8 @@ begin
         Move(s[0], bmp.ScanLine[dl + 1][0], 32);
       end;
     end;
-    bmp.InvalidateBitmap;
+
+//    bmp.InvalidateBitmap;
   end;
 end;
 
@@ -663,7 +664,11 @@ begin
   result := '';
   len := length(src);
   for i := 0 to len - 1 do
+  begin
+    if src[i] = #0 then
+      break;
     result += src[i];
+  end;
 end;
 
 function CharsToStr(src : array of byte; len : integer) : unicodestring;
@@ -673,7 +678,11 @@ begin
   result := '';
   len := length(src);
   for i := 0 to len - 1 do
+  begin
+    if src[i] = 0 then
+      break;
     result += char(src[i]);
+  end;
 end;
 
 procedure DrawDashLine(cnv : TCanvas; x1, y1, x2, y2 : integer; clr1, clr2 : TColor);
@@ -717,7 +726,7 @@ var
   tmpbmp : TBGRABitmap;
 begin
   tmpbmp := bmp.Resample(r.Width, r.Height, rmSimpleStretch) as TBGRABitmap;
-  cnv.Draw(r.Left, r.Top, tmpbmp.Bitmap);
+  tmpbmp.Draw(cnv, r.left, r.top);
   tmpbmp.free;
 end;
 
