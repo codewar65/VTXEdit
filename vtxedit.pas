@@ -89,7 +89,7 @@ uses
   Spin, ComCtrls,
   Math,
   BGRABitmap,
-  BGRABitmapTypes,
+  BGRABitmapTypes, SynEdit,
   Types,
   VTXPreviewBox,
   VTXConst,
@@ -99,7 +99,7 @@ uses
   VTXFontConfig,
   UnicodeHelper,
   RecList,
-  LResources, EditBtn,
+  LResources, EditBtn, Grids, ValEdit,
   Memory,
   dateutils,
   Inifiles;
@@ -282,6 +282,9 @@ type
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
     procedure DrawSelectionAndObjects;
+    procedure DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
+    procedure DrawBlockLine(fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+    procedure EraseLine(fx, fy, tx, ty : integer);
     procedure dtpSauceDateEditingDone(Sender: TObject);
     procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
@@ -3643,24 +3646,8 @@ begin
 
                 dcell.chr := iif(MouseLeft, CurrChar, $20);
                 dcell.attr := iif(MouseLeft, CurrAttr, $0007);
-                fx := FirstDrawX;
-                fy := FirstDrawY;
-                x := (fx - PageLeft) * CellWidthZ;
-                y := (fy - PageTop) * CellHeightZ;
-                RecordUndoCell(fy, fx, dcell);
-                Page.Rows[fy].Cells[fx] := dcell;
 
-                DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, dcell.chr, dcell.Attr);
-                LineCalcInit(fx, fy, DrawX, DrawY);
-                repeat
-                  done := LineCalcNext(fx, fy);
-                  x := (fx - PageLeft) * CellWidthZ;
-                  y := (fy - PageTop) * CellHeightZ;
-                  RecordUndoCell(fy, fx, dcell);
-                  Page.Rows[fy].Cells[fx] := dcell;
-
-                  DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, dcell.chr, dcell.Attr);
-                until done;
+                DrawCharLine(FirstDrawx, FirstDrawY, DrawX, DrawY, dcell, false);
 
                 undoblk.UndoType := utCells;
                 undoblk.CellData := CurrUndoData.Copy;
@@ -3678,37 +3665,14 @@ begin
                   GetBits(CurrAttr, A_CELL_FG_MASK),
                   GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                // blocks skip if on same cell. need to build some sort
-                // of object of drawn line.
-                // draw proposed line
-                fx := FirstDrawX;
-                fy := FirstDrawY;
-                LineCalcInit(fx, fy, DrawX, DrawY);
-                done := false;
-                done2 := false;
-                repeat
-                  done2 := done;
-                  mr := fy div SubYSize;
-                  mc := fx div SubXSize;
-                  sx := fx mod SubXSize;
-                  sy := fy mod SubYSize;
-                  x := (mc - PageLeft) * CellWidthZ;
-                  y := (mr - PageTop) * CellHeightZ;
+                DrawBlockLine(FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
 
-                  // add cell at mr, mc to drawdata if not there
-                  dcell := Page.Rows[mr].Cells[mc];
-                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                  dcell := SetBlockColor(
-                    bcolor,
-                    dcell,
-                    SubXSize, SubYSize,
-                    sx, sy);
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
 
-                  RecordUndoCell(mr, mc, dcell);
-                  Page.Rows[mr].Cells[mc] := dcell;
-                  DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
-                  done := LineCalcNext(fx, fy);
-                until done2;
               end;
           end;
           dragDraw := false;
@@ -4023,19 +3987,125 @@ begin
   result := i;
 end;
 
+// redraw document from fx,fy to tx,ty
+procedure TfMain.EraseLine(fx, fy, tx, ty : integer);
+var
+  done, done2 : boolean;
+  x, y, mr, mc : integer;
+begin
+  // erase previous line
+  LineCalcInit(fx, fy, tx, ty);
+  done := false;
+  repeat
+    done2 := done;
+    mr := fy div SubYSize;
+    mc := fx div SubXSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+    done := LineCalcNext(fx, fy);
+  until done2;
+end;
+
+procedure TfMain.DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
+var
+  done, done2 : boolean;
+  x, y : integer;
+begin
+  LineCalcInit(fx, fy, tx, ty);
+  done := false;
+  repeat
+    done2 := done;
+    x := (fx - PageLeft) * CellWidthZ;
+    y := (fy - PageTop) * CellHeightZ;
+    if skipUpdate then
+    begin
+      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, cell.chr, cell.Attr)
+    end
+    else
+    begin
+      RecordUndoCell(fy, fx, cell);
+      Page.Rows[fy].Cells[fx] := cell;
+      DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, cell.chr, cell.Attr);
+    end;
+    done := LineCalcNext(fx, fy);
+  until done2;
+end;
+
+// draw block line - if skipupdate then only display, no changes to doc.
+// else update and record changes to undo data.
+procedure TfMain.DrawBlockLine(fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+var
+  DrawData :    TRecList; // of TUndoCells;
+  DrawDataRec : TundoCells;
+  done, done2 : boolean;
+  mr, mc,
+  sx, sy,
+  x, y :        integer;
+  dcell :       TCell;
+  i :           integer;
+begin
+  // keep track of cells drawn on.
+  DrawData.Create(sizeof(TUndoCells), rleAdds);
+
+  // draw proposed line
+  LineCalcInit(fx, fy, tx, ty);
+  done := false;
+  repeat
+    done2 := done;
+    mr := fy div SubYSize;
+    mc := fx div SubXSize;
+    sx := fx mod SubXSize;
+    sy := fy mod SubYSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+
+    if skipUpdate then
+    begin
+      // add cell at mr, mc to drawdata if not there
+      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+
+      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        DrawDataRec.OldCell,
+        SubXSize, SubYSize, // these are global based on drawing mode
+        sx, sy);
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      DrawDataRec.OldCell := dcell;
+      DrawData.Put(@DrawDataRec, i);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+    end
+    else
+    begin
+      // add cell at mr, mc to drawdata if not there
+      dcell := Page.Rows[mr].Cells[mc];
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        dcell,
+        SubXSize, SubYSize,
+        sx, sy);
+
+      RecordUndoCell(mr, mc, dcell);
+      Page.Rows[mr].Cells[mc] := dcell;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+    end;
+
+    done := LineCalcNext(fx, fy);
+  until done2;
+  DrawData.Free;
+end;
+
 procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   i, dx, dy :       integer;
   fx, fy :          integer;
-  done2,
   done :            boolean;
   mr, mc, sx, sy :  integer;
   bcolor :          integer;
   dcell :           TCell;
-  DrawData :        TRecList; // of TUndoCells;
-  DrawDataRec :     TundoCells;
-  found :           boolean;
 
 //  dattr, dchar :    integer;
 begin
@@ -4184,34 +4254,14 @@ begin
                   if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
                   begin
                     // erase old proposed line
-                    fx := FirstDrawX;
-                    fy := FirstDrawY;
-                    LineCalcInit(fx, fy, LastDrawX, LastDrawY);
-                    x := (fx - PageLeft) * CellWidthZ;
-                    y := (fy - PageTop) * CellHeightZ;
-                    DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false);
-                    repeat
-                      done := LineCalcNext(fx, fy);
-                      x := (fx - PageLeft) * CellWidthZ;
-                      y := (fy - PageTop) * CellHeightZ;
-                      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false);
-                    until done;
+                    EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
-                    // draw proposed line
+                    // draw proposed line -
+                    // TODO - may need the ignore attributes done here
                     dcell.chr := iif(MouseLeft, CurrChar, $20);
                     dcell.attr := iif(MouseLeft, CurrAttr, $0007);
-                    fx := FirstDrawX;
-                    fy := FirstDrawY;
-                    x := (fx - PageLeft) * CellWidthZ;
-                    y := (fy - PageTop) * CellHeightZ;
-                    DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, dcell.chr, dcell.Attr);
-                    LineCalcInit(fx, fy, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(fx, fy);
-                      x := (fx - PageLeft) * CellWidthZ;
-                      y := (fy - PageTop) * CellHeightZ;
-                      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, dcell.chr, dcell.Attr);
-                    until done;
+
+                    DrawCharLine(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
 
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
@@ -4227,65 +4277,15 @@ begin
                   if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
                   begin
                     // erase previous line
-                    fx := FirstDrawX;
-                    fy := FirstDrawY;
-                    mr := fy div SubYSize;
-                    mc := fx div SubXSize;
-                    x := (mc - PageLeft) * CellWidthZ;
-                    y := (mr - PageTop) * CellHeightZ;
-                    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
-                    LineCalcInit(fx, fy, LastDrawX, LastDrawY);
-                    repeat
-                      done := LineCalcNext(fx, fy);
-                      mr := fy div SubYSize;
-                      mc := fx div SubXSize;
-                      x := (mc - PageLeft) * CellWidthZ;
-                      y := (mr - PageTop) * CellHeightZ;
-                      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
-                    until done;
+                    EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
                     // get color to draw in
                     bcolor := iif(MouseLeft,
                       GetBits(CurrAttr, A_CELL_FG_MASK),
                       GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                    // keep track of cells drawn on.
-                    DrawData.Create(sizeof(TUndoCells), rleAdds);
-
-                    // blocks skip if on same cell. need to build some sort
-                    // of object of drawn line.
-                    // draw proposed line
-                    fx := FirstDrawX;
-                    fy := FirstDrawY;
-                    LineCalcInit(fx, fy, DrawX, DrawY);
-                    done := false;
-                    done2 := false;
-                    repeat
-                      done2 := done;
-                      mr := fy div SubYSize;
-                      mc := fx div SubXSize;
-                      sx := fx mod SubXSize;
-                      sy := fy mod SubYSize;
-                      x := (mc - PageLeft) * CellWidthZ;
-                      y := (mr - PageTop) * CellHeightZ;
-
-                      // add cell at mr, mc to drawdata if not there
-                      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
-
-                      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                      dcell := SetBlockColor(
-                        bcolor,
-                        DrawDataRec.OldCell,
-                        SubXSize, SubYSize,
-                        sx, sy);
-                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                      DrawDataRec.OldCell := dcell;
-                      DrawData.Put(@DrawDataRec, i);
-                      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
-                      done := LineCalcNext(fx, fy);
-                    until done2;
-
-                    DrawData.Free;
+                    // draw temp line
+                    DrawBlockLine(FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
 
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
@@ -4298,8 +4298,12 @@ begin
           end;
         end;
 
-      tmRect:  ;
-      tmEllipse: ;
+      tmRect:
+        begin
+        end;
+
+      tmEllipse:
+        ;
     end
   end;
 end;
