@@ -1427,7 +1427,7 @@ begin
     begin
       // same colors
       SetBits(cell.Attr, A_CELL_FG_MASK, c2[0]);
-      cell.Chr  := GetCPChar(cp, Blocks2x1[3]);
+      cell.Chr := GetCPChar(cp, Blocks2x1[3]);
     end
     else
     begin
@@ -1565,7 +1565,6 @@ begin
     c6[x + (y << 1)] := clr;
 
     if Fonts[CurrFont] = encTeletextSeparated then
-//    if GetBits(cell.Attr, A_CELL_FONT_MASK, 28) = 12 then
       for i := 0 to 5 do
         if c6[i] <> clr then
           c6[i] := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
@@ -3697,12 +3696,13 @@ begin
                   y := (mr - PageTop) * CellHeightZ;
 
                   // add cell at mr, mc to drawdata if not there
+                  dcell := Page.Rows[mr].Cells[mc];
+                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   dcell := SetBlockColor(
                     bcolor,
-                    Page.Rows[mr].Cells[mc],
+                    dcell,
                     SubXSize, SubYSize,
                     sx, sy);
-                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
 
                   RecordUndoCell(mr, mc, dcell);
                   Page.Rows[mr].Cells[mc] := dcell;
@@ -3944,73 +3944,19 @@ begin
                   PutCharEx(dcell.Chr, dcell.Attr, MouseRow, MouseCol);
                 end;
 
-              dmLeftRights:
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
                 begin
                   bcolor := iif(Button = mbLeft,
                     GetBits(CurrAttr, A_CELL_FG_MASK),
                     GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    2, 1, SubX, SubY);
+                  // add cell at mr, mc to drawdata if not there
+                  dcell := Page.Rows[MouseRow].Cells[MouseCol];
                   SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol, false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-
-              dmTopBottoms:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
                   dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    1, 2, SubX, SubY);
-                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol,false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-
-              dmQuarters:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    2, 2, SubX, SubY);
-                  SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-                  RecordUndoCell(MouseRow, MouseCol, dcell);
-
-                  Page.Rows[MouseRow].Cells[MouseCol] := dcell;
-                  DrawCell(MouseRow, MouseCol,false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
-                end;
-
-              // teletext mosaic blocks
-              dmSixels:
-                begin
-                  bcolor := iif(Button = mbLeft,
-                    GetBits(CurrAttr, A_CELL_FG_MASK),
-                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                  dcell := SetBlockColor(
-                    bcolor,
-                    Page.Rows[MouseRow].Cells[MouseCol],
-                    2, 3, SubX, SubY);
+                    bcolor, dcell,
+                    SubXSize, SubYSize,
+                    SubX, SubY);
                   SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                   RecordUndoCell(MouseRow, MouseCol, dcell);
 
@@ -4188,7 +4134,7 @@ begin
                     until done;
                   end;
 
-                dmLeftRights:
+                dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
                   begin
                     bcolor := iif(MouseLeft,
                       GetBits(CurrAttr, A_CELL_FG_MASK),
@@ -4201,96 +4147,16 @@ begin
                       sx := LastDrawX mod SubXSize;
                       sy := LastDrawY mod SubYSize;
 
+                      dcell := Page.Rows[mr].Cells[mc];
+                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                       dcell := SetBlockColor(
                         bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        2, 1, sx, sy);
-                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+                        dcell,
+                        SubXSize, SubYSize, sx, sy);
 
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-
-                dmTopBottoms:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        1, 2, sx, sy);
-                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc, false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-
-                dmQuarters:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        2, 2, sx, sy);
-                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc,false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
-                    until done;
-                  end;
-
-                dmSixels:
-                  begin
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-                    LineCalcInit(lastDrawX, LastDrawY, DrawX, DrawY);
-                    repeat
-                      done := LineCalcNext(LastDrawX, LastDrawY);
-                      mr := LastDrawY div SubYSize;
-                      mc := LastDrawX div SubXSize;
-                      sx := LastDrawX mod SubXSize;
-                      sy := LastDrawY mod SubYSize;
-
-                      dcell := SetBlockColor(
-                        bcolor,
-                        Page.Rows[mr].Cells[mc],
-                        2, 3, sx, sy);
-                      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
-
-                      RecordUndoCell(mr, mc, dcell);
-                      Page.Rows[mr].Cells[mc] := dcell;
-                      DrawCell(mr, mc,false);
                       CurrFileChanged := true;
                       UpdateTitles;
                     until done;
@@ -4406,6 +4272,7 @@ begin
                       // add cell at mr, mc to drawdata if not there
                       i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
 
+                      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
                       dcell := SetBlockColor(
                         bcolor,
                         DrawDataRec.OldCell,
