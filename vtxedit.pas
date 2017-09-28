@@ -281,6 +281,7 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    procedure DrawSelectionAndObjects;
     procedure dtpSauceDateEditingDone(Sender: TObject);
     procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
@@ -504,6 +505,7 @@ var
   // region selection
   CopySelection :           TRecList;
   drag :                    boolean;    // in drag mode
+  dragDraw :                boolean;    // in drawing mode (line, rect, ellipse)
   dragType :                integer;    // 0=select, 1=add, 2=remove
   dragRow, dragCol :        integer;    // drag delta
   dragObjRow, dragObjCol :  integer;    // start pos of obj drag
@@ -3709,7 +3711,7 @@ begin
                 until done2;
               end;
           end;
-          drag := false;
+          dragDraw := false;
         end;
     end;
   end;
@@ -4036,7 +4038,7 @@ begin
                   FirstDrawY := DrawY;
                   LastDrawX := DrawX;
                   LastDrawY := DrawY;
-                  drag := true;
+                  dragDraw := true;
                 end;
             end;
           end;
@@ -4308,7 +4310,7 @@ begin
           // draw without effecting document
           // erase previous line, draw new line from FirstDrawX, FirstDrawY to
           // DrawX, DrawY
-          if drag then
+          if dragDraw then
           begin
             case DrawMode of
               dmChars:
@@ -4347,6 +4349,9 @@ begin
 
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
+
+                    DrawSelectionAndObjects;
+
                   end;
                 end;
 
@@ -4417,6 +4422,9 @@ begin
 
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
+
+                    DrawSelectionAndObjects;
+
                   end;
                 end;
             end;
@@ -5456,6 +5464,118 @@ begin
   nop;
 end;
 
+// draw the copy selection and objects onto page
+procedure TfMain.DrawSelectionAndObjects;
+var
+  i, r, c,
+  x, y :      integer;
+  tmpreg :    TRecList;
+  pr :        TRect;
+  cl1, cl2 :  integer;
+  objnum :    integer;
+  copyrec :   TLoc;
+  cnv :       TCanvas;
+  cell :      TCell;
+
+begin
+  cnv := pbPage.Canvas;
+
+  // draw selection information
+  tmpreg := BuildDisplayCopySelection;
+  for i := tmpreg.Count - 1 downto 0 do
+  begin
+    tmpreg.Get(@copyrec, i);
+    pr.Top := (copyrec.Row - PageTop) * CellHeightZ;
+    pr.Left := (copyrec.Col - PageLeft) * CellWidthZ;
+    pr.Width := CellWidthZ;
+    pr.Height := CellHeightZ;
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top,
+        pr.Left + CellWidthZ, pr.Top,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top + CellHeightZ - 1,
+        pr.Left + CellWidthZ, pr.Top + CellHeightZ - 1,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
+      DrawDashLine(cnv,
+        pr.Left, pr.Top,
+        pr.Left, pr.Top + CellHeightZ - 1,
+        clSelectionArea1, clSelectionArea2);
+    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
+      DrawDashLine(cnv,
+        pr.Left + CellWidthZ - 1, pr.Top,
+        pr.Left + CellWidthZ - 1, pr.Top + CellHeightZ,
+        clSelectionArea1, clSelectionArea2);
+  end;
+  tmpreg.Free;
+
+  // draw objects over top
+  for r := PageTop to PageTop + WindowRows do
+  begin
+    if r >= NumRows then
+      break;
+
+    y := (r - PageTop) * CellHeightZ;
+    for c := PageLeft to PageLeft + WindowCols do
+    begin
+      if c >= NumCols then
+        break;
+
+      x := (c - PageLeft) * CellWidthZ;
+      objnum := GetObjectCell(r, c, cell);
+      if (objnum <> -1) and (cell.Chr <> _EMPTY) then
+      begin
+        // object here.
+        DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
+        if ObjectOutlines then
+        begin
+          if objnum = SelectedObject then
+          begin
+            cl1 := clSelectedObject1;
+            cl2 := clSelectedObject2;
+          end
+          else
+          begin
+            cl1 := clUnselectedObject1;
+            cl2 := clUnselectedObject2;
+          end;
+
+          if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
+            DrawDashLine(cnv,
+              x, y,
+              x + CellWidthZ, y,
+              cl1, cl2);
+          if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
+            DrawDashLine(cnv,
+              x, y + CellHeightZ - 1,
+              x + CellWidthZ, y + CellHeightZ - 1,
+              cl1, cl2);
+          if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
+            DrawDashLine(cnv,
+              x, y,
+              x, y + CellHeightZ,
+              cl1, cl2);
+          if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
+            DrawDashLine(cnv,
+              x + CellWidthZ - 1, y,
+              x + CellWidthZ - 1, y + CellHeightZ,
+              cl1, cl2);
+        end;
+      end;
+    end;
+  end;
+
+  // draw page guidelines
+  r := floor((NumRows - PageTop) * CellHeightZ);
+  c := floor((NumCols - PageLeft) * CellWidthZ);
+  DrawDashLine(cnv, 0, r, pbPage.Width, r, clPageBorder1, clPageBorder2);
+  DrawDashLine(cnv, c, 0, c, pbPage.Height, clPageBorder1, clPageBorder2);
+
+end;
+
 // draw the document
 procedure TfMain.pbPagePaint(Sender: TObject);
 var
@@ -5520,96 +5640,7 @@ begin
   cnv.Draw(0, 0, tmp2.Bitmap);
   tmp2.free;
 
-  // draw selection information
-  tmpreg := BuildDisplayCopySelection;
-  for i := tmpreg.Count - 1 downto 0 do
-  begin
-    tmpreg.Get(@copyrec, i);
-    pr.Top := (copyrec.Row - PageTop) * CellHeightZ;
-    pr.Left := (copyrec.Col - PageLeft) * CellWidthZ;
-    pr.Width := CellWidthZ;
-    pr.Height := CellHeightZ;
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top,
-        pr.Left + CellWidthZ, pr.Top,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top + CellHeightZ - 1,
-        pr.Left + CellWidthZ, pr.Top + CellHeightZ - 1,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
-      DrawDashLine(cnv,
-        pr.Left, pr.Top,
-        pr.Left, pr.Top + CellHeightZ - 1,
-        clSelectionArea1, clSelectionArea2);
-    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
-      DrawDashLine(cnv,
-        pr.Left + CellWidthZ - 1, pr.Top,
-        pr.Left + CellWidthZ - 1, pr.Top + CellHeightZ,
-        clSelectionArea1, clSelectionArea2);
-  end;
-  tmpreg.Free;
-
-  // draw objects over top
-  for r := PageTop to PageTop + WindowRows do
-  begin
-    if r >= NumRows then break;
-
-      y := (r - PageTop) * CellHeightZ;
-      for c := PageLeft to PageLeft + WindowCols do
-      begin
-        if c >= NumCols then break;
-
-        x := (c - PageLeft) * CellWidthZ;
-        objnum := GetObjectCell(r, c, cell);
-        if (objnum <> -1) and (cell.Chr <> _EMPTY) then
-        begin
-          // object here.
-          DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
-          if ObjectOutlines then
-          begin
-            if objnum = SelectedObject then
-            begin
-              cl1 := clSelectedObject1;
-              cl2 := clSelectedObject2;
-            end
-            else
-            begin
-              cl1 := clUnselectedObject1;
-              cl2 := clUnselectedObject2;
-            end;
-            if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
-              DrawDashLine(cnv,
-                x, y,
-                x + CellWidthZ, y,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
-              DrawDashLine(cnv,
-                x, y + CellHeightZ - 1,
-                x + CellWidthZ, y + CellHeightZ - 1,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
-              DrawDashLine(cnv,
-                x, y,
-                x, y + CellHeightZ,
-                cl1, cl2);
-            if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
-              DrawDashLine(cnv,
-                x + CellWidthZ - 1, y,
-                x + CellWidthZ - 1, y + CellHeightZ,
-                cl1, cl2);
-          end;
-        end;
-    end;
-  end;
-
-  // draw page guidelines
-  r := floor((NumRows - PageTop) * CellHeightZ);
-  c := floor((NumCols - PageLeft) * CellWidthZ);
-  DrawDashLine(cnv, 0, r, pbPage.Width, r, clPageBorder1, clPageBorder2);
-  DrawDashLine(cnv, c, 0, c, pbPage.Height, clPageBorder1, clPageBorder2);
+  DrawSelectionAndObjects;
 
 end;
 
