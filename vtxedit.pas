@@ -73,6 +73,7 @@ uses
   Windows,
   {$endif}
   LCLType,
+  LazFileUtils,
   Classes,
   SysUtils,
   strutils,
@@ -99,7 +100,8 @@ uses
   VTXFontConfig,
   UnicodeHelper,
   RecList,
-  LResources, EditBtn, Grids, ValEdit,
+  LResources,
+  EditBtn,
   Memory,
   dateutils,
   Inifiles;
@@ -282,6 +284,7 @@ type
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
     procedure DrawSelectionAndObjects;
+    function AdjustCellIgnores(cell : TCell; r, c : integer) : TCell;
     procedure DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
     procedure DrawBlockLine(fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
     procedure EraseLine(fx, fy, tx, ty : integer);
@@ -412,7 +415,7 @@ type
     procedure DrawMouseBox;
     procedure PutCharExpand(ch : integer);
     procedure PutChar(ch : integer);
-    procedure PutCharEx(ch, cattr, row, col : integer);
+    procedure PutCharEx(ch, attr, row, col : integer);
     function HasUnicodes(cp : TEncoding; chars : array of UInt16) : boolean;
     function GetUnicode(cell : TCell) : integer;
     function GetCPChar(cp : TEncoding; unicode : integer) : integer;
@@ -534,8 +537,6 @@ var
   ObjectOutlines :          boolean = true;
 
   LastCharNum :             integer = 0;
-
-  CustomCursors : array [ CURSOR_ARROW .. CURSOR_EYEDROPPER ] of TCursorImage;
 
 {*****************************************************************************}
 
@@ -2412,15 +2413,15 @@ begin
   UpdateTitles;
 end;
 
-procedure TfMain.PutCharEx(ch, cattr, row, col : integer);
+// adjust cell using ignore information and char at r,c
+function TfMain.AdjustCellIgnores(cell : TCell; r, c : integer) : TCell;
 var
-  attr, mask : UInt32;
+  mask : longint;
 begin
-//  ScrollToCursor; // keep cursor on screen if typing
+  result := cell;
 
-  // tags on attribute buttons used to mark if attribute is to be
-  // ignored.
-  if tbAttrCharacter.Tag = 0 then     Page.Rows[row].Cells[col].Chr := ch;
+  if tbAttrCharacter.Tag <> 0 then
+    result.chr := Page.Rows[r].Cells[c].Chr;
 
   // build attribute Mask
   mask := $00000000;
@@ -2441,11 +2442,22 @@ begin
   or (tbAttrTop.Tag = 0)
   or (tbAttrBottom.Tag = 0) then      mask := mask or A_CELL_DISPLAY_MASK;
 
-//  attr := Page.Rows[row].Cells[col].Attr;
-  attr := cattr;
-  attr := attr and (not mask);
-  attr := attr or (cattr and mask);
-  Page.Rows[row].Cells[col].Attr := attr;
+  result.Attr := result.Attr and mask;
+  result.Attr := result.Attr or (Page.Rows[r].Cells[c].Attr and not mask);
+
+end;
+
+procedure TfMain.PutCharEx(ch, attr, row, col : integer);
+var
+  cell : TCell;
+begin
+
+  cell.chr := ch;
+  cell.attr := attr;
+
+  cell := AdjustCellIgnores(cell, row, col);
+  SetBits(cell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+  Page.Rows[row].Cells[col] := cell;
   DrawCell(row, col, false);
 
   CurrFileChanged := true;
@@ -2455,49 +2467,20 @@ end;
 // called from keypress or Print in keybinds
 procedure TfMain.PutChar(ch : integer);
 var
-  attr,
-  mask :    UInt32;
   cell :    TCell;
 begin
 //  ScrollToCursor; // keep cursor on screen if typing
 
-  if tbAttrCharacter.Tag <> 0 then
-    ch := Page.Rows[CursorRow].Cells[CursorCol].Chr;
+  cell.chr := ch;
+  cell.attr := CurrAttr;
 
-  // build attribute Mask
-  mask := $00000000;
-  if tbAttrFG.Tag = 0 then            mask := mask or A_CELL_FG_MASK;
-  if tbAttrBG.Tag = 0 then            mask := mask or A_CELL_BG_MASK;
-
-  if tbAttrBold.Tag = 0 then          mask := mask or A_CELL_BOLD;
-  if tbAttrFaint.Tag = 0 then         mask := mask or A_CELL_FAINT;
-  if tbAttrUnderline.Tag = 0 then     mask := mask or A_CELL_UNDERLINE;
-  if tbAttrBlinkSlow.Tag = 0 then     mask := mask or A_CELL_BLINKSLOW;
-  if tbAttrBlinkFast.Tag = 0 then     mask := mask or A_CELL_BLINKFAST;
-  if tbAttrReverse.Tag = 0 then       mask := mask or A_CELL_REVERSE;
-  if tbAttrStrikethrough.Tag = 0 then mask := mask or A_CELL_STRIKETHROUGH;
-  if tbAttrDoublestrike.Tag = 0 then  mask := mask or A_CELL_DOUBLESTRIKE;
-  if tbAttrShadow.Tag = 0 then        mask := mask or A_CELL_SHADOW;
-
-  if (tbAttrConceal.Tag = 0)
-    or (tbAttrTop.Tag = 0)
-    or (tbAttrBottom.Tag = 0) then    mask := mask or A_CELL_DISPLAY_MASK;
-
-  attr := Page.Rows[CursorRow].Cells[CursorCol].Attr;
-  attr := attr and (not mask);
-  attr := attr or (CurrAttr and mask);
-
-  SetBits(attr, A_CELL_FONT_MASK, CurrFont, 28);
-
-  cell.Chr := ch;
-  cell.Attr := attr;
+  cell := AdjustCellIgnores(cell, CursorRow, CursorCol);
+  SetBits(cell.attr, A_CELL_FONT_MASK, CurrFont, 28);
   RecordUndoCell(CursorRow, CursorCol, cell);
-
-  Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
-  Page.Rows[CursorRow].Cells[CursorCol].Attr := attr;
-
+  Page.Rows[CursorRow].Cells[CursorCol] := cell;
   DrawCell(CursorRow, CursorCol, false);
   CursorRight;
+
   CurrFileChanged := true;
   UpdateTitles;
 end;
@@ -2794,7 +2777,6 @@ procedure TfMain.NewFile;
 var
   i :       integer;
   r, c :    integer;
-  undoblk : TUndoBlock;
 begin
   // truncate page
   for r := 0 to length(Page.Rows) - 1 do
@@ -3574,12 +3556,7 @@ var
   undoblk :   TUndoBlock;
   tmp :       TRecList;
   dcell :     TCell;
-  fx, fy :    integer;
-  done2,
-  done :      boolean;
   bcolor :    integer;
-  mr, mc :  integer;
-  sx, sy : integer;
 begin
 
   if Button = mbMiddle then
@@ -3654,6 +3631,7 @@ begin
                 undoblk.CellData.Trim;
                 UndoAdd(undoblk);
                 CurrUndoData.Clear;
+                DrawSelectionAndObjects;
               end;
 
             dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
@@ -3672,7 +3650,37 @@ begin
                 undoblk.CellData.Trim;
                 UndoAdd(undoblk);
                 CurrUndoData.Clear;
+                DrawSelectionAndObjects;
+              end;
+          end;
+          dragDraw := false;
+        end;
 
+      tmRect:
+        begin
+          case DrawMode of
+            dmChars:
+              begin
+                SaveUndoKeys;
+
+                // draw proposed line -
+                dcell.chr := iif(MouseLeft, CurrChar, $20);
+                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+
+                DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell, false);
+                DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell, false);
+                DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell, false);
+                DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell, false);
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
+                DrawSelectionAndObjects;
+              end;
+
+            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+              begin
               end;
           end;
           dragDraw := false;
@@ -3691,14 +3699,13 @@ end;
 procedure TfMain.pbPageMouseWheel(Sender: TObject; Shift: TShiftState;
   WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
 var
-  val :       integer;
-  PrevZoom :  double;
-  NewWindowCols, NewWindowRows : integer;
+  val :           integer;
+  NewWindowCols,
+  NewWindowRows : integer;
 begin
   // zoom
   if ssShift in Shift then
   begin
-    PrevZoom := PageZoom;
     if WheelDelta < 0 then
     begin
       PageZoom /= 2;
@@ -4011,6 +4018,7 @@ procedure TfMain.DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate
 var
   done, done2 : boolean;
   x, y : integer;
+  cell2 : TCell;
 begin
   LineCalcInit(fx, fy, tx, ty);
   done := false;
@@ -4020,13 +4028,17 @@ begin
     y := (fy - PageTop) * CellHeightZ;
     if skipUpdate then
     begin
-      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, cell.chr, cell.Attr)
+      cell2 := AdjustCellIgnores(cell, fy, fx);
+      DrawCellEx(pbPage.Canvas, x, y, fy, fx, true, false, cell2.chr, cell2.Attr)
     end
     else
     begin
-      RecordUndoCell(fy, fx, cell);
-      Page.Rows[fy].Cells[fx] := cell;
-      DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, cell.chr, cell.Attr);
+      cell2 := AdjustCellIgnores(cell, fy, fx);
+
+      RecordUndoCell(fy, fx, cell2);
+      Page.Rows[fy].Cells[fx] := cell2;
+      DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, cell2.chr, cell2.Attr);
+
     end;
     done := LineCalcNext(fx, fy);
   until done2;
@@ -4101,7 +4113,6 @@ procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   i, dx, dy :       integer;
-  fx, fy :          integer;
   done :            boolean;
   mr, mc, sx, sy :  integer;
   bcolor :          integer;
@@ -4257,17 +4268,12 @@ begin
                     EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
                     // draw proposed line -
-                    // TODO - may need the ignore attributes done here
                     dcell.chr := iif(MouseLeft, CurrChar, $20);
                     dcell.attr := iif(MouseLeft, CurrAttr, $0007);
-
                     DrawCharLine(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
-
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
-
                     DrawSelectionAndObjects;
-
                   end;
                 end;
 
@@ -4300,6 +4306,36 @@ begin
 
       tmRect:
         begin
+          if dragDraw then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase old proposed line
+                    EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
+                    EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
+                    EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
+                    EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
+
+                    // draw proposed line -
+                    dcell.chr := iif(MouseLeft, CurrChar, $20);
+                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                    DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell);
+                    DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell);
+                    DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell);
+                    DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell);
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                    DrawSelectionAndObjects;
+                  end;
+                end;
+
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                ;
+            end;
+          end;
         end;
 
       tmEllipse:
@@ -7413,7 +7449,7 @@ begin
       for r := 0 to Objects[o].Height - 1 do
         for c := 0 to Objects[o].Width - 1 do
         begin
-          Objects[o].Data.Get(@cell, r * Objects[i].Width + c);
+          Objects[o].Data.Get(@cell, r * Objects[o].Width + c);
           fontsused[(GetBits(cell.Attr, A_CELL_FONT_MASK, 28) and $0F)] := 1;
         end;
 

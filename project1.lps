@@ -8,7 +8,7 @@
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit0>
       <Unit1>
         <Filename Value="vtxedit.pas"/>
@@ -18,9 +18,9 @@
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXEdit"/>
         <IsVisibleTab Value="True"/>
-        <TopLine Value="4009"/>
-        <CursorPos X="18" Y="4064"/>
-        <UsageCount Value="83"/>
+        <TopLine Value="8309"/>
+        <CursorPos X="6" Y="8367"/>
+        <UsageCount Value="85"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -30,7 +30,7 @@
         <UnitName Value="VTXConst"/>
         <EditorIndex Value="3"/>
         <TopLine Value="16"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
         <Loaded Value="True"/>
       </Unit2>
       <Unit3>
@@ -40,7 +40,7 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXPreviewBox"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit3>
       <Unit4>
         <Filename Value="vtxsupport.pas"/>
@@ -49,19 +49,19 @@
         <EditorIndex Value="2"/>
         <TopLine Value="503"/>
         <CursorPos X="19" Y="614"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
         <Loaded Value="True"/>
       </Unit4>
       <Unit5>
         <Filename Value="vtxedit.ini"/>
         <IsPartOfProject Value="True"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit5>
       <Unit6>
         <Filename Value="vtxencdetect.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="VTXEncDetect"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit6>
       <Unit7>
         <Filename Value="unicodehelper.pas"/>
@@ -70,7 +70,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="310"/>
         <CursorPos Y="334"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit7>
       <Unit8>
         <Filename Value="reclist.pas"/>
@@ -79,24 +79,24 @@
         <EditorIndex Value="1"/>
         <TopLine Value="95"/>
         <CursorPos Y="151"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
         <Loaded Value="True"/>
       </Unit8>
       <Unit9>
         <Filename Value="memory.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="Memory"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit9>
       <Unit10>
         <Filename Value="vtxcursors.lrs"/>
         <IsPartOfProject Value="True"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit10>
       <Unit11>
         <Filename Value="buildres.bat"/>
         <IsPartOfProject Value="True"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit11>
       <Unit12>
         <Filename Value="vtxexportoptions.pas"/>
@@ -105,7 +105,7 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXExportOptions"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit12>
       <Unit13>
         <Filename Value="vtxfontconfig.pas"/>
@@ -114,7 +114,7 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXFontConfig"/>
-        <UsageCount Value="83"/>
+        <UsageCount Value="85"/>
       </Unit13>
       <Unit14>
         <Filename Value="C:\lazarus\lcl\stdctrls.pp"/>
@@ -142,124 +142,135 @@
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4069" TopLine="4003"/>
+        <Caret Line="416" Column="29" TopLine="313"/>
       </Position1>
       <Position2>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4070" TopLine="4003"/>
+        <Caret Line="2395" Column="27" TopLine="2291"/>
       </Position2>
       <Position3>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4071" TopLine="4003"/>
+        <Caret Line="2529" TopLine="2508"/>
       </Position3>
       <Position4>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4072" TopLine="4003"/>
+        <Caret Line="3638" Column="29" TopLine="3529"/>
       </Position4>
       <Position5>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4073" TopLine="4003"/>
+        <Caret Line="4028" TopLine="3932"/>
       </Position5>
       <Position6>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4074" TopLine="4003"/>
+        <Caret Line="3673" TopLine="3592"/>
       </Position6>
       <Position7>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4075" TopLine="4003"/>
+        <Caret Line="3674" TopLine="3592"/>
       </Position7>
       <Position8>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4078" TopLine="4003"/>
+        <Caret Line="3676" TopLine="3592"/>
       </Position8>
       <Position9>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4080" TopLine="4003"/>
+        <Caret Line="3677" TopLine="3592"/>
       </Position9>
       <Position10>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4081" TopLine="4003"/>
+        <Caret Line="3678" TopLine="3592"/>
       </Position10>
       <Position11>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4086" TopLine="4003"/>
+        <Caret Line="3679" TopLine="3592"/>
       </Position11>
       <Position12>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4087" TopLine="4003"/>
+        <Caret Line="3680" TopLine="3592"/>
       </Position12>
       <Position13>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4088" TopLine="4003"/>
+        <Caret Line="3681" TopLine="3592"/>
       </Position13>
       <Position14>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4089" TopLine="4003"/>
+        <Caret Line="3682" TopLine="3592"/>
       </Position14>
       <Position15>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4091" TopLine="4003"/>
+        <Caret Line="3683" TopLine="3592"/>
       </Position15>
       <Position16>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4092" TopLine="4003"/>
+        <Caret Line="3684" TopLine="3592"/>
       </Position16>
       <Position17>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4069" TopLine="4003"/>
+        <Caret Line="3685" TopLine="3592"/>
       </Position17>
       <Position18>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4070" TopLine="4003"/>
+        <Caret Line="4347" Column="9" TopLine="4250"/>
       </Position18>
       <Position19>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4071" TopLine="4003"/>
+        <Caret Line="3561" TopLine="3505"/>
       </Position19>
       <Position20>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4070" TopLine="4003"/>
+        <Caret Line="2780" TopLine="2724"/>
       </Position20>
       <Position21>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4091" TopLine="4004"/>
+        <Caret Line="3703" TopLine="3647"/>
       </Position21>
       <Position22>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4064" Column="30" TopLine="4004"/>
+        <Caret Line="4079" Column="50" TopLine="4023"/>
       </Position22>
       <Position23>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4065" Column="30" TopLine="4005"/>
+        <Caret Line="4117" TopLine="4061"/>
       </Position23>
       <Position24>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4064" Column="30" TopLine="4004"/>
+        <Caret Line="5250" Column="58" TopLine="5195"/>
       </Position24>
       <Position25>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4049" TopLine="4004"/>
+        <Caret Line="76" Column="16"/>
       </Position25>
       <Position26>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="301" Column="62" TopLine="225"/>
+        <Caret Line="3710" TopLine="3654"/>
       </Position26>
       <Position27>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3716" TopLine="3635"/>
+        <Caret Line="104" Column="3" TopLine="47"/>
       </Position27>
       <Position28>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="4050" TopLine="4027"/>
+        <Caret Line="7926" Column="3" TopLine="7870"/>
       </Position28>
       <Position29>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="1289" TopLine="1228"/>
+        <Caret Line="541" TopLine="485"/>
       </Position29>
       <Position30>
         <Filename Value="vtxedit.pas"/>
-        <Caret Line="3704" TopLine="3619"/>
+        <Caret Line="7452" TopLine="7390"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>
+  <Debugging>
+    <BreakPoints Count="1">
+      <Item1>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="vtxedit.pas"/>
+        <Line Value="8365"/>
+      </Item1>
+    </BreakPoints>
+  </Debugging>
 </CONFIG>
