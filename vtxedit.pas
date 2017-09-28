@@ -286,8 +286,11 @@ type
     procedure DrawSelectionAndObjects;
     function AdjustCellIgnores(cell : TCell; r, c : integer) : TCell;
     procedure DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
-    procedure DrawBlockLine(fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+    procedure DrawCharEllipse(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
+    procedure DrawBlockEllipse(var DrawData : TRecList; fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+    procedure DrawBlockLine(var DrawData : TRecList; fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
     procedure EraseLine(fx, fy, tx, ty : integer);
+    procedure EraseEllipse(fx, fy, tx, ty : integer);
     procedure dtpSauceDateEditingDone(Sender: TObject);
     procedure ExportTextFile(fname : string; useBOM, usesauce : boolean);
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
@@ -3557,6 +3560,7 @@ var
   tmp :       TRecList;
   dcell :     TCell;
   bcolor :    integer;
+  DrawData :  TRecList;
 begin
 
   if Button = mbMiddle then
@@ -3643,7 +3647,9 @@ begin
                   GetBits(CurrAttr, A_CELL_FG_MASK),
                   GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                DrawBlockLine(FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
+                DrawData.Create(sizeof(TUndoCells), rleAdds);
+                DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
+                DrawData.Free;
 
                 undoblk.UndoType := utCells;
                 undoblk.CellData := CurrUndoData.Copy;
@@ -3671,6 +3677,7 @@ begin
                 DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell, false);
                 DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell, false);
                 DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell, false);
+
                 undoblk.UndoType := utCells;
                 undoblk.CellData := CurrUndoData.Copy;
                 undoblk.CellData.Trim;
@@ -3681,6 +3688,71 @@ begin
 
             dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
               begin
+                SaveUndoKeys;
+
+                // get color to draw in
+                bcolor := iif(MouseLeft,
+                  GetBits(CurrAttr, A_CELL_FG_MASK),
+                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                DrawData.Create(sizeof(TUndoCells), rleAdds);
+                DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor, false);
+                DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor, false);
+                DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor, false);
+                DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor, false);
+                DrawData.Free;
+
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
+                DrawSelectionAndObjects;
+              end;
+          end;
+          dragDraw := false;
+        end;
+
+      tmEllipse:
+        begin
+          case DrawMode of
+            dmChars:
+              begin
+                SaveUndoKeys;
+
+                // draw proposed line -
+                dcell.chr := iif(MouseLeft, CurrChar, $20);
+                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+
+                DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell, false);
+
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
+                DrawSelectionAndObjects;
+              end;
+
+            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+              begin
+                SaveUndoKeys;
+
+                // get color to draw in
+                bcolor := iif(MouseLeft,
+                  GetBits(CurrAttr, A_CELL_FG_MASK),
+                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                DrawData.Create(sizeof(TUndoCells), rleAdds);
+                DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
+                DrawData.Free;
+
+                undoblk.UndoType := utCells;
+                undoblk.CellData := CurrUndoData.Copy;
+                undoblk.CellData.Trim;
+                UndoAdd(undoblk);
+                CurrUndoData.Clear;
+                DrawSelectionAndObjects;
               end;
           end;
           dragDraw := false;
@@ -4034,11 +4106,9 @@ begin
     else
     begin
       cell2 := AdjustCellIgnores(cell, fy, fx);
-
       RecordUndoCell(fy, fx, cell2);
       Page.Rows[fy].Cells[fx] := cell2;
       DrawCellEx(pbPage.Canvas, x, y, fy, fx, false, false, cell2.chr, cell2.Attr);
-
     end;
     done := LineCalcNext(fx, fy);
   until done2;
@@ -4046,9 +4116,14 @@ end;
 
 // draw block line - if skipupdate then only display, no changes to doc.
 // else update and record changes to undo data.
-procedure TfMain.DrawBlockLine(fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+procedure TfMain.DrawBlockLine(
+  var DrawData : TRecList;
+  fx, fy,
+  tx, ty,
+  cl : integer;
+  skipUpdate : boolean = true);
 var
-  DrawData :    TRecList; // of TUndoCells;
+//  DrawData :    TRecList; // of TUndoCells;
   DrawDataRec : TundoCells;
   done, done2 : boolean;
   mr, mc,
@@ -4058,7 +4133,7 @@ var
   i :           integer;
 begin
   // keep track of cells drawn on.
-  DrawData.Create(sizeof(TUndoCells), rleAdds);
+//  DrawData.Create(sizeof(TUndoCells), rleAdds);
 
   // draw proposed line
   LineCalcInit(fx, fy, tx, ty);
@@ -4106,7 +4181,327 @@ begin
 
     done := LineCalcNext(fx, fy);
   until done2;
-  DrawData.Free;
+//  DrawData.Free;
+end;
+
+procedure TfMain.EraseEllipse(fx, fy, tx, ty : integer);
+var
+  x1, y1,
+  x2, y2 :      integer;
+  cx, cy,
+  xrad, yrad :  integer;
+  done :        boolean;
+  xo, yo :      integer;
+  mr, mc,
+  x, y :        integer;
+begin
+  x1 := min(fx, tx);
+  y1 := min(fy, ty);
+  x2 := max(fx, tx);
+  y2 := max(fy, ty);
+  cx := (x1 + x2) >> 1;
+  cy := (y1 + y2) >> 1;
+  xrad := (x2 - x1) >> 1;
+  yrad := (y2 - y1) >> 1;
+  EllipseCalcInit(xrad, yrad);
+  repeat
+    done := EllipseCalcNext(xo, yo);
+    // plot the four points around cx, cy
+    mr := (cy - yo) div SubYSize;
+    mc := (cx - xo) div SubXSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+
+    mr := (cy - yo) div SubYSize;
+    mc := (cx + xo) div SubXSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+
+    mr := (cy + yo) div SubYSize;
+    mc := (cx - xo) div SubXSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+
+    mr := (cy + yo) div SubYSize;
+    mc := (cx + xo) div SubXSize;
+    x := (mc - PageLeft) * CellWidthZ;
+    y := (mr - PageTop) * CellHeightZ;
+    DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false);
+
+  until done;
+end;
+
+procedure TfMain.DrawBlockEllipse(var DrawData : TRecList; fx, fy, tx, ty, cl : integer; skipUpdate : boolean = true);
+var
+  x1, y1,
+  x2, y2 :      integer;
+  cx, cy,
+  xrad, yrad :  integer;
+  done :        boolean;
+  xo, yo :      integer;
+  i,
+  mr, mc,
+  sx, sy,
+  x, y :        integer;
+  cell2 :       TCell;
+  DrawDataRec : TUndoCells;
+  dcell :       TCell;
+begin
+  x1 := min(fx, tx);
+  y1 := min(fy, ty);
+  x2 := max(fx, tx);
+  y2 := max(fy, ty);
+  cx := (x1 + x2) >> 1;
+  cy := (y1 + y2) >> 1;
+  xrad := (x2 - x1) >> 1;
+  yrad := (y2 - y1) >> 1;
+  EllipseCalcInit(xrad, yrad);
+  repeat
+    done := EllipseCalcNext(xo, yo);
+
+    if skipUpdate then
+    begin
+      mc := (cx - xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      sx := (cx - xo) mod SubXSize;
+      sy := (cy - yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        DrawDataRec.OldCell,
+        SubXSize, SubYSize, // these are global based on drawing mode
+        sx, sy);
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      DrawDataRec.OldCell := dcell;
+      DrawData.Put(@DrawDataRec, i);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      sx := (cx + xo) mod SubXSize;
+      sy := (cy - yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        DrawDataRec.OldCell,
+        SubXSize, SubYSize, // these are global based on drawing mode
+        sx, sy);
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      DrawDataRec.OldCell := dcell;
+      DrawData.Put(@DrawDataRec, i);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+
+      mc := (cx - xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      sx := (cx - xo) mod SubXSize;
+      sy := (cy + yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        DrawDataRec.OldCell,
+        SubXSize, SubYSize, // these are global based on drawing mode
+        sx, sy);
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      DrawDataRec.OldCell := dcell;
+      DrawData.Put(@DrawDataRec, i);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      sx := (cx + xo) mod SubXSize;
+      sy := (cy + yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      i := DrawDataAddOrGet(DrawData, DrawDataRec, mr, mc);
+      SetBits(DrawDataRec.OldCell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        DrawDataRec.OldCell,
+        SubXSize, SubYSize, // these are global based on drawing mode
+        sx, sy);
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      DrawDataRec.OldCell := dcell;
+      DrawData.Put(@DrawDataRec, i);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, dcell.chr, dcell.attr);
+
+    end
+    else
+    begin
+      mc := (cx - xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      sx := (cx - xo) mod SubXSize;
+      sy := (cy - yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      dcell := Page.Rows[mr].Cells[mc];
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        dcell,
+        SubXSize, SubYSize,
+        sx, sy);
+      RecordUndoCell(mr, mc, dcell);
+      Page.Rows[mr].Cells[mc] := dcell;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      sx := (cx + xo) mod SubXSize;
+      sy := (cy - yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      dcell := Page.Rows[mr].Cells[mc];
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        dcell,
+        SubXSize, SubYSize,
+        sx, sy);
+      RecordUndoCell(mr, mc, dcell);
+      Page.Rows[mr].Cells[mc] := dcell;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+
+      mc := (cx - xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      sx := (cx - xo) mod SubXSize;
+      sy := (cy + yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      dcell := Page.Rows[mr].Cells[mc];
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        dcell,
+        SubXSize, SubYSize,
+        sx, sy);
+      RecordUndoCell(mr, mc, dcell);
+      Page.Rows[mr].Cells[mc] := dcell;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      sx := (cx + xo) mod SubXSize;
+      sy := (cy + yo) mod SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      dcell := Page.Rows[mr].Cells[mc];
+      SetBits(dcell.attr, A_CELL_FONT_MASK, CurrFont, 28);
+      dcell := SetBlockColor(
+        cl,
+        dcell,
+        SubXSize, SubYSize,
+        sx, sy);
+      RecordUndoCell(mr, mc, dcell);
+      Page.Rows[mr].Cells[mc] := dcell;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, dcell.chr, dcell.attr);
+    end;
+  until done;
+end;
+
+procedure TfMain.DrawCharEllipse(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
+var
+  x1, y1,
+  x2, y2 :      integer;
+  cx, cy,
+  xrad, yrad :  integer;
+  done :        boolean;
+  xo, yo :      integer;
+  mr, mc,
+  x, y :        integer;
+  cell2 :       TCell;
+begin
+  x1 := min(fx, tx);
+  y1 := min(fy, ty);
+  x2 := max(fx, tx);
+  y2 := max(fy, ty);
+  cx := (x1 + x2) >> 1;
+  cy := (y1 + y2) >> 1;
+  xrad := (x2 - x1) >> 1;
+  yrad := (y2 - y1) >> 1;
+  EllipseCalcInit(xrad, yrad);
+  repeat
+    done := EllipseCalcNext(xo, yo);
+    if skipUpdate then
+    begin
+      mc := (cx - xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, cell2.chr, cell2.Attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, cell2.chr, cell2.Attr);
+
+      mc := (cx - xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, cell2.chr, cell2.Attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, true, false, cell2.chr, cell2.Attr);
+    end
+    else
+    begin
+      mc := (cx - xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      RecordUndoCell(mr, mc, cell2);
+      Page.Rows[mr].Cells[mc] := cell2;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, cell2.chr, cell2.Attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy - yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      RecordUndoCell(mr, mc, cell2);
+      Page.Rows[mr].Cells[mc] := cell2;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, cell2.chr, cell2.Attr);
+
+      mc := (cx - xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      RecordUndoCell(mr, mc, cell2);
+      Page.Rows[mr].Cells[mc] := cell2;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, cell2.chr, cell2.Attr);
+
+      mc := (cx + xo) div SubXSize;
+      mr := (cy + yo) div SubYSize;
+      x := (mc - PageLeft) * CellWidthZ;
+      y := (mr - PageTop) * CellHeightZ;
+      cell2 := AdjustCellIgnores(cell, mr, mc);
+      RecordUndoCell(mr, mc, cell2);
+      Page.Rows[mr].Cells[mc] := cell2;
+      DrawCellEx(pbPage.Canvas, x, y, mr, mc, false, false, cell2.chr, cell2.Attr);
+    end;
+  until done;
 end;
 
 procedure TfMain.pbPageMouseMove(Sender: TObject; Shift: TShiftState; X,
@@ -4117,6 +4512,7 @@ var
   mr, mc, sx, sy :  integer;
   bcolor :          integer;
   dcell :           TCell;
+  DrawData :        TRecList;
 
 //  dattr, dchar :    integer;
 begin
@@ -4291,13 +4687,13 @@ begin
                       GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
                     // draw temp line
-                    DrawBlockLine(FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
-
+                    // keep track of cells drawn on.
+                    DrawData.Create(sizeof(TUndoCells), rleAdds);
+                    DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
+                    DrawData.Free;
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
-
                     DrawSelectionAndObjects;
-
                   end;
                 end;
             end;
@@ -4322,10 +4718,12 @@ begin
                     // draw proposed line -
                     dcell.chr := iif(MouseLeft, CurrChar, $20);
                     dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+
                     DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell);
                     DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell);
                     DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell);
                     DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell);
+
                     LastDrawX := DrawX;
                     LastDrawY := DrawY;
                     DrawSelectionAndObjects;
@@ -4333,13 +4731,86 @@ begin
                 end;
 
               dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-                ;
+                begin
+                  // erase old proposed line
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase previous line
+                    EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
+                    EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
+                    EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
+                    EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
+
+                    // get color to draw in
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                    // draw temp line
+                    DrawData.Create(sizeof(TUndoCells), rleAdds);
+                    DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor);
+                    DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor);
+                    DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor);
+                    DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor);
+                    DrawData.Free;
+
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                    DrawSelectionAndObjects;
+                  end;
+                end;
             end;
           end;
         end;
 
       tmEllipse:
-        ;
+        begin
+          if dragDraw then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase old proposed ellipse
+                    EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+
+                    // draw proposed ellipse -
+                    dcell.chr := iif(MouseLeft, CurrChar, $20);
+                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+
+                    DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
+
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                    DrawSelectionAndObjects;
+                  end;
+                end;
+
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin
+                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                  begin
+                    // erase old proposed ellipse
+                    EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+
+                    // get color to draw in
+                    bcolor := iif(MouseLeft,
+                      GetBits(CurrAttr, A_CELL_FG_MASK),
+                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                    DrawData.Create(sizeof(TUndoCells), rleAdds);
+                    DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
+                    DrawData.Free;
+
+                    LastDrawX := DrawX;
+                    LastDrawY := DrawY;
+                    DrawSelectionAndObjects;
+                  end;
+                end;
+            end;
+          end;
+        end;
     end
   end;
 end;

@@ -76,6 +76,8 @@ procedure DrawRectangle(cnv: TCanvas; x1, y1, x2, y2 : integer; clr : TColor);
 procedure DrawRectangle(cnv: TCanvas; rect : TRect; clr : TColor);
 procedure LineCalcInit(x0, y0, x1, y1 : integer);
 function LineCalcNext(var xo, yo : integer) : boolean;
+procedure EllipseCalcInit(xrad, yrad : longint);
+function EllipseCalcNext(var xo, yo : longint) : boolean;
 function QuadToStr(q : TQuad) : unicodestring;
 function StrToQuad(str : unicodestring) : TQuad;
 procedure SetFormQuad(f : TForm; q : TQuad);
@@ -555,49 +557,204 @@ end;
 
 // http://members.chello.at/~easyfilter/bresenham.html
 
-// line plotting vars
+// encapsulated line plotting globals
 var
-  calcX0, calcY0, calcX1, calcY1 : integer;
-  calcDX, calcDY, calcSX, calcSY : integer;
-  calcErr : integer;
+  LineData : record
+    calcX0, calcY0,
+    calcX1, calcY1 :  longint;
+    calcDX, calcDY,
+    calcSX, calcSY :  longint;
+    calcErr :         longint;
+  end;
 
 // initialize line plotting calculator
-procedure LineCalcInit(x0, y0, x1, y1 : integer);
+procedure LineCalcInit(x0, y0, x1, y1 : longint);
 begin
-  calcX0 := x0;           calcY0 := y0;
-  calcX1 := x1;           calcY1 := y1;
-  calcDX := abs(x1 - x0); calcDY := abs(y1 - y0);
-  if x0 < x1 then calcSX := 1 else calcSX := -1;
-  if y0 < y1 then calcSY := 1 else calcSY := -1;
-  if calcDX > calcDY then
-    calcErr := calcDX div 2
-  else
-    calcErr := (-calcDY) div 2;
+  LineData.calcX0 := x0;
+  LineData.calcY0 := y0;
+  LineData.calcX1 := x1;
+  LineData.calcY1 := y1;
+  with LineData do
+  begin
+    calcDX := abs(x1 - x0);
+    calcDY := abs(y1 - y0);
+    if x0 < x1 then
+      calcSX := 1
+    else
+      calcSX := -1;
+    if y0 < y1 then
+      calcSY := 1
+    else
+      calcSY := -1;
+    if calcDX > calcDY then
+      calcErr := calcDX div 2
+    else
+      calcErr := (-calcDY) div 2;
+  end;
 end;
 
 // get next point
-function LineCalcNext(var xo, yo : integer) : boolean;
+function LineCalcNext(var xo, yo : longint) : boolean;
 var
-  e2 : integer;
+  e2 : longint;
 begin
-  result := ((calcX0 = calcX1) and (calcY0 = calcY1));
-  if not result then
+  with LineData do
   begin
-    e2 := calcErr;
-    if e2 > -calcDX then
-    begin
-      calcErr -= calcDY;
-      calcX0 += calcSX;
-    end;
-    if e2 < calcDY then
-    begin
-      calcErr += calcDX;
-      calcY0 += calcSY;
-    end;
     result := ((calcX0 = calcX1) and (calcY0 = calcY1));
+    if not result then
+    begin
+      e2 := calcErr;
+      if e2 > -calcDX then
+      begin
+        calcErr -= calcDY;
+        calcX0 += calcSX;
+      end;
+      if e2 < calcDY then
+      begin
+        calcErr += calcDX;
+        calcY0 += calcSY;
+      end;
+      result := ((calcX0 = calcX1) and (calcY0 = calcY1));
+    end;
+    xo := calcX0;
+    yo := calcY0;
   end;
-  xo := calcX0;
-  yo := calcY0;
+end;
+
+// encapsulated ellipse plotting globals
+var
+  EllipseData : record
+    State :                   integer;
+    X, Y :                    longint;
+    TwoASquare, TwoBSquare :  longint;
+    XChange, YChange :        longint;
+    EllipseError :            longint;
+    StoppingX, StoppingY :    longint;
+    XRadius, YRadius :        longint;
+  end;
+
+procedure EllipseCalcInit(xrad, yrad : longint);
+begin
+  EllipseData.XRadius := xrad;
+  EllipseData.YRadius := yrad;
+  EllipseData.State := 0;
+
+end;
+
+function EllipseCalcNext(var xo, yo : longint) : boolean;
+begin
+  result := false;
+  with EllipseData do
+  begin
+    if (XRadius = 0) or (YRadius = 0) then
+    begin
+      xo := 0;
+      yo := 0;
+      result := true;
+      exit;
+    end;
+    case State of
+      0, 1:
+        begin
+          if State = 0 then
+          begin
+            // init for first part of ellipse
+            TwoASquare := 2 * XRadius * XRadius;
+            TwoBSquare := 2 * YRadius * YRadius;
+            X := XRadius;
+            Y := 0;
+            XChange := YRadius * YRadius * (1 - 2 * XRadius);
+            YChange := XRadius * XRadius;
+            EllipseError := 0;
+            StoppingX := TwoBSquare * XRadius;
+            StoppingY := 0;
+            State := 1;
+          end;
+          if StoppingX >= StoppingY then
+          begin
+            // the results.
+            xo := X;
+            yo := Y;
+            y += 1;
+            inc(StoppingY, TwoASquare);
+            inc(EllipseError, YChange);
+            inc(YChange, TwoASquare);
+            if ((2 * EllipseError + XChange) > 0) then
+            begin
+              x -= 1;
+              dec(StoppingX, TwoBSquare);
+              inc(EllipseError, XChange);
+              inc(XChange, TwoBSquare)
+            end;
+          end
+          else
+          begin
+            X := 0;
+            Y := YRadius;
+            XChange := YRadius * YRadius;
+            YChange := XRadius * XRadius * (1 - 2 * YRadius);
+            EllipseError := 0;
+            StoppingX := 0;
+            StoppingY := TwoASquare * YRadius;
+            State := 2;
+
+            if StoppingX <= StoppingY then
+            begin
+              // the results.
+              xo := X;
+              yo := Y;
+              x += 1;;
+              inc(StoppingX, TwoBSquare);
+              inc(EllipseError, XChange);
+              inc(XChange, TwoBSquare);
+              if ((2 * EllipseError + YChange) > 0) then
+              begin
+                y -= 1;
+                dec(StoppingY, TwoASquare);
+                inc(EllipseError, YChange);
+                inc(YChange, TwoASquare)
+              end;
+            end
+            else
+            begin
+              // done
+              xo := x;
+              yo := y;
+              result := true;
+            end;
+          end;
+        end;
+
+      2:
+        begin
+          if StoppingX <= StoppingY then
+          begin
+            // the results.
+            xo := X;
+            yo := Y;
+            x += 1;;
+            inc(StoppingX, TwoBSquare);
+            inc(EllipseError, XChange);
+            inc(XChange, TwoBSquare);
+            if ((2 * EllipseError + YChange) > 0) then
+            begin
+              y -= 1;
+              dec(StoppingY, TwoASquare);
+              inc(EllipseError, YChange);
+              inc(YChange, TwoASquare)
+            end;
+          end
+          else
+          begin
+            // done
+            xo := x;
+            yo := y;
+            result := true;
+          end;
+        end;
+
+    end;
+  end;
 end;
 
 function QuadToStr(q : TQuad) : unicodestring;
