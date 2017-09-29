@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 752
+  Left = 295
   Height = 730
-  Top = 402
+  Top = 103
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 710
@@ -1048,17 +1048,17 @@ object fMain: TfMain
         Height = 635
         Top = 1
         Width = 376
-        ActivePage = TabSheet2
+        ActivePage = TabSheet1
         Align = alClient
-        TabIndex = 1
+        TabIndex = 0
         TabOrder = 0
         object TabSheet1: TTabSheet
           Caption = 'Colors'
-          ClientHeight = 524
+          ClientHeight = 607
           ClientWidth = 368
           object pbColors: TPaintBox
             Left = 2
-            Height = 351
+            Height = 434
             Top = 50
             Width = 360
             Anchors = [akTop, akLeft, akRight, akBottom]

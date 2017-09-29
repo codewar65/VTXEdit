@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 }
 
 {
+  SGR 5 BlinkSlow is iCeBlink
 
   UTF 8 nas no characters in the  128-191 range
 
@@ -657,11 +658,11 @@ begin
           if objnum = -1 then
             cell := Page.Rows[r].Cells[c];
 
-          // check / fix this logic
-          if HasBits(cell.Attr, A_CELL_BLINKSLOW)
-            or ((CursorRow = r) and (CursorCol = c)) then
+          if (CursorRow = r) and (CursorCol = c) then
+//          if HasBits(cell.Attr, A_CELL_BLINKSLOW)
+//            or ((CursorRow = r) and (CursorCol = c)) then
             docell := true;
-          if (HasBits(cell.Attr, A_CELL_BLINKFAST) and (ColorScheme <> COLORSCHEME_ICE)) then
+          if (HasBits(cell.Attr, A_CELL_BLINKSLOW) and (ColorScheme <> COLORSCHEME_ICE)) then
             docell := true;
 
           if docell then
@@ -2548,11 +2549,9 @@ begin
           end;
       end;
       Page.Rows[r].Cells[c].Attr := attr;
-//      DrawCell(r, c, false);
     end;
   GenerateBmpPage;
   pbPage.Invalidate;
-
   pbColors.Invalidate;
 end;
 
@@ -2571,6 +2570,7 @@ begin
         tbAttrItalics.Enabled := false;
         tbAttrUnderline.Enabled := false;
         tbAttrBlinkSlow.Enabled := false;
+        tbAttrBlinkFast.Enabled := false;
         tbAttrStrikethrough.Enabled := false;
         tbAttrDoublestrike.Enabled := false;
         tbAttrShadow.Enabled := false;
@@ -2601,7 +2601,8 @@ begin
         tbAttrFaint.Enabled := false;
         tbAttrItalics.Enabled := false;
         tbAttrUnderline.Enabled := false;
-        tbAttrBlinkSlow.Enabled := false;
+        tbAttrBlinkSlow.Enabled := true;
+        tbAttrBlinkFast.Enabled := false;
         tbAttrStrikethrough.Enabled := false;
         tbAttrDoublestrike.Enabled := false;
         tbAttrShadow.Enabled := false;
@@ -2631,6 +2632,7 @@ begin
         tbAttrItalics.Enabled := true;
         tbAttrUnderline.Enabled := true;
         tbAttrBlinkSlow.Enabled := true;
+        tbAttrBlinkFast.Enabled := true;
         tbAttrStrikethrough.Enabled := true;
         tbAttrDoublestrike.Enabled := true;
         tbAttrShadow.Enabled := true;
@@ -2658,7 +2660,7 @@ begin
   pbPage.Invalidate;
 
   SetBits(CurrAttr, A_CELL_BOLD or A_CELL_FAINT or A_CELL_ITALICS
-      or A_CELL_UNDERLINE or A_CELL_BLINKSLOW or A_CELL_STRIKETHROUGH
+      or A_CELL_UNDERLINE or A_CELL_BLINKSLOW or A_CELL_BLINKFAST or A_CELL_STRIKETHROUGH
       or A_CELL_DOUBLESTRIKE or A_CELL_SHADOW or A_CELL_DISPLAY_TOP
       or A_CELL_DISPLAY_BOTTOM, 0);
   pbCurrCell.Invalidate;
@@ -3052,24 +3054,56 @@ end;
 
 procedure TfMain.pbColorsPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  cls : integer;
-  maxr : integer;
-  cl, x, y, r, c : integer;
-  rect : TRect;
-  bmp : TBitmap;
+  pb :    TPaintBox;
+  cnv :   TCanvas;
+  cls :   integer;
+  maxr :  integer;
+  cl,
+  fg, bg,
+  x, y,
+  r, c :  integer;
+  rect :  TRect;
+  bmp :   TBitmap;
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
 
   // max colors
+  // clamp out of range colors. as well
+  fg := GetBits(CurrAttr, A_CELL_FG_MASK);
+  bg := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
   case ColorScheme of
-    COLORSCHEME_BASIC: begin cls := 8; end;
-    COLORSCHEME_BBS: begin cls := 16; end;
-    COLORSCHEME_ICE: begin cls := 16; end;
-    COLORSCHEME_256: begin cls := 256; end;
+    COLORSCHEME_BASIC:
+      begin
+        cls := 8;
+        if fg > 7 then
+          fg := fg and $07;
+        if bg > 7 then
+          bg := bg and $07;
+      end;
+    COLORSCHEME_BBS:
+      begin
+        cls := 16;
+        if fg > 15 then
+          fg := fg and $0F;
+        if bg > 7 then
+          bg := bg and $07;
+      end;
+    COLORSCHEME_ICE:
+      begin
+        cls := 16;
+        if fg > 15 then
+          fg := fg and $0F;
+        if bg > 15 then
+          bg := bg and $0F;
+      end;
+    COLORSCHEME_256:
+      begin
+        cls := 256;
+      end;
   end;
+  SetBits(CurrAttr, A_CELL_FG_MASK, fg);
+  SetBits(CurrAttr, A_CELL_BG_MASK, bg, 8);
 
   maxr := cls div 16;  // 16 colors per row
   y := 0;
@@ -3090,7 +3124,7 @@ begin
       cnv.pen.color := clBlack;
       cnv.Rectangle(rect);
 
-      if cl = GetBits(CurrAttr, A_CELL_FG_MASK) then
+      if cl = fg then
       begin
         bmp := TBitmap.create;
         bmp.PixelFormat:=pf32bit;
@@ -3099,7 +3133,7 @@ begin
         bmp.free;
       end;
 
-      if cl = GetBits(CurrAttr, A_CELL_BG_MASK, 8) then
+      if cl = bg then
       begin
         bmp := TBitmap.create;
         bmp.PixelFormat:=pf32bit;
@@ -3858,10 +3892,11 @@ end;
 procedure TfMain.pbPageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  bcolor :        integer;
-  dcell :         TCell;
-  objnum :        integer;
-  tmp :           integer;
+  bcolor :  integer;
+  dcell :   TCell;
+  objnum :  integer;
+  tmp :     integer;
+  sx, sy :  integer;
 begin
   // left click to type.
   // left drag to select
@@ -4029,6 +4064,57 @@ begin
                   LastDrawY := DrawY;
                   dragDraw := true;
                 end;
+            end;
+          end;
+        end;
+
+      tmEyedropper:
+        begin
+          if DrawMode = dmChars then
+          begin
+            // if in char mode, get char and attributes
+            if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
+              and between(MouseCol, 0, NumCols-1) then
+            begin
+              CurrAttr := Page.Rows[MouseRow].Cells[MouseCol].Attr;
+              CurrFont := GetBits(CurrAttr, A_CELL_FONT_MASK, 28);
+              case CurrFont of
+                0: tbFont0.Click;
+                1: tbFont1.Click;
+                2: tbFont2.Click;
+                3: tbFont3.Click;
+                4: tbFont4.Click;
+                5: tbFont5.Click;
+                6: tbFont6.Click;
+                7: tbFont7.Click;
+                8: tbFont8.Click;
+                9: tbFont9.Click;
+                10: tbFont10.Click;
+                11: tbFont11.Click;
+                12: tbFont12.Click;
+              end;
+              SetAttrButtons(CurrAttr);
+              CurrChar := Page.Rows[MouseRow].Cells[MouseCol].Chr;
+              seCharacter.Value := CurrChar;
+              pbCurrCell.Invalidate;
+              pbColors.Invalidate;
+            end;
+          end
+          else
+          begin
+            // get color under eyedropper - set a FG color
+            if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
+            begin
+              sx := DrawX mod SubXSize;
+              sy := DrawY mod SubYSize;
+              dcell := Page.Rows[MouseRow].Cells[MouseCol];
+              tmp := GetBlockColor(dcell, SubXSize, SubYSize, sx, sy);
+              if MouseLeft then
+                SetBits(CurrAttr, A_CELL_FG_MASK, tmp)
+              else if MouseRight then
+                SetBits(CurrAttr, A_CELL_BG_MASK, tmp, 8);
+              pbCurrCell.Invalidate;
+              pbColors.Invalidate;
             end;
           end;
         end;
@@ -4653,163 +4739,181 @@ begin
           // draw without effecting document
           // erase previous line, draw new line from FirstDrawX, FirstDrawY to
           // DrawX, DrawY
-          if dragDraw then
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
           begin
-            case DrawMode of
-              dmChars:
-                begin
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+            if dragDraw then
+            begin
+              case DrawMode of
+                dmChars:
                   begin
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase old proposed line
+                      EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+
+                      // draw proposed line -
+                      dcell.chr := iif(MouseLeft, CurrChar, $20);
+                      dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                      DrawCharLine(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
+                  end;
+
+                dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                  begin;
                     // erase old proposed line
-                    EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase previous line
+                      EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
-                    // draw proposed line -
-                    dcell.chr := iif(MouseLeft, CurrChar, $20);
-                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
-                    DrawCharLine(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
+                      // get color to draw in
+                      bcolor := iif(MouseLeft,
+                        GetBits(CurrAttr, A_CELL_FG_MASK),
+                        GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+
+                      // draw temp line
+                      // keep track of cells drawn on.
+                      DrawData.Create(sizeof(TUndoCells), rleAdds);
+                      DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
+                      DrawData.Free;
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
                   end;
-                end;
-
-              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-                begin;
-                  // erase old proposed line
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
-                  begin
-                    // erase previous line
-                    EraseLine(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
-
-                    // get color to draw in
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                    // draw temp line
-                    // keep track of cells drawn on.
-                    DrawData.Create(sizeof(TUndoCells), rleAdds);
-                    DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
-                    DrawData.Free;
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
-                  end;
-                end;
+              end;
             end;
-          end;
+            DrawMouseBox;
+          end
+          else
+            DrawCell(LastDrawRow, LastDrawCol);
         end;
 
       tmRect:
         begin
-          if dragDraw then
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
           begin
-            case DrawMode of
-              dmChars:
-                begin
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+            if dragDraw then
+            begin
+              case DrawMode of
+                dmChars:
+                  begin
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase old proposed line
+                      EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
+                      EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
+                      EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
+                      EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
+
+                      // draw proposed line -
+                      dcell.chr := iif(MouseLeft, CurrChar, $20);
+                      dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+
+                      DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell);
+                      DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell);
+                      DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell);
+                      DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell);
+
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
+                  end;
+
+                dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
                   begin
                     // erase old proposed line
-                    EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
-                    EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
-                    EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
-                    EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase previous line
+                      EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
+                      EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
+                      EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
+                      EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
 
-                    // draw proposed line -
-                    dcell.chr := iif(MouseLeft, CurrChar, $20);
-                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                      // get color to draw in
+                      bcolor := iif(MouseLeft,
+                        GetBits(CurrAttr, A_CELL_FG_MASK),
+                        GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                    DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell);
-                    DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell);
-                    DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell);
-                    DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell);
+                      // draw temp line
+                      DrawData.Create(sizeof(TUndoCells), rleAdds);
+                      DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor);
+                      DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor);
+                      DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor);
+                      DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor);
+                      DrawData.Free;
 
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
                   end;
-                end;
-
-              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-                begin
-                  // erase old proposed line
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
-                  begin
-                    // erase previous line
-                    EraseLine(FirstDrawX, FirstDrawY, FirstDrawX, LastDrawY);
-                    EraseLine(FirstDrawX, LastDrawY, LastDrawX, LastDrawY);
-                    EraseLine(LastDrawX, LastDrawY, LastDrawX, FirstDrawY);
-                    EraseLine(LastDrawX, FirstDrawY, FirstDrawX, FirstDrawY);
-
-                    // get color to draw in
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
-
-                    // draw temp line
-                    DrawData.Create(sizeof(TUndoCells), rleAdds);
-                    DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor);
-                    DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor);
-                    DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor);
-                    DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor);
-                    DrawData.Free;
-
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
-                  end;
-                end;
+              end;
             end;
-          end;
+            DrawMouseBox;
+          end
+          else
+            DrawCell(LastDrawRow, LastDrawCol);
         end;
 
       tmEllipse:
         begin
-          if dragDraw then
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
           begin
-            case DrawMode of
-              dmChars:
-                begin
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+            if dragDraw then
+            begin
+              case DrawMode of
+                dmChars:
                   begin
-                    // erase old proposed ellipse
-                    EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase old proposed ellipse
+                      EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
-                    // draw proposed ellipse -
-                    dcell.chr := iif(MouseLeft, CurrChar, $20);
-                    dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                      // draw proposed ellipse -
+                      dcell.chr := iif(MouseLeft, CurrChar, $20);
+                      dcell.attr := iif(MouseLeft, CurrAttr, $0007);
 
-                    DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
+                      DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell);
 
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
                   end;
-                end;
 
-              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-                begin
-                  if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
                   begin
-                    // erase old proposed ellipse
-                    EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
+                    if (LastDrawX <> DrawX) or (LastDrawY <> DrawY) then
+                    begin
+                      // erase old proposed ellipse
+                      EraseEllipse(FirstDrawX, FirstDrawY, LastDrawX, LastDrawY);
 
-                    // get color to draw in
-                    bcolor := iif(MouseLeft,
-                      GetBits(CurrAttr, A_CELL_FG_MASK),
-                      GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                      // get color to draw in
+                      bcolor := iif(MouseLeft,
+                        GetBits(CurrAttr, A_CELL_FG_MASK),
+                        GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                    DrawData.Create(sizeof(TUndoCells), rleAdds);
-                    DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
-                    DrawData.Free;
+                      DrawData.Create(sizeof(TUndoCells), rleAdds);
+                      DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor);
+                      DrawData.Free;
 
-                    LastDrawX := DrawX;
-                    LastDrawY := DrawY;
-                    DrawSelectionAndObjects;
+                      LastDrawX := DrawX;
+                      LastDrawY := DrawY;
+                      DrawSelectionAndObjects;
+                    end;
                   end;
-                end;
+              end;
             end;
-          end;
+            DrawMouseBox;
+          end
+          else
+            DrawCell(LastDrawRow, LastDrawCol);
         end;
     end
   end;
@@ -6322,13 +6426,13 @@ begin
 
       fPreviewBox.Invalidate;
 
-      if bslow and not BlinkSlow then
+      if bfast and not BlinkFast then
       begin
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
         GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
       end;
 
-      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
+      if bslow and not BlinkSlow and (ColorScheme <> COLORSCHEME_ICE) then
       begin
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
         GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
@@ -6336,9 +6440,9 @@ begin
     end
     else
     begin
-      if bslow and not BlinkSlow then
+      if bfast and not BlinkFast then
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
-      if bfast and not BlinkFast and (ColorScheme <> COLORSCHEME_ICE) then
+      if bslow and not BlinkSlow and (ColorScheme <> COLORSCHEME_ICE) then
         SetBits(attr, A_CELL_DISPLAY_MASK, A_CELL_DISPLAY_CONCEAL); // hide blink
       GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, attr, false);
     end;
