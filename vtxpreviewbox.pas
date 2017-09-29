@@ -165,8 +165,8 @@ begin
               off := CPages[cp].QuickGlyph[cell.Chr];
             end;
             GetGlyphBmp(bmp, CPages[cp].GlyphTable, off, cell.Attr, false);
-            bmp.ResampleFilter:=rfMitchell;
-            bmp2 := bmp.Resample(2, 4, rmFineResample) as TBGRABitmap;
+//            bmp.ResampleFilter:=rfMitchell;
+            bmp2 := bmp.Resample(round(2 * XScale), 4, rmFineResample) as TBGRABitmap;
             cnv.Draw(x, y, bmp2.Bitmap);
             bmp2.free;
           end;
