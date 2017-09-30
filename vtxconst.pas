@@ -248,7 +248,12 @@ type
   end;
 
   TRowCol = record
-    row, col : integer;
+    Row, Col : integer;
+  end;
+
+  TScanLine = record
+    Row,
+    Col1, Col2 : integer;
   end;
 
 const

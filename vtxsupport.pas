@@ -96,6 +96,7 @@ function RectHeight(r : TRect) : integer; inline;
 procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
 function GetObjectCell(row, col : integer; var cell : TCell) : integer;
 function InRect(x, y, rx, ry, rw, rh : integer) : boolean; inline;
+operator =(cell1, cell2 : TCell) : boolean;
 
 var
   Version : string;
@@ -131,6 +132,11 @@ var
   KeyBinds : array of TKeyBinds;
 
 implementation
+
+operator =(cell1, cell2 : TCell) : boolean;
+begin
+  result := (cell1.Chr = cell2.Chr) and (cell1.Attr = cell2.Attr);
+end;
 
 {*****************************************************************************}
 

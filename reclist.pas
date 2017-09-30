@@ -54,6 +54,8 @@ type
     procedure Free;
     procedure Add(rec : Pointer);  // add new record
     procedure Remove(recnum : DWORD);
+    procedure Push(rec : Pointer);
+    procedure Pop(rec : Pointer);
     procedure Put(rec : Pointer; recnum : DWORD);
     procedure Get(rec : Pointer; recnum : DWORD);
     procedure Clear;
@@ -95,6 +97,11 @@ begin
   self.Count := 0;
 end;
 
+procedure TRecList.Push(rec : Pointer);
+begin
+  self.Add(rec);
+end;
+
 procedure TRecList.Add(rec : Pointer);
 var
   newsz : DWORD;
@@ -122,6 +129,14 @@ begin
 
   MemCopy(rec, @self.Data[self.Count * self.RecSize], self.RecSize);
   self.Count += 1;
+end;
+
+procedure TRecList.Pop(rec : Pointer);
+begin
+  if self.Count = 0 then
+    raise Exception.Create('TRecList Stack Underflow.');
+  self.Get(rec, self.Count - 1);
+  self.Count -= 1;
 end;
 
 procedure TRecList.Remove(recnum : DWORD);
