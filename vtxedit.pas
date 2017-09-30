@@ -284,8 +284,10 @@ type
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    function GetBlock(x, y : integer) : integer;
     function InToFill(r, c : integer) : boolean;
-    procedure FloodFillChar(r, c : integer; fillwith : TCell);
+    procedure FloodFillChar(x, y : integer; fillwith : TCell);
+    procedure FloodFillBlock(x, y, fillwith : integer);
     procedure DrawSelectionAndObjects;
     function AdjustCellIgnores(cell : TCell; r, c : integer) : TCell;
     procedure DrawCharLine(fx, fy, tx, ty : integer; cell : TCell; skipUpdate : boolean = true);
@@ -4131,7 +4133,21 @@ begin
               SaveUndoKeys;
               dcell.Chr := CurrChar;
               dcell.Attr := CurrAttr;
-              FloodFillChar(MouseRow, MouseCol, dcell);
+              FloodFillChar(MouseCol, MouseRow, dcell);
+              GenerateBmpPage;
+              pbPage.Invalidate;
+            end;
+          end
+          else
+          begin
+            if (MouseLeft or MouseRight) and between(MouseRow, 0, NumRows-1)
+              and between(MouseCol, 0, NumCols-1) then
+            begin
+              SaveUndoKeys;
+              sx := DrawX mod SubXSize;
+              sy := DrawY mod SubYSize;
+              dcell := Page.Rows[MouseRow].Cells[MouseCol];
+              FloodFillBlock(DrawX, DrawY, GetBits(CurrAttr, A_CELL_FG_MASK));
               GenerateBmpPage;
               pbPage.Invalidate;
             end;
@@ -4196,20 +4212,18 @@ end;
 
 // flood fill character at r,c using cell. build fill region based on character
 // at r,c.
-procedure TfMain.FloodFillChar(r, c : integer; fillwith : TCell);
+procedure TfMain.FloodFillChar(x, y : integer; fillwith : TCell);
 var
-  fillon :    TCell;      // cell to match for fill
-  rc :        TRowCol;
-  rc2 :       TRowCol;
-  scanline :  TScanLine;
-  i :         integer;
+  fillon :      TCell;      // cell to match for fill
+  rc :          TRowCol;
+  rc2 :         TRowCol;
+  scanline :    TScanLine;
   lookedup,
-  lookeddown,
-  skip :      boolean;
-  row, col1 : integer;
-  undoblk :   TUndoBlock;
+  lookeddown :  boolean;
+  row, col1 :   integer;
+  undoblk :     TUndoBlock;
 begin
-  fillon := Page.Rows[r].Cells[c];
+  fillon := Page.Rows[y].Cells[x];
 
   if fillon = fillwith then
     exit;
@@ -4217,8 +4231,8 @@ begin
   todo.Create(sizeof(TRowCol), rleDoubles);
   tofill.Create(sizeof(TScanLine), rleDoubles);
 
-  rc.Row := r;
-  rc.Col := c;
+  rc.Row := y;
+  rc.Col := x;
   todo.Push(@rc);
 
   while todo.Count > 0 do
@@ -4309,7 +4323,6 @@ begin
   UndoAdd(undoblk);
   CurrUndoData.Clear;
 
-
   tofill.Free;
   todo.Free;
 
@@ -4355,7 +4368,140 @@ begin
   //    pop from fr,fc and to tr,tc
   //    fill from fr,fc to tr,tc (fr should equal tr)
   //  end while
+end;
 
+// x and y are in block coordinates
+function TfMain.GetBlock(x, y : integer) : integer;
+var
+  mr, mc,
+  sx, sy : integer;
+begin
+  mr := y div SubYSize;
+  mc := x div SubXSize;
+  sx := x mod SubXSize;
+  sy := y mod SubYSize;
+  result := GetBlockColor(Page.Rows[mr].Cells[mc], SubXSize, SubYSize, sx, sy);
+end;
+
+procedure TfMain.FloodFillBlock(x, y, fillwith : integer);
+var
+  fillon :      integer;      // cell to match for fill
+  rc :          TRowCol;
+  rc2 :         TRowCol;
+  scanline :    TScanLine;
+  lookedup,
+  lookeddown :  boolean;
+  row, col1 :   integer;
+  undoblk :     TUndoBlock;
+  DrawData :    TRecList;
+begin
+  fillon := GetBlock(x, y);
+
+  if fillon = fillwith then
+    exit;
+
+  todo.Create(sizeof(TRowCol), rleDoubles);
+  tofill.Create(sizeof(TScanLine), rleDoubles);
+
+  // r & c's from here in this function are actually y & x's in block coords
+
+  rc.Row := y;
+  rc.Col := x;
+  todo.Push(@rc);
+
+  while todo.Count > 0 do
+  begin
+    todo.Pop(@rc);
+
+    lookedup := false;
+    lookeddown := false;
+    if not InToFill(rc.Row, rc.Col) then
+    begin
+      // not filling, check
+      // scan left until not fillon
+      while (rc.Col >= 0) and (GetBlock(rc.Col, rc.Row) = fillon) do
+        rc.Col -= 1;
+      rc.Col += 1;
+
+      // remember start of scanline
+      row := rc.Row;
+      col1 := rc.Col;
+
+      while (rc.Col < (NumCols * SubXSize)) and (GetBlock(rc.Col, rc.Row) = fillon) do
+      begin
+
+        // look up
+        if (rc.Row > 0) then
+        begin
+          // see if up is already in tofill
+          if not InToFill(rc.Row - 1, rc.Col) then
+          begin
+            if GetBlock(rc.Col, rc.Row - 1) = fillon then
+            begin
+              if not lookedup then
+              begin
+                rc2.Row := rc.Row - 1;
+                rc2.Col := rc.Col;
+                todo.Push(@rc2);
+                lookedup := true;
+              end;
+            end
+            else
+              lookedup := false;
+          end
+          else
+            lookedup := false;
+        end;
+
+        // look down
+        if (rc.Row < (NumRows * SubYSize) - 1) then
+        begin
+          // see if up is already in tofill
+          if not InToFill(rc.Row + 1, rc.Col) then
+          begin
+            if GetBlock(rc.Col, rc.Row + 1) = fillon then
+            begin
+              if not lookeddown then
+              begin
+                rc2.Row := rc.Row + 1;
+                rc2.Col := rc.Col;
+                todo.Push(@rc2);
+                lookeddown := true;
+              end;
+            end
+            else
+              lookeddown := false;
+          end
+          else
+            lookeddown := false;
+        end;
+
+        rc.Col += 1;
+      end;
+      scanline.Row := row;
+      scanline.Col1 := col1;
+      scanline.Col2 := rc.Col - 1;
+      tofill.Push(@scanline);
+    end;
+  end;
+
+  // fill it in... oooo pretty!
+  DrawData.Create(sizeof(TUndoCells), rleAdds);
+  while tofill.Count > 0 do
+  begin
+    tofill.Pop(@scanline);
+    DrawBlockLine(DrawData, scanline.Col1, scanline.Row, scanline.Col2, scanline.Row, fillwith, false);
+  end;
+  DrawData.Free;
+  undoblk.UndoType := utCells;
+  undoblk.CellData := CurrUndoData.Copy;
+  undoblk.CellData.Trim;
+  UndoAdd(undoblk);
+  CurrUndoData.Clear;
+
+
+  tofill.Free;
+  todo.Free;
 end;
 
 // redraw document from fx,fy to tx,ty
