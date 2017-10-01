@@ -1408,7 +1408,9 @@ begin
   else if (xsize = 1) and (ysize = 2) then
     result := GetColors1x2(cell)[y]
   else if (xsize = 2) and (ysize = 2) then
-    result := GetColors2x2(cell)[x + (y << 1)];
+    result := GetColors2x2(cell)[x + (y << 1)]
+  else if (xsize = 2) and (ysize = 3) then
+    result := GetColors2x3(cell)[x + (y << 1)];
 end;
 
 // compute new subblock
