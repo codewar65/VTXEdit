@@ -38,6 +38,9 @@ uses
   SysUtils,
   RecList;
 
+const
+  Version = '0.9.0 beta';
+
 type
 
   TKeyBinds = record

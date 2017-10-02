@@ -234,6 +234,7 @@ object fMain: TfMain
         Hint = 'Paint'
         Top = 0
         Caption = 'tbToolPaint'
+        Enabled = False
         ImageIndex = 21
         OnClick = tbToolClick
         ParentShowHint = False

@@ -107,12 +107,6 @@ uses
   dateutils,
   Inifiles;
 
-// used for version
-const
-  yyyy = 2017;
-  mm = 09;
-  dd = 02;
-
 type
 
   { TfMain }
@@ -874,7 +868,6 @@ begin
   cbCodePage.Enabled := true;
 
   //DecodeDate(now, yyyy, mm, dd);
-  Version := Format('%0.4d%0.2d%0.2d alpha', [yyyy, mm, dd]);
   UpdateTitles;
 
   DoubleBuffered := true;
@@ -4148,8 +4141,11 @@ begin
               SaveUndoKeys;
               sx := DrawX mod SubXSize;
               sy := DrawY mod SubYSize;
-              dcell := Page.Rows[MouseRow].Cells[MouseCol];
-              FloodFillBlock(DrawX, DrawY, GetBits(CurrAttr, A_CELL_FG_MASK));
+              if MouseLeft then
+                tmp := GetBits(CurrAttr, A_CELL_FG_MASK)
+              else
+                tmp := GetBits(CurrAttr, A_CELL_BG_MASK, 8);
+              FloodFillBlock(DrawX, DrawY, tmp);
               GenerateBmpPage;
               pbPage.Invalidate;
             end;

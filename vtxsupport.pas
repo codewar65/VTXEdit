@@ -99,8 +99,6 @@ function InRect(x, y, rx, ry, rw, rh : integer) : boolean; inline;
 operator =(cell1, cell2 : TCell) : boolean;
 
 var
-  Version : string;
-
   // various settings
   PageType :                integer;  // from cbPageType  PAGETYPE_
   ColorScheme :             integer;  // from cbColorScheme COLORSCHEME_
