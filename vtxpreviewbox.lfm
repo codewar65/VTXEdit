@@ -1,7 +1,7 @@
 object fPreview: TfPreview
-  Left = 1206
+  Left = 1011
   Height = 363
-  Top = 458
+  Top = 342
   Width = 300
   BorderIcons = []
   BorderStyle = bsSizeToolWin

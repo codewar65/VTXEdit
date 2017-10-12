@@ -78,7 +78,9 @@ uses
   Classes,
   SysUtils,
   strutils,
-  FileUtil, DateTimePicker,
+  FileUtil,
+  DateTimePicker,
+  DividerBevel,
   Forms,
   Controls,
   Dialogs,
@@ -112,22 +114,40 @@ type
   { TfMain }
 
   TfMain = class(TForm)
+    bObjFlipHorz: TToolButton;
+    bObjFlipVert: TToolButton;
+    bObjHideOutlines: TToolButton;
+    bObjLoad: TToolButton;
+    bObjMerge: TToolButton;
+    bObjMergeAll: TToolButton;
+    bObjMoveBack: TToolButton;
+    bObjMoveToBack: TToolButton;
+    bObjMoveToFront: TToolButton;
+    bObjSave: TToolButton;
+    bObnjMoveForward: TToolButton;
     cbCodePage: TComboBox;
     cbColorScheme: TComboBox;
     cbPageType: TComboBox;
     CoolBar1: TCoolBar;
+    dpAllPanels: TPanel;
+    dPanel0: TPanel;
+    dpcDockers0: TPageControl;
+    dtbAddPage: TToolButton;
+    dtbClosePage: TToolButton;
+    dtbControls: TToolBar;
+    dtbMinMax: TToolButton;
+    dtbMoveDown: TToolButton;
+    dtbMoveUp: TToolButton;
     dtpSauceDate: TDateTimePicker;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
     ilCursors: TImageList;
+    ilIcons11x11: TImageList;
+    ilIcons8x8: TImageList;
     Label1: TLabel;
     Label10: TLabel;
-    Label11: TLabel;
-    Label12: TLabel;
-    Label13: TLabel;
     Label14: TLabel;
     Label15: TLabel;
-    Label16: TLabel;
     Label17: TLabel;
     Label18: TLabel;
     Label2: TLabel;
@@ -144,6 +164,7 @@ type
     MenuItem2: TMenuItem;
     MenuItem5: TMenuItem;
     MenuItem7: TMenuItem;
+    MenuItem8: TMenuItem;
     miFileImport: TMenuItem;
     miObjMergeAll: TMenuItem;
     miFileSaveAs: TMenuItem;
@@ -170,24 +191,23 @@ type
     miEditPaste: TMenuItem;
     odObject: TOpenDialog;
     odImage: TOpenDialog;
-    PageControl1: TPageControl;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
     miFileSave: TMenuItem;
     miViewPreview: TMenuItem;
     miView: TMenuItem;
     odAnsi: TOpenDialog;
-    Panel2: TPanel;
-    Panel3: TPanel;
-    Panel4: TPanel;
     pbChars: TPaintBox;
     pbColors: TPaintBox;
     pbCurrCell: TPaintBox;
-    pRightBar: TPanel;
     pbPage: TPaintBox;
     pbRulerLeft: TPaintBox;
     pbRulerTop: TPaintBox;
-    pPagePanel: TPanel;
+    pDockers: TPanel;
+    pDocument: TPanel;
+    pMain: TPanel;
+    pmDockers: TPopupMenu;
+    pRightBar: TPanel;
     miFileExit: TMenuItem;
     miFileNew: TMenuItem;
     mMenu: TMainMenu;
@@ -195,21 +215,24 @@ type
     miEdit: TMenuItem;
     miHelp: TMenuItem;
     pbStatusBar: TPaintBox;
-    pSettings: TPanel;
-    sdObject: TSaveDialog;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
-    sbChars: TScrollBox;
+    ScrollBox1: TScrollBox;
+    ScrollBox2: TScrollBox;
+    ScrollBox3: TScrollBox;
+    ScrollBox4: TScrollBox;
+    ScrollBox5: TScrollBox;
+    ScrollBox6: TScrollBox;
+    sdObject: TSaveDialog;
     sdAnsi: TSaveDialog;
-    seCharacter: TSpinEdit;
     irqBlink: TTimer;
+    seCharacter: TSpinEdit;
     seCols: TSpinEdit;
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
     SpeedButton1: TSpeedButton;
-    TabSheet1: TTabSheet;
-    TabSheet2: TTabSheet;
-    TabSheet3: TTabSheet;
+    tsCurrent: TTabSheet;
+    tsSAUCE: TTabSheet;
     tbCodePage: TEdit;
     tbSauceAuthor: TEdit;
     tbSauceGroup: TEdit;
@@ -228,10 +251,6 @@ type
     tbFont10: TToolButton;
     tbUnicode: TEdit;
     ToolBar1: TToolBar;
-    bObjMoveBack: TToolButton;
-    bObjSave: TToolButton;
-    bObjLoad: TToolButton;
-    bObjHideOutlines: TToolButton;
     ToolButton1: TToolButton;
     ToolButton15: TToolButton;
     tbModeCharacter: TToolButton;
@@ -265,19 +284,46 @@ type
     tbFont6: TToolButton;
     tbFont11: TToolButton;
     tbFont12: TToolButton;
-    bObjMoveToBack: TToolButton;
-    bObnjMoveForward: TToolButton;
-    bObjMoveToFront: TToolButton;
-    bObjFlipHorz: TToolButton;
-    bObjFlipVert: TToolButton;
-    bObjMerge: TToolButton;
-    ToolButton2: TToolButton;
-    bObjMergeAll: TToolButton;
     tbToolPaint: TToolButton;
     tbFontConfig: TToolButton;
+    ToolButton2: TToolButton;
+    ToolButton3: TToolButton;
+    ToolButton4: TToolButton;
     ToolButton8: TToolButton;
     tbToolDraw: TToolButton;
     tbFont7: TToolButton;
+    tsCharacters: TTabSheet;
+    tsColors: TTabSheet;
+    tsDocument: TTabSheet;
+    tsObjects: TTabSheet;
+
+    function DGetDockerPanel(dockernum : integer) : TPanel;
+    function DGetPageControl(dockernum : integer) : TPageControl;
+    function DGetNumDockers : integer;
+    function DGetNumTabs(dockernum : integer) : integer;
+    function DGetTabSheet(dockernum, tabnum : integer) : TTabSheet;
+    function DFindTabSheet(captionstr : string; var dockernum, tabnum : integer) : TTabSheet;
+    function DFindTabSheet(captionstr : string) : TTabSheet;
+    procedure dpAllPanelsResize(Sender: TObject);
+    procedure DRemoveDocker(dockernum : integer);
+
+    procedure DividerBevel1MouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure DividerBevel1MouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure DividerBevel1MouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure dpcTabChange(Sender: TObject);
+    procedure dpcDockersMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure dtbControlsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure InitDockers;
+    procedure DeinitDockers;
+    procedure SetActiveTab;
+    procedure AddNewDockerPanel(ts : TTabSheet);
+    procedure dtbClosePageClick(Sender: TObject);
+    procedure dtbControlsPaint(Sender: TObject);
+    procedure dtbMinMaxClick(Sender: TObject);
+    procedure dtbMoveDownClick(Sender: TObject);
+    procedure dtbMoveUpClick(Sender: TObject);
+    procedure AddDocker(Sender: TObject);
+
     function GetBlock(x, y : integer) : integer;
     function InToFill(r, c : integer) : boolean;
     procedure FloodFillChar(x, y : integer; fillwith : TCell);
@@ -350,6 +396,7 @@ type
     function CopySelectionToObject : TObj;
     procedure BuildCharacterPalette;
     function BuildDisplayCopySelection : TRecList;
+
     procedure lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem; ARect: TRect; AState: TOwnerDrawState);
     procedure lvObjectsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbCharsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -365,13 +412,7 @@ type
     procedure tbAttributesPalettePaintButton(Sender: TToolButton; State: integer);
     procedure UpdateTitles;
     procedure pbCurrCellPaint(Sender: TObject);
-    procedure DrawCellEx(
-      cnv : TCanvas;
-      x, y, row, col : integer;
-      skipUpdate : boolean = true;
-      skipDraw : boolean = false;
-      usech : uint16 = _EMPTY;
-      useattr : uint32 = $FFFF);
+    procedure DrawCellEx(cnv : TCanvas; x, y, row, col : integer; skipUpdate : boolean = true; skipDraw : boolean = false; usech : uint16 = _EMPTY; useattr : uint32 = $FFFF);
     procedure SetAttrButtons(attr : Uint32);
     procedure cbCodePageChange(Sender: TObject);
     procedure cbColorSchemeChange(Sender: TObject);
@@ -1021,6 +1062,17 @@ begin
   dtpSauceDate.Date := now;
 
   Page.SauceComments := TStringList.Create;
+
+  InitDockers;
+end;
+
+procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
+begin
+  CheckToSave;
+  SaveSettings;
+  fPreviewBox.Hide;
+  fPreviewBox.Free;
+  DeinitDockers;
 end;
 
 procedure TfMain.LoadlvObjects;
@@ -1033,14 +1085,6 @@ begin
   for i := l downto 0 do
     lvObjects.AddItem(Objects[i].Name, nil);
   lvObjects.Invalidate;
-end;
-
-procedure TfMain.FormClose(Sender: TObject; var CloseAction: TCloseAction);
-begin
-  CheckToSave;
-  SaveSettings;
-  fPreviewBox.Hide;
-  fPreviewBox.Free;
 end;
 
 procedure TfMain.FormDestroy(Sender: TObject);
@@ -3037,8 +3081,8 @@ begin
     COLORSCHEME_256: begin fgs := 256; bgs := 256; cls := 256; end;
   end;
 
-  r := Y div 22;
-  c := X div 22;
+  r := Y div 18;
+  c := X div 18;
   maxr := cls div 16;  // 16 colors per row
 
   if not between(r, 0, maxr) or not between(c, 0, 15) then
@@ -3113,6 +3157,8 @@ begin
   SetBits(CurrAttr, A_CELL_BG_MASK, bg, 8);
 
   maxr := cls div 16;  // 16 colors per row
+  pb.Height := maxr * 18;
+
   y := 0;
   for r := 0 to maxr - 1 do
   begin
@@ -3121,8 +3167,8 @@ begin
     begin
       rect.left :=   x;
       rect.top :=    y;
-      rect.width :=  20;
-      rect.height := 20;
+      rect.width :=  16;
+      rect.height := 16;
 
       cl := (r << 4) + c;
 
@@ -3149,9 +3195,9 @@ begin
         bmp.free;
       end;
 
-      x += 22;
+      x += 18;
       end;
-    y += 22;
+    y += 18;
   end;
 
 end;
@@ -3914,7 +3960,7 @@ begin
     mbRight : MouseRight := true;
   end;
 
-  pSettings.SetFocus;
+//  pSettings.SetFocus;
   if Button = mbMiddle then
   begin
     // pan
@@ -9768,6 +9814,852 @@ begin
   nop;
 
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const
+  MAXDOCKERS = 4;
+
+var
+  DockerInfo : record
+    SaveDockerWidth : integer;        // save width of dockers when minimized
+    SkipTabChange : boolean;
+    CurrDocker : integer;             // current active docker
+    CurrTab : integer;                // current active tab
+    DockerResize : integer; // docker resizing, -1 = none.
+    DockerResizeY : integer;
+  end;
+
+
+// support functions.
+//
+//  pMain : TPanel
+//    pDocument : TPanel (left side)
+//    pDockers : TPanel (right side)
+//      dpAllPanels : TPanel (contains all dockers)
+//        dPanel0 : TPanel
+//        : dsSplitter0 : TSplitter
+//        : dpcDockers0 : TPageControl
+//        :   ts : TTabSheet (docker page)
+//        :   :
+//        :   ts : TTabSheet (docker page)
+//        dPanelX : TPanel
+//          dsSplitterX : TSplitter
+//          dpcDockersX : TPageControl
+//            ts : TTabSheet (docker page)
+//            :
+//            ts : TTabSheet (docker page)
+//      dtbControls : TToolBar (docker controls)
+
+//procedure nop; var i : integer; begin i := 0; end;
+
+// return the nth docker panel (dPanelX)
+function TfMain.DGetDockerPanel(dockernum : integer) : TPanel;
+var
+  i, t : integer;
+begin
+  t := 0;
+  for i := 0 to dpAllPanels.ControlCount - 1 do
+  begin
+    if dpAllPanels.Controls[i].ClassName = 'TPanel' then
+    begin
+      if t = dockernum then
+      begin
+        result := TPanel(dpAllPanels.Controls[i]);
+        exit;
+      end;
+      t += 1;
+    end;
+  end;
+  result := nil
+end;
+
+// return the TTabSheet
+function TfMain.DGetTabSheet(dockernum, tabnum : integer) : TTabSheet;
+var
+  p : TPanel;
+  pc : TPageControl;
+  tabs : integer;
+  i, t : integer;
+begin
+  p := DGetDockerPanel(dockernum);
+  if p = nil then
+    raise exception.Create(Format('Docker %d not found.', [ dockernum ]));
+  pc := DGetPageControl(dockernum);
+  tabs := DGetNumTabs(dockernum);
+  if tabnum >= tabs then
+    exit(nil);
+
+  t := 0;
+  for i := 0 to pc.PageCount - 1 do
+  begin
+    if pc.Pages[i].TabVisible then
+    begin
+      if t = tabnum then
+      begin
+        result := pc.Pages[i];
+        exit;
+      end;
+      t += 1;
+    end;
+  end;
+  raise exception.Create(Format('Docker tab %d not found.', [ tabnum ]));
+end;
+
+// return the TPageControl
+function TfMain.DGetPageControl(dockernum : integer) : TPageControl;
+var
+  i : integer;
+  p : TPanel;
+begin
+  p := DGetDockerPanel(dockernum);
+  if p = nil then
+    raise exception.Create(Format('Docker %d not found.', [ dockernum ]));
+
+  result := nil;
+  for i := 0 to p.ControlCount - 1 do
+  begin
+    if p.Controls[i].ClassName = 'TPageControl' then
+    begin
+      result := TPageControl(p.Controls[i]);
+      break;
+    end;
+  end;
+  if result = nil then
+    raise exception.Create(Format('Docker %d not found.', [ dockernum ]));
+end;
+
+// return the number of dockers (dPanelX)
+function TfMain.DGetNumDockers : integer;
+var
+  i :     integer;
+  ctrl :  TPanel;
+begin
+  result := 0;
+  for i := 0 to MAXDOCKERS - 1 do
+  begin
+    ctrl := DGetDockerPanel(i);
+    if ctrl <> nil then
+      result += 1;
+  end;
+end;
+
+// return the number of tabs on a docker
+function TfMain.DGetNumTabs(dockernum : integer) : integer;
+var
+  pc :  TPageControl;
+  i : integer;
+begin
+  // get the pagecontrol in p
+  pc := DGetPageControl(dockernum);
+  // don't count tabs set for TabVisible = false
+  result := 0;
+  for i := 0 to pc.PageCount - 1 do
+    if pc.Page[i].TabVisible then
+      result += 1;
+end;
+
+// scan for tab sheet matching on tabname. return TTabSheet, set dockernum and tabnum
+function TfMain.DFindTabSheet(captionstr : string; var dockernum, tabnum : integer) : TTabSheet;
+var
+  i, j, t : integer;
+  pc : TPageControl;
+begin
+  for i := 0 to DGetNumDockers - 1 do
+  begin
+    pc := DGetPageControl(i);
+    t := 0;
+    for j := 0 to pc.PageCount - 1 do
+    begin
+      if pc.Pages[j].TabVisible then
+      begin
+        if pc.Pages[j].Caption = captionstr then
+        begin
+          dockernum := i;
+          tabnum := t;
+          result := pc.Pages[j];
+          exit;
+        end;
+        t += 1;
+      end;
+    end;
+  end;
+  raise exception.Create(Format('Tab Sheet %s not found.', [ captionstr ]));
+end;
+
+// scan for tab sheet matching on tabname. return TTabSheet, set dockernum and tabnum
+function TfMain.DFindTabSheet(captionstr : string) : TTabSheet;
+var
+  i, j : integer;
+  pc : TPageControl;
+begin
+  for i := 0 to DGetNumDockers - 1 do
+  begin
+    pc := DGetPageControl(i);
+    for j := 0 to pc.PageCount - 1 do
+      if pc.Pages[j].Caption = captionstr then
+      begin
+        result := pc.Pages[j];
+        exit;
+      end;
+  end;
+  raise exception.Create(Format('Tab Sheet %s not found.', [ captionstr ]));
+end;
+
+// be sure all docker panels are on screen. if off screen, move tabs to previous
+// docker and remove
+procedure TfMain.dpAllPanelsResize(Sender: TObject);
+var
+  ap, dp, dp2 : TPanel;
+  pc1, pc2 : TPageControl;
+  ts : TTabSheet;
+  i : integer;
+begin
+  ap := TPanel(Sender);
+  i := DGetNumDockers - 1;
+  while DGetDockerPanel(i).Top > (ap.Height - 48) do
+  begin
+    dp := DGetDockerPanel(i);
+    dp2 := DGetDockerPanel(i - 1);
+    pc1 := DGetPageControl(i);
+    pc2 := DGetPageControl(i - 1);
+    while pc1.PageCount > 0 do
+    begin
+      ts := pc1.Pages[0];
+      ts.Parent := pc2;
+      ts.PageIndex := DGetNumTabs(i - 1);
+      ts.TabVisible := true;
+    end;
+    ap.RemoveControl(dp);
+    dp2.Anchors := dp2.Anchors + [ akBottom ];
+    dp2.Height := ap.Height - dp2.Top;
+    i := DGetNumDockers - 1;
+  end;
+end;
+
+// resize
+procedure TfMain.DividerBevel1MouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  p1, p2 : TPanel;
+  dockernum, i : integer;
+begin
+  // get dockernum for this gripper
+  p1 := TPanel(TDividerBevel(Sender).Parent);
+  dockernum := -1;
+  for i := 0 to DGetNumDockers - 1 do
+  begin
+    p2 := DGetDockerPanel(i);
+    if p1 = p2 then
+    begin
+      dockernum := i;
+      break;
+    end;
+  end;
+  DockerInfo.DockerResize := dockernum;
+  DockerInfo.DockerResizeY := Y;
+end;
+
+procedure TfMain.DividerBevel1MouseMove(Sender: TObject; Shift: TShiftState; X,
+  Y: Integer);
+var
+  p1, p2 : TPanel;
+  delta, hadj : integer;
+  h1, h2, t2 : integer;
+begin
+  // ignore mouse X
+  if DockerInfo.DockerResize > 0 then
+  begin
+    // resize dockerresize. grow / shrink the docker above. keep minimun height
+    // for this docker and above to 32
+
+    p1 := DGetDockerPanel(DockerInfo.DockerResize - 1);
+    p2 := DGetDockerPanel(DockerInfo.DockerResize);
+
+    delta := DockerInfo.DockerResizeY - Y;
+
+    hadj := 0;
+    if DockerInfo.DockerResize = 1 then
+      hadj := -12;
+
+    if (p1.Height - delta - hadj) < 48 then
+      delta := p1.Height - 48 - hadj
+    else if (p2.Height + delta) < 48 then
+      delta := 48 - p2.Height;
+
+    h1 := p1.Height - delta;
+    t2 := p2.Top - delta;
+    h2 := p2.Height + delta;
+
+    if t2 > (dpAllPanels.Height - 48) then
+    begin
+      t2 := dpAllPanels.Height - 49;
+      h1 := t2 - p1.Top;
+      h2 := dpAllPanels.Height - t2;
+      DockerInfo.DockerResize := -1;
+    end;
+    p1.Height :=  h1;
+    p2.Top :=     t2;
+    p2.Height :=  h2;
+  end;
+end;
+
+procedure TfMain.DividerBevel1MouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  DockerInfo.DockerResize := -1;
+end;
+
+// remove a TPanel, TSplitter, TPageControl (should be empty)
+procedure TfMain.DRemoveDocker(dockernum : integer);
+var
+  p : TPanel;
+begin
+  p := DGetDockerPanel(dockernum);
+  dpAllPanels.RemoveControl(DGetDockerPanel(dockernum));
+  p.Free;
+end;
+
+
+// initialize
+procedure TfMain.InitDockers;
+var
+  p : TPanel;
+  pc : TPageControl;
+  ts : TTabSheet;
+  i, j : integer;
+  mi : TMenuItem;
+  ini : TIniFile;
+  sect : string;
+  tabnames : TStringArray;
+  tabs : string;
+  t, h : integer;
+begin
+  // build context menu
+  DockerInfo.SkipTabChange := true;
+
+  pmDockers.Items.Clear;
+  for i := 0 to dpcDockers0.PageCount - 1 do
+  begin
+    mi := TMenuItem.Create(nil);
+    mi.Caption := dpcDockers0.Pages[i].Caption;
+    mi.OnClick := @AddDocker;
+    pmDockers.Items.Add(mi);
+    dpcDockers0.Pages[i].TabVisible := false;
+  end;
+
+  // load settings
+  //  [Docker0]
+  //  Tabs=name,name
+
+  ini := TIniFile.Create('tabs.ini');
+
+  // create all the panels we will need
+  for i := 0 to MAXDOCKERS - 1 do
+  begin
+    sect := 'Docker' + inttostr(i);
+    tabs := ini.ReadString(sect, 'Tabs', '');
+    tabnames := tabs.Split([',']);
+    if (i > 0) and (length(tabnames) > 0) then
+    begin
+      // create new docker.
+      ts := DGetTabSheet(0, 0);
+      AddNewDockerPanel(ts);
+    end;
+  end;
+
+  // reorganize the tabs
+  for i := 0 to MAXDOCKERS - 1 do
+  begin
+    sect := 'Docker' + inttostr(i);
+    tabs := ini.ReadString(sect, 'Tabs', '');
+    tabnames := tabs.Split([',']);
+    if length(tabnames) > 0 then
+    begin
+      p := DGetDockerPanel(i);
+      pc := DGetPageControl(i);
+      for j := 0 to length(tabnames) - 1 do
+      begin
+        // move these tabs here
+        ts := DFindTabSheet(tabnames[j]);
+        ts.Parent := pc;
+        ts.TabVisible := true;
+      end;
+    end;
+  end;
+
+  ini.Free;
+
+  // set something as active
+  DockerInfo.SkipTabChange := false;
+  DockerInfo.DockerResize := -1;
+  DockerInfo.CurrDocker := 0;
+  DockerInfo.CurrTab := 0;
+  SetActiveTab;
+
+end;
+
+procedure TfMain.DeinitDockers;
+var
+  ini : TIniFile;
+  sect : String;
+  tabnames : string;
+  i, j : integer;
+  ts : TTabSheet;
+begin
+  // save settings
+  DeleteFile('tabs.ini'); // create fresh tabs settings
+  ini := TIniFile.Create('tabs.ini');
+  for i := 0 to DGetNumDockers - 1 do
+  begin
+    sect := 'Docker' + inttostr(i);
+    tabnames := '';
+    for j := 0 to DGetNumTabs(i) - 1 do
+    begin
+      ts := DGetTabSheet(i, j);
+      tabnames += ',' + ts.Caption;
+    end;
+    tabnames := tabnames.substring(1);
+    ini.WriteString(sect, 'Tabs', tabnames);
+  end;
+  ini.Free;
+end;
+
+// set tab names and select tab for CurrDocker CurrTab
+procedure TfMain.SetActiveTab;
+var
+  pc :    TPageControl;
+  ts :    TTabSheet;
+  i, j :  integer;
+begin
+  if not DockerInfo.SkipTabChange then
+  begin
+    for i := 0 to DGetNumDockers - 1 do
+    begin
+      pc := DGetPageControl(i);
+      for j := 0 to pc.PageCount - 1 do
+      begin
+        ts := pc.Pages[j];
+        ts.ImageIndex := -1;
+      end;
+    end;
+
+    pc := DGetPageControl(DockerInfo.CurrDocker);
+    ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+    if ts <> nil then
+    begin
+      ts.ImageIndex := 0;
+      pc.ActivePage := ts;
+    end;
+  end;
+end;
+
+// Hide/Show the docker Panel.
+procedure TfMain.dtbMinMaxClick(Sender: TObject);
+begin
+  if dpAllPanels.Width > 50 then
+  begin
+    // hide
+    DockerInfo.SaveDockerWidth   := dpAllPanels.Width;       // save current width of tabs
+    dpAllPanels.Width := 0;
+    pDockers.Width    := dtbControls.Width;
+    pDocument.Width   := pMain.Width - dtbControls.Width;
+    dtbMinMax.ImageIndex := 1;
+  end
+  else
+  begin
+    // reveal
+    dpAllPanels.Width := DockerInfo.SaveDockerWidth;
+    pDockers.Width    := DockerInfo.SaveDockerWidth + dtbControls.Width;
+    pDocument.Width   := pMain.Width - pDockers.Width;
+    dtbMinMax.ImageIndex := 0;
+    SetActiveTab;
+  end;
+end;
+
+
+// hide the current tab sheet
+// can't remove first tab due to hidden tabs
+procedure TfMain.dtbClosePageClick(Sender: TObject);
+var
+  p, p0 : TPanel;
+  pc : TPageControl;
+  ts : TTabSheet;
+  t, h : integer;
+  a : TAnchors;
+  fd : TPanel;
+  fc : TControl;
+  hid : boolean;
+begin
+  // get active
+  ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+  if ts = nil then
+    exit;
+
+  // hide it
+  DockerInfo.SkipTabChange := true;
+  ts.TabVisible := false;
+
+  // move to first docker
+  ts.Parent := DGetPageControl(0);
+
+  // if no other tabs,
+  p := DGetDockerPanel(DockerInfo.CurrDocker);
+  if DGetNumTabs(DockerInfo.CurrDocker) = 0 then
+  begin
+    // last docker
+    if DockerInfo.CurrDocker = DGetNumDockers - 1 then
+    begin
+      // expand previous docker down to this
+      if DockerInfo.CurrDocker > 0 then
+      begin
+        a := p.Anchors;
+        h := p.Height;
+        DRemoveDocker(DockerInfo.CurrDocker);
+        p := DGetDockerPanel(DockerInfo.CurrDocker - 1);
+        p.Height := p.Height + h;
+      end
+    end
+    else
+    begin
+      // move any hidden tabs to next docker
+      pc := DGetPageControl(DockerInfo.CurrDocker);
+      while pc.PageCount > 0 do
+      begin
+        ts := pc.Pages[0];
+        hid := ts.TabVisible;
+        ts.Parent := DGetPageControl(DockerInfo.CurrDocker + 1);
+        ts.TabVisible := hid;
+      end;
+
+      t := p.Top;
+      h := p.Height;
+      DRemoveDocker(DockerInfo.CurrDocker);
+
+      // having removed the empty docker, Currdocker now points to the next.
+      p := DGetDockerPanel(DockerInfo.CurrDocker);
+
+      // remove splitter from first docker
+      p0 := DGetDockerPanel(0);
+      if p0.Controls[0].ClassName = 'TDividerBevel' then
+        p0.RemoveControl(p0.Controls[0]);
+
+      p.Top := t;
+      p.Height := p.Height + h;
+    end;
+  end;
+
+  DockerInfo.SkipTabChange := false;
+
+  DockerInfo.CurrDocker := 0;
+  DockerInfo.CurrTab := 0;
+  SetActiveTab;
+end;
+
+// clicked on context menu
+procedure TfMain.AddDocker(Sender: TObject);
+var
+  mi : TMenuItem;
+  d, t : integer;
+  ts : TTabSheet;
+begin
+  mi := TMenuItem(Sender);
+  ts := DFindTabSheet(mi.Caption); // call to get just the tabsheet
+  ts.TabVisible:=true;
+  ts := DFindTabSheet(mi.Caption, d, t); // now get docker / tab
+  DockerInfo.CurrDocker := d;
+  DockerInfo.CurrTab := t;
+  SetActiveTab;
+end;
+
+procedure TfMain.dtbControlsPaint(Sender: TObject);
+var
+  tb :        TToolBar;
+  cnv :       TCanvas;
+  numbtns :   integer;
+  y1, y2 :    integer;
+begin
+  tb := TToolBar(Sender);
+  cnv := tb.Canvas;
+
+  // draw default
+  Inherited Paint;
+
+  // draw sideways text below last button
+  numbtns := tb.ButtonCount;
+  y1 := numbtns * tb.ButtonHeight;
+  y2 := tb.Height;
+
+  cnv.Pen.Color := clGrayText;
+  cnv.Line(3, y1, 3, y2 - 3);
+  cnv.Line(6, y1 - 1, 6, y2 - 2);
+  cnv.Line(9, y1, 9, y2 - 3);
+end;
+
+// activated on a tab
+procedure TfMain.dpcTabChange(Sender: TObject);
+var
+  d, t :  integer;
+  pc :    TPageControl;
+begin
+  if not DockerInfo.SkipTabChange then
+  begin
+    pc := TPageControl(Sender);
+    DFindTabSheet(pc.ActivePage.Caption, d, t);
+    DockerInfo.CurrDocker := d;
+    DockerInfo.CurrTab := t;
+    SetActiveTab;
+  end;
+end;
+
+// clicked on tab
+procedure TfMain.dpcDockersMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  pc : TPageControl;
+  tnum : integer;
+  d, t : integer;
+begin
+  pc := TPageControl(Sender);
+  tnum := pc.IndexOfPageAt(x, y);
+  DFindTabSheet(pc.Pages[tnum].Caption, d, t);
+  DockerInfo.CurrDocker := d;
+  DockerInfo.CurrTab := t;
+  SetActiveTab;
+end;
+
+procedure TfMain.dtbControlsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  // min/max
+  dtbMinMaxClick(Sender);
+end;
+
+// move cuurent tab down. if at bottom, move to next docker page. if on last docker
+// page and more than one docker here, create new one - move it.
+procedure TfMain.dtbMoveDownClick(Sender: TObject);
+var
+  p : TPanel;
+  pc, pc2 : TPageControl;
+  ts : TTabSheet;
+  a : TAnchors;
+  h : integer;
+begin
+  if DockerInfo.CurrTab < DGetNumTabs(DockerInfo.CurrDocker) - 1 then
+  begin
+    // others after this on this docker. just move down.
+    ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+    ts.PageIndex := (ts.PageIndex + 1);
+    SetActiveTab;
+  end
+  else
+  begin
+    // last one on this docker.
+    if DGetNumTabs(DockerInfo.CurrDocker) > 1 then
+    begin
+      // only if others. don't move solo tabs to next docker.
+      ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+      if (DockerInfo.CurrDocker < MAXDOCKERS - 1) then
+        if (DockerInfo.CurrDocker = DGetNumDockers - 1) then
+        begin
+          // add new docker.
+          AddNewDockerPanel(ts);
+        end
+        else
+        begin
+          // add to top of list of next docker.
+          ts.Parent := DGetPageControl(DockerInfo.CurrDocker + 1);
+          DockerInfo.SkipTabChange:=true;
+          ts.PageIndex := 0;
+          ts.TabVisible := true;
+          DockerInfo.SkipTabChange:=false;
+          DockerInfo.CurrDocker += 1;
+          DockerInfo.CurrTab := 0;
+          SetActiveTab;
+        end;
+    end
+    else
+    begin
+      // is there a docker after this one?
+      if DockerInfo.CurrDocker <> DGetNumDockers - 1 then
+      begin
+        // move all the tabs in next docker to this one.
+        pc := DGetPageControl(DockerInfo.CurrDocker);
+        pc2 := DGetPageControl(DockerInfo.CurrDocker + 1);
+
+        while pc2.PageCount > 0 do
+        begin
+          ts := pc2.Pages[0];
+          ts.Parent := pc;
+          ts.TabVisible := true;
+        end;
+
+        // remove next docker
+        p := DGetDockerPanel(DockerInfo.CurrDocker + 1);
+        a := p.Anchors;
+        h := p.Height;
+        DRemoveDocker(DockerInfo.CurrDocker + 1);
+
+        // expand this docker down to bottom of next.
+        p := DGetDockerPanel(DockerInfo.CurrDocker);
+        p.Anchors := a;
+        p.Height := p.Height + h;
+      end;
+    end;
+  end;
+end;
+
+// move current tab up - if at top, move to previos docker page, then if this docker page
+// is empty, remove it. cascade...
+procedure TfMain.dtbMoveUpClick(Sender: TObject);
+var
+  p1, p2 : TPanel;
+  pc : TPageControl;
+  ts : TTabSheet;
+  a : TAnchors;
+  h : integer;
+begin
+  if DockerInfo.CurrTab > 0 then
+  begin
+    // just move it prev
+    ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+    ts.PageIndex := (ts.PageIndex - 1);
+  end
+  else
+  begin
+    // don't do first docker
+    if DockerInfo.CurrDocker > 0 then
+    begin
+      // first tab of docker
+
+      // move to previous
+      ts := DGetTabSheet(DockerInfo.CurrDocker, DockerInfo.CurrTab);
+      pc := DGetPageControl(DockerInfo.CurrDocker - 1);
+      DockerInfo.SkipTabChange := true;
+      ts.Parent := pc;
+      ts.PageIndex := DGetNumTabs(DockerInfo.CurrDocker - 1);
+      ts.TabVisible := true;
+      pc.ActivePage := ts;
+      DockerInfo.SkipTabChange := false;
+
+      if DGetNumTabs(DockerInfo.CurrDocker) = 0 then
+      begin
+        p1 := DGetDockerPanel(DockerInfo.CurrDocker - 1);
+        p2 := DGetDockerPanel(DockerInfo.CurrDocker);
+        a := p2.Anchors;
+        h := p2.Height;
+        dpAllPanels.RemoveControl(p2);
+        p1.Anchors := a;
+        p1.Height := p1.Height + h;
+      end;
+
+      DockerInfo.CurrDocker -= 1;
+      DockerInfo.CurrTab := DGetNumTabs(DockerInfo.CurrDocker) - 1;
+    end;
+  end;
+end;
+
+procedure TfMain.AddNewDockerPanel(ts : TTabSheet);
+var
+  p :         TPanel;
+  pc :        TPageControl;
+  db :        TDividerBevel;
+  i, y, nh :  integer;
+  ndockers :  integer;
+begin
+
+  ndockers := DGetNumDockers;
+  if ndockers < MAXDOCKERS then
+  begin
+    // resize all existing dockers heights and y positions
+    y := 0;
+    nh := floor(pDockers.ClientHeight / (ndockers + 1));
+    for i := 0 to ndockers - 1 do
+    begin
+      p := DGetDockerPanel(i);
+      p.Top := y;
+      p.Height := nh;
+      y += nh;
+    end;
+
+    p := DGetDockerPanel(DockerInfo.CurrDocker);
+    p.Anchors := p.Anchors - [ akBottom ];
+
+    // create a docker
+    p := TPanel.Create(dpAllPanels);
+    p.Parent := dpAllPanels;
+    p.Anchors := [ akTop, akLeft, akRight, akBottom ];
+    p.BevelOuter := bvNone;
+    p.Left := 0;
+    p.Top := y;
+    p.Width := DGetDockerPanel(0).Width;
+    p.Height := nh;
+
+    db := TDividerBevel.Create(p);
+    db.Parent := p;
+    db.Align := alTop;
+    db.AutoSize := false;
+    db.BevelStyle := bsRaised;
+    db.BorderSpacing.Bottom := 2;
+    db.BorderSpacing.Left := ((p.Width - 64) >> 1);
+    db.BorderSpacing.Right := ((p.Width - 64) >> 1);
+    db.Cursor := crVSplit;
+    db.Height := 10;
+    db.Style := gsGripper;
+
+    // dragging events
+    db.OnMouseDown := @DividerBevel1MouseDown;
+    db.OnMouseMove := @DividerBevel1MouseMove;
+    db.OnMouseUp := @DividerBevel1MouseUp;
+
+    pc := TPageControl.Create(p);
+    pc.Parent := p;
+    pc.Align := alClient;
+    pc.Images := ilIcons11x11;
+    pc.ParentFont := false;
+    pc.Font.Height := -11;
+    pc.TabPosition := tpTop;
+    pc.OnChange := @dpcTabChange;
+    pc.OnMouseDown := @dpcDockersMouseDown;
+
+    // move sheet here
+    if ts <> nil then
+    begin
+      ts.Parent := pc;
+      ts.TabVisible := true;
+    end;
+
+    DockerInfo.CurrDocker += 1;
+    DockerInfo.CurrTab := 0;
+    SetActiveTab;
+  end;
+
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 initialization
