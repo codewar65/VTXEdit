@@ -2149,9 +2149,17 @@ begin
             CopySelection.Get(@copyrec, i);
             r := copyrec.Row;
             c := copyrec.Col;
+            RecordUndoCell(r, c, BLANK);
             Page.Rows[r].Cells[c] := BLANK;
             DrawCell(r, c, false);
           end;
+
+          undoblk.UndoType := utCells;
+          undoblk.CellData := CurrUndoData.Copy;
+          undoblk.CellData.Trim;
+          UndoAdd(undoblk);
+          CurrUndoData.Clear;
+
           CurrFileChanged := true;
           UpdateTitles;
         end;
