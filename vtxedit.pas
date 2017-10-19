@@ -396,6 +396,8 @@ type
     function CopySelectionToObject : TObj;
     procedure BuildCharacterPalette;
     function BuildDisplayCopySelection : TRecList;
+    procedure ResetBlink;
+    procedure DrawCursor;
 
     procedure lvObjectsDrawItem(Sender: TCustomListView; AItem: TListItem; ARect: TRect; AState: TOwnerDrawState);
     procedure lvObjectsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -653,6 +655,42 @@ begin
   result := -1;
 end;
 
+// draw cursor overlay
+procedure TfMain.DrawCursor;
+var
+  x, y :    integer;
+  zz :      real;
+  h1, h2,
+  v1, v2 :  integer;
+  cnv :     TCanvas;
+begin
+  cnv := pbPage.Canvas;
+  x := (CursorCol - PageLeft) * CellWidthZ;
+  y := (CursorRow - PageTop) * CellHeightZ;
+  zz := PageZoom * XScale;
+  h1 := floor(1 * PageZoom);
+  h2 := floor(5 * PageZoom);
+  v1 := floor(1 * zz);
+  v2 := floor(3 * zz);
+  cnv.Brush.Color := ANSIColor[GetBits(Page.CrsrAttr, A_CURSOR_COLOR_MASK)];
+  case GetBits(Page.CrsrAttr, A_CURSOR_VERTICAL or A_CURSOR_SIZE_MASK, 8) of
+      1:  // horz thin
+        cnv.FillRect(x, y + CellHeightZ - h1, x + CellWidthZ, y + CellHeightZ);
+
+      2:  // horz thick
+        cnv.FillRect(x, y + CellHeightZ - h2, x + CellWidthZ, y + CellHeightZ);
+
+      5:  // vert thin
+        cnv.FillRect(x, y, x + v1, y + CellHeightZ);
+
+      6:  // vert thick
+        cnv.FillRect(x, y, x + v2, y + CellHeight);
+
+      3, 7: // full
+        cnv.FillRect(x, y, x + CellWidthZ, y + CellHeightZ);
+  end;
+end;
+
 // refresh cursor and blinking text
 procedure TfMain.DoBlink;
 var
@@ -661,151 +699,126 @@ var
   cnv :         TCanvas;
   docell :      boolean;
   objnum :      integer;
-  h1, h2,
-  v1, v2 :      integer;
   i :           integer;
   cl1, cl2 :    TColor;
   copyrec :     TLoc;
 begin
   if bmpPage <> nil then
   begin
-    cell := BLANK;
-    BlinkFast := not BlinkFast;
-    if BlinkFast then
     begin
-      BlinkSlow := not BlinkSlow;
-    end;
+      cell := BLANK;
+      BlinkFast := not BlinkFast;
+      if BlinkFast then
+        BlinkSlow := not BlinkSlow;
 
-    // only display blink on normal or higher zoom
-    if PageZoom >= 1 then
-    begin
-      cnv := pbPage.Canvas;
-      y := 0;
-      for r := PageTop to NumRows - 1 do
+      // only display blink on normal or higher zoom
+      if PageZoom >= 1 then
       begin
-        if r > PageTop + WindowRows then
-          break;
-        x := 0;
-        for c := PageLeft to NumCols - 1 do
+        cnv := pbPage.Canvas;
+        y := 0;
+        for r := PageTop to NumRows - 1 do
         begin
-          if c > PageLeft + WindowCols then
+          if r > PageTop + WindowRows then
             break;
-
-          docell := false;
-
-          objnum := GetObjectCell(r, c, cell);
-          if objnum = -1 then
-            cell := Page.Rows[r].Cells[c];
-
-          if (CursorRow = r) and (CursorCol = c) then
-//          if HasBits(cell.Attr, A_CELL_BLINKSLOW)
-//            or ((CursorRow = r) and (CursorCol = c)) then
-            docell := true;
-          if (HasBits(cell.Attr, A_CELL_BLINKSLOW) and (ColorScheme <> COLORSCHEME_ICE)) then
-            docell := true;
-
-          if docell then
+          x := 0;
+          for c := PageLeft to NumCols - 1 do
           begin
-            DrawCellEx(cnv, x, y, r, c, true, false, cell.chr, cell.attr);
+            if c > PageLeft + WindowCols then
+              break;
 
-            // draw cursor over top if cursor location (if on page)
-            if (CursorRow = r) and (CursorCol = c) and (objnum = -1) then
+            docell := false;
+
+            objnum := GetObjectCell(r, c, cell);
+            if objnum = -1 then
+              cell := Page.Rows[r].Cells[c];
+
+            if (CursorRow = r) and (CursorCol = c) then
+              docell := true;
+
+            if (HasBits(cell.Attr, A_CELL_BLINKSLOW OR A_CELL_BLINKFAST) and (ColorScheme <> COLORSCHEME_ICE)) then
+              docell := true;
+
+            if docell then
             begin
+              DrawCellEx(cnv, x, y, r, c, true, false, cell.chr, cell.attr);
 
-              // draw selection border
-              for i := CopySelection.Count - 1 downto 0 do
+              // draw cursor over top if cursor location (if on page)
+              if (CursorRow = r) and (CursorCol = c) and (objnum = -1) then
               begin
-                CopySelection.Get(@copyrec, i);
-                if (copyrec.Row = r) and (copyrec.Col = c) then
+
+                // draw selection border
+                for i := CopySelection.Count - 1 downto 0 do
                 begin
-                  if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
-                    DrawDashLine(cnv,
-                      x, y,
-                      x + CellWidthZ, y,
-                      clSelectionArea1, clSelectionArea2);
+                  CopySelection.Get(@copyrec, i);
+                  if (copyrec.Row = r) and (copyrec.Col = c) then
+                  begin
+                    if not HasBits(copyrec.Neighbors, NEIGHBOR_NORTH) then
+                      DrawDashLine(cnv,
+                        x, y,
+                        x + CellWidthZ, y,
+                        clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
-                    DrawDashLine(cnv,
-                      x, y + CellHeightZ - 1,
-                      x + CellWidthZ, y + CellHeightZ - 1,
-                      clSelectionArea1, clSelectionArea2);
+                    if not HasBits(copyrec.Neighbors, NEIGHBOR_SOUTH) then
+                      DrawDashLine(cnv,
+                        x, y + CellHeightZ - 1,
+                        x + CellWidthZ, y + CellHeightZ - 1,
+                        clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
-                    DrawDashLine(cnv,
-                      x, y,
-                      x, y + CellHeightZ,
-                      clSelectionArea1, clSelectionArea2);
+                    if not HasBits(copyrec.Neighbors, NEIGHBOR_WEST) then
+                      DrawDashLine(cnv,
+                        x, y,
+                        x, y + CellHeightZ,
+                        clSelectionArea1, clSelectionArea2);
 
-                  if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
-                    DrawDashLine(cnv,
-                      x + CellWidthZ - 1, y,
-                      x + CellWidthZ - 1, y + CellHeightZ,
-                      clSelectionArea1, clSelectionArea2);
-                  break;
-                end;
-              end;
-
-              if not BlinkFast then
-              begin
-                h1 := floor(1 * PageZoom);
-                h2 := floor(5 * PageZoom);
-                v1 := floor(1 * PageZoom * XScale);
-                v2 := floor(3 * PageZoom * XScale);
-                cnv.Brush.Color := ANSIColor[GetBits(Page.CrsrAttr, A_CURSOR_COLOR_MASK)];
-                case GetBits(Page.CrsrAttr, A_CURSOR_VERTICAL or A_CURSOR_SIZE_MASK, 8) of
-                    1:  // horz thin
-                      cnv.FillRect(x, y + CellHeightZ - h1, x + CellWidthZ, y + CellHeightZ);
-
-                    2:  // horz thick
-                      cnv.FillRect(x, y + CellHeightZ - h2, x + CellWidthZ, y + CellHeightZ);
-
-                    5:  // vert thin
-                      cnv.FillRect(x, y, x + v1, y + CellHeightZ);
-
-                    6:  // vert thick
-                      cnv.FillRect(x, y, x + v2, y + CellHeight);
-
-                    3, 7: // full
-                      cnv.FillRect(x, y, x + CellWidthZ, y + CellHeightZ);
-                end;
-              end;
-            end
-            else
-            begin
-              // never a object border on a cursor
-              if ObjectOutlines then
-              begin
-                cnv.Brush.Style := bsClear;
-
-                if objnum = SelectedObject then
-                begin
-                  cl1 := clSelectedObject1;
-                  cl2 := clSelectedObject2;
-                end
-                else
-                begin
-                  cl1 := clUnselectedObject1;
-                  cl2 := clUnselectedObject2;
+                    if not HasBits(copyrec.Neighbors, NEIGHBOR_EAST) then
+                      DrawDashLine(cnv,
+                        x + CellWidthZ - 1, y,
+                        x + CellWidthZ - 1, y + CellHeightZ,
+                        clSelectionArea1, clSelectionArea2);
+                    break;
+                  end;
                 end;
 
-                if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
-                  DrawDashLine(cnv, x, y,
-                    x + CellWidthZ - 1, y, cl1, cl2);
-                if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
-                  DrawDashLine(cnv, x, y + CellHeightZ - 1,
-                    x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
-                if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
-                  DrawDashLine(cnv, x, y,
-                    x, y + CellHeightZ - 1, cl1, cl2);
-                if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
-                  DrawDashLine(cnv, x + CellWidthZ - 1, y,
-                    x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
+                if BlinkFast then
+                  DrawCursor;
+              end
+              else
+              begin
+                // never a object border on a cursor
+                if ObjectOutlines then
+                begin
+                  cnv.Brush.Style := bsClear;
+
+                  if objnum = SelectedObject then
+                  begin
+                    cl1 := clSelectedObject1;
+                    cl2 := clSelectedObject2;
+                  end
+                  else
+                  begin
+                    cl1 := clUnselectedObject1;
+                    cl2 := clUnselectedObject2;
+                  end;
+
+                  if not HasBits(cell.neighbors, NEIGHBOR_NORTH) then
+                    DrawDashLine(cnv, x, y,
+                      x + CellWidthZ - 1, y, cl1, cl2);
+                  if not HasBits(cell.neighbors, NEIGHBOR_SOUTH) then
+                    DrawDashLine(cnv, x, y + CellHeightZ - 1,
+                      x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
+                  if not HasBits(cell.neighbors, NEIGHBOR_WEST) then
+                    DrawDashLine(cnv, x, y,
+                      x, y + CellHeightZ - 1, cl1, cl2);
+                  if not HasBits(cell.neighbors, NEIGHBOR_EAST) then
+                    DrawDashLine(cnv, x + CellWidthZ - 1, y,
+                      x + CellWidthZ - 1, y + CellHeightZ - 1, cl1, cl2);
+                end;
               end;
             end;
+            x += CellWidthZ;
           end;
-          x += CellWidthZ;
+          y += CellHeightZ;
         end;
-        y += CellHeightZ;
       end;
     end;
   end;
@@ -1721,6 +1734,14 @@ begin
   CursorStatus;
 end;
 
+// reset blinks for on keyboard cursor movements
+procedure TfMain.ResetBlink;
+begin
+  BlinkSlow := true;
+  BlinkFast := true;
+  DrawCursor;
+end;
+
 procedure TfMain.CursorRight;
 var
   v0, v1 : integer;
@@ -1739,6 +1760,7 @@ begin
   end;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1761,6 +1783,7 @@ begin
   end;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1775,6 +1798,7 @@ begin
     CursorRow := 0;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1791,6 +1815,7 @@ begin
   end;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1808,6 +1833,7 @@ begin
   CursorCol := 0;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1820,8 +1846,10 @@ begin
   CursorCol := ((CursorCol >> 3) + 1) << 3;
   if CursorCol >= NumCols then
     CursorCol := NumCols - 1;
+  ResetBlink;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1836,6 +1864,7 @@ begin
     CursorCol := 0;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -1849,6 +1878,7 @@ begin
   CursorCol := col;
   DrawCell(v0, v1);
   DrawCell(CursorRow, CursorCol);
+  ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
 end;
 
@@ -2150,8 +2180,6 @@ begin
         begin
           RedoPerform(UndoPos);
           UndoPos += 1;
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
@@ -2163,8 +2191,6 @@ begin
           // only if there is some undo to be done.
           UndoPerform(UndoPos - 1);
           UndoPos -= 1;
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
@@ -2181,8 +2207,6 @@ begin
           SelectedObject := -1;
           lvObjects.ItemIndex := lvObjIndex(selectedObject);
           pbPage.Invalidate;
-          CurrFileChanged := true;
-          UpdateTitles;
         end
         else if CopySelection.Count > 0 then
         begin
@@ -2203,9 +2227,6 @@ begin
           undoblk.CellData.Trim;
           UndoAdd(undoblk);
           CurrUndoData.Clear;
-
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
@@ -2218,15 +2239,11 @@ begin
           // copy object to clipboard
           Clipboard.Data.Free;
           CopyObject(Objects[SelectedObject], Clipboard);
-          CurrFileChanged := true;
-          UpdateTitles;
         end
         else if CopySelection.Count > 0 then
         begin
           Clipboard.Data.Free;
           Clipboard := CopySelectionToObject;
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
@@ -2258,79 +2275,57 @@ begin
           lvObjects.ItemIndex := lvObjIndex(SelectedObject);
           pbPage.Invalidate;
           fPreviewBox.Invalidate;
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
     KA_OBJECTMOVEBACK:
       begin
         ObjMoveBack;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTMOVEFORWARD:
       begin
         ObjMoveForward;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTMOVETOBACK:
       begin
         ObjMoveToBack;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTMOVETOFRONT:
       begin
         ObjMoveToFront;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTFLIPHORZ:
       begin
         ObjFlipHorz;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTFLIPVERT:
       begin
         ObjFlipVert;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTMERGE:
       begin
         ObjMerge;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTMERGEALL:
       begin
         ObjMergeAll;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTNEXT:
       begin
         ObjNext;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_OBJECTPREV:
       begin
         ObjPrev;
-        CurrFileChanged := true;
-        UpdateTitles;
       end;
 
     KA_DELETE:
@@ -2380,8 +2375,6 @@ begin
             CopySelection.Clear;
             pbPage.Invalidate;
           end;
-          CurrFileChanged := true;
-          UpdateTitles;
         end;
       end;
 
@@ -2451,6 +2444,7 @@ procedure TfMain.PutCharExpand(ch : integer);
 begin
   Page.Rows[CursorRow].Cells[CursorCol].Chr := ch;
   Page.Rows[CursorRow].Cells[CursorCol].Attr := CurrAttr;
+  Page.Rows[CursorRow].Cells[CursorCol].Neighbors := $f;
   DrawCell(CursorRow, CursorCol, false);
 
   CursorCol += 1;
@@ -2464,8 +2458,6 @@ begin
       ResizePage;
     end;
   end;
-  CurrFileChanged := true;
-  UpdateTitles;
 end;
 
 // adjust cell using ignore information and char at r,c
@@ -2509,14 +2501,12 @@ begin
 
   cell.chr := ch;
   cell.attr := attr;
+  cell.Neighbors := $f;
 
   cell := AdjustCellIgnores(cell, row, col);
   SetBits(cell.attr, A_CELL_FONT_MASK, CurrFont, 28);
   Page.Rows[row].Cells[col] := cell;
   DrawCell(row, col, false);
-
-  CurrFileChanged := true;
-  UpdateTitles;
 end;
 
 // called from keypress or Print in keybinds
@@ -2528,6 +2518,7 @@ begin
 
   cell.chr := ch;
   cell.attr := CurrAttr;
+  cell.Neighbors:= $f;
 
   cell := AdjustCellIgnores(cell, CursorRow, CursorCol);
   SetBits(cell.attr, A_CELL_FONT_MASK, CurrFont, 28);
@@ -2535,9 +2526,6 @@ begin
   Page.Rows[CursorRow].Cells[CursorCol] := cell;
   DrawCell(CursorRow, CursorCol, false);
   CursorRight;
-
-  CurrFileChanged := true;
-  UpdateTitles;
 end;
 
 procedure TfMain.CodePageChange;
@@ -4093,8 +4081,6 @@ begin
 
                   Page.Rows[MouseRow].Cells[MouseCol] := dcell;
                   DrawCell(MouseRow, MouseCol,false);
-                  CurrFileChanged := true;
-                  UpdateTitles;
                 end;
             end;
           end;
@@ -5124,8 +5110,6 @@ begin
                       RecordUndoCell(mr, mc, dcell);
                       Page.Rows[mr].Cells[mc] := dcell;
                       DrawCell(mr, mc, false);
-                      CurrFileChanged := true;
-                      UpdateTitles;
                     until done;
                   end;
               end;
@@ -6335,8 +6319,7 @@ begin
   cnv.TextOut(ARect.Left + 48, ARect.Top, val);
 end;
 
-procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem;
-  var AValue: string);
+procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem; var AValue: string);
 begin
   ObjectRename := false;
   Objects[Item.Index].Name := AValue;
@@ -7558,9 +7541,7 @@ begin
   iin.WriteString(sect, 'Window', QuadToStr(GetFormQuad(fMain)));
   iin.WriteString(sect, 'PreviewBox', QuadToStr(GetFormQuad(fPreviewBox)));
   iin.WriteBool(sect, 'PreviewBoxOpen', fPreviewBox.Showing);
-
   iin.WriteBool(sect, 'WindowMax', fMain.WindowState = wsMaximized);
-
   iin.free;
 end;
 
@@ -7597,6 +7578,8 @@ begin
     rec.OldCell := Page.Rows[row].Cells[col];
     CurrUndoData.Add(@rec);
   end;
+  CurrFileChanged := true;
+  UpdateTitles;
 end;
 
 // clear all data from pos to end of list. move list count down.
@@ -7635,6 +7618,9 @@ begin
 
   UndoTruncate(UndoPos);
   Undo.Add(@undoblk);
+
+  CurrFileChanged := true;
+  UpdateTitles;
 
   // remove top if beyond UNDO_LEVELS
   if Undo.Count > UNDO_LEVELS then
@@ -7680,7 +7666,6 @@ begin
         end;
         GenerateBmpPage;
         pbPage.Invalidate;
-        CurrFileChanged := true;
       end;
 
     utObjMove:
@@ -7733,7 +7718,6 @@ begin
         LoadlvObjects;
         GenerateBmpPage;
         pbPage.Invalidate;
-        CurrFileChanged := true;
       end;
 
     utObjFlipHorz:
@@ -7748,6 +7732,7 @@ begin
 
   end;
   CurrFileChanged := true;
+  UpdateTitles;
 end;
 
 // redo
@@ -7770,7 +7755,6 @@ begin
         end;
         GenerateBmpPage;
         pbPage.Invalidate;
-        CurrFileChanged := true;
       end;
 
     utObjMove:
@@ -7827,7 +7811,6 @@ begin
         LoadlvObjects;
         GenerateBmpPage;
         pbPage.Invalidate;
-        CurrFileChanged := true;
       end;
 
     utObjFlipHorz:
@@ -7841,6 +7824,8 @@ begin
       end;
 
   end;
+  CurrFileChanged := true;
+  UpdateTitles;
 end;
 
 procedure TfMain.ClearAllUndo;

@@ -769,12 +769,13 @@ object fMain: TfMain
               Height = 717
               Top = 0
               Width = 340
-              ActivePage = tsColors
+              ActivePage = tsCharacters
               Align = alClient
               Anchors = [akTop, akLeft, akBottom]
               Font.Height = -11
+              Images = ilIcons11x11
               ParentFont = False
-              TabIndex = 1
+              TabIndex = 2
               TabOrder = 0
               OnChange = dpcTabChange
               OnMouseDown = dpcDockersMouseDown
