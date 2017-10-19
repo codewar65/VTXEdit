@@ -28,15 +28,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 }
 
 {
-  SGR 5 BlinkSlow is iCeBlink
+  Notes:
 
-  UTF 8 nas no characters in the  128-191 range
+    SGR 5 BlinkSlow is iCeBlink
 
-  https://gist.github.com/NuSkooler/a235339cf383759c49c57ee30d34876c?fref=gc&dti=254577004687053
+    UTF 8 nas no characters in the  128-191 range
 
-  Tip :
-
-    Avoid drawing to TBGRABitmap directly. It's SLOOOOOOOOOW.
+    https://gist.github.com/NuSkooler/a235339cf383759c49c57ee30d34876c?fref=gc&dti=254577004687053
 
   TODO :
 
@@ -51,8 +49,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
     border on display / center document on window
-
-    paint / line / rectangle / ellipse / fill tools
 
     export as bitmap, rtf, html
 
@@ -2860,6 +2856,7 @@ begin
   for i := 0 to length(Objects) - 1 do
     Objects[i].Data.Free;
   setlength(Objects, 0);
+  SelectedObject:=-1;
   LoadlvObjects;
   pbPage.Invalidate;
   fPreviewBox.Invalidate;
@@ -6037,8 +6034,6 @@ begin
 
     RemoveObject(SelectedObject);
     SelectedObject := -1;
-
-
     LoadlvObjects;
     lvObjects.ItemIndex := lvObjIndex(SelectedObject);
     GenerateBmpPage;
@@ -6395,7 +6390,7 @@ begin
 
       x := (c - PageLeft) * CellWidthZ;
       objnum := GetObjectCell(r, c, cell);
-      if (objnum <> -1) and (cell.Chr <> _EMPTY) then
+      if (objnum <> -1) and (cell.Chr <> _EMPTY) and not Objects[objnum].Hidden then
       begin
         // object here.
         DrawCellEx(cnv, x, y,  r, c, true,  false, cell.Chr, cell.Attr);
@@ -7844,6 +7839,9 @@ var
   b :           byte;
   namein :      packed array [0..63] of char;
   cellrec :     TCell;
+  cellrec2 :    TCell;
+  n : integer;
+  p : integer;
 const
   ID = 'VTXEDIT';
 begin
@@ -7913,7 +7911,47 @@ begin
       fin.ReadBuffer(cellrec.Attr, sizeof(DWord));
       Objects[i].Data.Add(@cellrec);
     end;
+
+    // compute neighbors.
+    p := 0;
+    for r := 0 to Objects[i].Height - 1 do
+      for c := 0 to Objects[i].Width - 1 do
+      begin
+        Objects[i].Data.Get(@cellrec, p);
+        n := 0;
+        if r > 0 then
+        begin
+          Objects[i].Data.Get(@cellrec2, p - Objects[i].Width);
+          if cellrec2.Chr <> _EMPTY then
+            n := n or NEIGHBOR_NORTH;
+        end;
+        if r < Objects[i].Height - 1 then
+        begin
+          Objects[i].Data.Get(@cellrec2, p + Objects[i].Width);
+          if cellrec2.Chr <> _EMPTY then
+            n := n or NEIGHBOR_SOUTH;
+        end;
+        if c > 0 then
+        begin
+          Objects[i].Data.Get(@cellrec2, p - 1);
+          if cellrec2.Chr <> _EMPTY then
+            n := n or NEIGHBOR_WEST;
+        end;
+        if c < Objects[i].Width - 1 then
+        begin
+          Objects[i].Data.Get(@cellrec2, p + 1);
+          if cellrec2.Chr <> _EMPTY then
+            n := n or NEIGHBOR_EAST;
+        end;
+        cellrec.Neighbors := n;
+        Objects[i].Data.Put(@cellrec, p);
+
+        p += 1;
+      end;
   end;
+  SelectedObject := -1;
+  LoadlvObjects;
+  lvObjects.Invalidate;
 
   fin.free;
 end;
