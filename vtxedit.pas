@@ -144,7 +144,6 @@ type
     Label10: TLabel;
     Label14: TLabel;
     Label15: TLabel;
-    Label17: TLabel;
     Label18: TLabel;
     Label2: TLabel;
     Label3: TLabel;
@@ -203,7 +202,6 @@ type
     pDocument: TPanel;
     pMain: TPanel;
     pmDockers: TPopupMenu;
-    pRightBar: TPanel;
     miFileExit: TMenuItem;
     miFileNew: TMenuItem;
     mMenu: TMainMenu;
@@ -227,9 +225,10 @@ type
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
     SpeedButton1: TSpeedButton;
+    tbCodePage: TEdit;
+    tbUnicode: TEdit;
     tsCurrent: TTabSheet;
     tsSAUCE: TTabSheet;
-    tbCodePage: TEdit;
     tbSauceAuthor: TEdit;
     tbSauceGroup: TEdit;
     tbSauceTitle: TEdit;
@@ -245,7 +244,6 @@ type
     tbFont8: TToolButton;
     tbFont9: TToolButton;
     tbFont10: TToolButton;
-    tbUnicode: TEdit;
     ToolBar1: TToolBar;
     ToolButton1: TToolButton;
     ToolButton15: TToolButton;
@@ -2472,6 +2470,7 @@ begin
   if tbAttrBG.Tag = 0 then            mask := mask or A_CELL_BG_MASK;
 
   if tbAttrBold.Tag = 0 then          mask := mask or A_CELL_BOLD;
+  if tbAttrItalics.Tag = 0 then       mask := mask or A_CELL_ITALICS;
   if tbAttrFaint.Tag = 0 then         mask := mask or A_CELL_FAINT;
   if tbAttrUnderline.Tag = 0 then     mask := mask or A_CELL_UNDERLINE;
   if tbAttrBlinkSlow.Tag = 0 then     mask := mask or A_CELL_BLINKSLOW;
@@ -2893,15 +2892,15 @@ var
   cp : TEncoding;
 const
   PALCOLS = 16;
-  CELL_WIDTH = 21;
-  CELL_HEIGHT = 40;
+  CELL_WIDTH = 19;
+  CELL_HEIGHT = 35;
 
 begin
   cp := Fonts[CurrFont];
 
   // build palette
   seCharacter.Enabled := false;
-  cell := TBGRABitmap.Create(8,16);
+  cell := TBGRABitmap.Create(8, 16);
   if cp in [ encUTF8, encUTF16 ] then
   begin
     NumChars := math.floor(length(UVGA16) / 18) - 1;
@@ -2935,7 +2934,7 @@ begin
   bmpCharPalette.PixelFormat := pf16bit;
 
   bmpCharPalette.Canvas.Brush.Style := bsSolid;
-  bmpCharPalette.Canvas.Brush.Color := clBlack;
+  bmpCharPalette.Canvas.Brush.Color := clWindow;
   bmpCharPalette.Canvas.FillRect(0, 0, bmpCharPalette.Width, bmpCharPalette.Height);
   for i := 0 to NumChars - 1 do
   begin
@@ -2946,15 +2945,14 @@ begin
 
     y := i div PALCOLS;
     x := i - (y * PALCOLS);
-
     x := x * CELL_WIDTH + 2;
     y := y * CELL_HEIGHT + 2;
 
     // draw simple glyph in cell (8x16)
-    GetGlyphBmp(cell, CPages[cp].GlyphTable, off, 15, false);
+    GetGlyphBmp(cell, CPages[cp].GlyphTable, off, 10, false);
 
-    rect.Left := 2 + x;
-    rect.Top := 2 + y;
+    rect.Left := x;
+    rect.Top := y;
     rect.Width := 16;
     rect.Height := 32;
 
@@ -2975,8 +2973,8 @@ var
   cp : TEncoding;
 const
   PALCOLS = 16;
-  CELL_WIDTH = 21;
-  CELL_HEIGHT = 40;
+  CELL_WIDTH = 19;
+  CELL_HEIGHT = 35;
 
 begin
   cp := Fonts[CurrFont];
@@ -3009,15 +3007,14 @@ end;
 
 procedure TfMain.pbCharsPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
+  pb :      TPaintBox;
+  cnv :     TCanvas;
   i, x, y : integer;
-
+  r :       TRect;
 const
   PALCOLS = 16;
-  CELL_WIDTH = 21;
-  CELL_HEIGHT = 40;
-
+  CELL_WIDTH = 19;
+  CELL_HEIGHT = 35;
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
@@ -3041,14 +3038,19 @@ begin
 
   y := i div PALCOLS;
   x := i - (y * PALCOLS);
-  x := x * CELL_WIDTH + 4;
-  y := y * CELL_HEIGHT + 2;
+  x := x * CELL_WIDTH + 1;
+  y := y * CELL_HEIGHT + 1;
 
   cnv.Brush.Style := bsClear;
   cnv.Pen.Color := clRed;
   cnv.Pen.Width := 1;
-  cnv.Rectangle(x - 2, y, x + 18, y + 36);
-
+  r.Left := x;
+  r.Top := y;
+  r.Right := x + 18;
+  r.Bottom := y + 34;
+  cnv.Rectangle(r);
+  r.Inflate(1, 1);
+  cnv.Rectangle(r);
   pbCurrCell.Invalidate;
 end;
 
@@ -3066,8 +3068,8 @@ begin
     COLORSCHEME_256: begin fgs := 256; bgs := 256; cls := 256; end;
   end;
 
-  r := Y div 18;
-  c := X div 18;
+  r := Y div 19;
+  c := X div 19;
   maxr := cls div 16;  // 16 colors per row
 
   if not between(r, 0, maxr) or not between(c, 0, 15) then
@@ -3142,7 +3144,7 @@ begin
   SetBits(CurrAttr, A_CELL_BG_MASK, bg, 8);
 
   maxr := cls div 16;  // 16 colors per row
-  pb.Height := maxr * 18;
+  pb.Height := maxr * 19;
 
   y := 0;
   for r := 0 to maxr - 1 do
@@ -3152,8 +3154,8 @@ begin
     begin
       rect.left :=   x;
       rect.top :=    y;
-      rect.width :=  16;
-      rect.height := 16;
+      rect.width :=  18;
+      rect.height := 18;
 
       cl := (r << 4) + c;
 
@@ -3176,13 +3178,13 @@ begin
         bmp := TBitmap.create;
         bmp.PixelFormat:=pf32bit;
         ilButtons.GetBitmap(48, bmp);
-        cnv.Draw(x + 2, y + 2, bmp);
+        cnv.Draw(x + 1, y + 1, bmp);
         bmp.free;
       end;
 
-      x += 18;
+      x += 19;
       end;
-    y += 18;
+    y += 19;
   end;
 
 end;
