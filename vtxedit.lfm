@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 291
+  Left = 187
   Height = 793
-  Top = 147
+  Top = 148
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 773
@@ -461,7 +461,7 @@ object fMain: TfMain
       Left = 14
       Height = 21
       Top = 27
-      Width = 295
+      Width = 274
       Align = alNone
       AutoSize = True
       BorderSpacing.Left = 14
@@ -605,14 +605,6 @@ object fMain: TfMain
         ShowHint = True
         Style = tbsCheck
       end
-      object tbFontConfig: TToolButton
-        Left = 274
-        Hint = 'Configure Fonts'
-        Top = 0
-        Caption = 'tbFontConfig'
-        ImageIndex = 81
-        OnClick = tbFontConfigClick
-      end
     end
   end
   object Panel1: TPanel
@@ -635,24 +627,24 @@ object fMain: TfMain
     end
     object pMain: TPanel
       Left = 0
-      Height = 707
+      Height = 700
       Top = 0
       Width = 1060
       Anchors = [akTop, akLeft, akRight, akBottom]
       BevelOuter = bvNone
       Caption = 'pMain'
-      ClientHeight = 707
+      ClientHeight = 700
       ClientWidth = 1060
       TabOrder = 0
       object pDocument: TPanel
         Left = 0
-        Height = 707
+        Height = 700
         Top = 0
         Width = 702
         Align = alLeft
         Anchors = [akTop, akLeft, akRight, akBottom]
         BevelOuter = bvNone
-        ClientHeight = 707
+        ClientHeight = 700
         ClientWidth = 702
         Color = clNone
         ParentColor = False
@@ -660,7 +652,7 @@ object fMain: TfMain
         object sbHorz: TScrollBar
           Left = 16
           Height = 16
-          Top = 691
+          Top = 684
           Width = 666
           Anchors = [akLeft, akRight, akBottom]
           Max = 80
@@ -669,8 +661,8 @@ object fMain: TfMain
           OnChange = sbHorzChange
         end
         object pbPage: TPaintBox
-          Left = 16
-          Height = 756
+          Left = 14
+          Height = 671
           Top = 14
           Width = 668
           Anchors = [akTop, akLeft, akRight, akBottom]
@@ -685,7 +677,7 @@ object fMain: TfMain
         end
         object pbRulerLeft: TPaintBox
           Left = 0
-          Height = 785
+          Height = 778
           Top = 0
           Width = 16
           Anchors = [akTop, akLeft, akBottom]
@@ -706,13 +698,13 @@ object fMain: TfMain
         object SpeedButton1: TSpeedButton
           Left = 684
           Height = 16
-          Top = 690
+          Top = 683
           Width = 16
           Anchors = [akRight, akBottom]
         end
         object sbVert: TScrollBar
           Left = 684
-          Height = 673
+          Height = 666
           Top = 16
           Width = 16
           Anchors = [akTop, akRight, akBottom]
@@ -724,49 +716,49 @@ object fMain: TfMain
       end
       object pDockers: TPanel
         Left = 699
-        Height = 707
+        Height = 700
         Top = 0
         Width = 361
         Align = alRight
         Alignment = taRightJustify
         BevelOuter = bvNone
-        ClientHeight = 707
+        ClientHeight = 700
         ClientWidth = 361
         TabOrder = 1
         object dpAllPanels: TPanel
           Left = 0
-          Height = 707
+          Height = 700
           Top = 0
           Width = 348
           Align = alClient
           Alignment = taLeftJustify
-          ClientHeight = 707
+          ClientHeight = 700
           ClientWidth = 348
           TabOrder = 1
           OnResize = dpAllPanelsResize
           object dPanel0: TPanel
             Left = 0
-            Height = 703
+            Height = 696
             Top = 0
             Width = 346
             Anchors = [akTop, akLeft, akRight, akBottom]
             BevelOuter = bvNone
-            ClientHeight = 703
+            ClientHeight = 696
             ClientWidth = 346
             TabOrder = 0
             TabStop = True
             object dpcDockers0: TPageControl
               Left = 0
-              Height = 703
+              Height = 696
               Top = 0
               Width = 346
-              ActivePage = tsCharacters
+              ActivePage = tsFonts
               Align = alClient
               Anchors = [akTop, akLeft, akBottom]
               Font.Height = -11
               Images = ilIcons11x11
               ParentFont = False
-              TabIndex = 2
+              TabIndex = 6
               TabOrder = 0
               OnChange = dpcTabChange
               OnMouseDown = dpcDockersMouseDown
@@ -1353,17 +1345,17 @@ object fMain: TfMain
               end
               object tsCurrent: TTabSheet
                 Caption = 'Current'
-                ClientHeight = 677
+                ClientHeight = 670
                 ClientWidth = 338
                 object ScrollBox6: TScrollBox
                   Left = 0
-                  Height = 677
+                  Height = 670
                   Top = 0
                   Width = 338
                   HorzScrollBar.Page = 154
                   VertScrollBar.Page = 96
                   Align = alClient
-                  ClientHeight = 673
+                  ClientHeight = 666
                   ClientWidth = 334
                   TabOrder = 0
                   object pbCurrCell: TPaintBox
@@ -1375,12 +1367,209 @@ object fMain: TfMain
                   end
                 end
               end
+              object tsFonts: TTabSheet
+                Caption = 'Fonts'
+                ClientHeight = 670
+                ClientWidth = 338
+                object ScrollBox7: TScrollBox
+                  Left = 0
+                  Height = 670
+                  Top = 0
+                  Width = 338
+                  HorzScrollBar.Page = 218
+                  VertScrollBar.Page = 219
+                  Align = alClient
+                  ClientHeight = 666
+                  ClientWidth = 334
+                  TabOrder = 0
+                  object Label11: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 8
+                    Width = 36
+                    Caption = 'Font 1:'
+                    ParentColor = False
+                  end
+                  object cbFont1: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 6
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 0
+                    Text = 'cbFont1'
+                  end
+                  object Label12: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 32
+                    Width = 36
+                    Caption = 'Font 2:'
+                    ParentColor = False
+                  end
+                  object cbFont2: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 30
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 1
+                    Text = 'cbFont2'
+                  end
+                  object Label13: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 56
+                    Width = 36
+                    Caption = 'Font 3:'
+                    ParentColor = False
+                  end
+                  object cbFont3: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 54
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 2
+                    Text = 'cbFont3'
+                  end
+                  object Label16: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 80
+                    Width = 36
+                    Caption = 'Font 4:'
+                    ParentColor = False
+                  end
+                  object cbFont4: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 78
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 3
+                    Text = 'cbFont4'
+                  end
+                  object Label17: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 104
+                    Width = 36
+                    Caption = 'Font 5:'
+                    ParentColor = False
+                  end
+                  object cbFont5: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 102
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 4
+                    Text = 'cbFont5'
+                  end
+                  object Label19: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 128
+                    Width = 36
+                    Caption = 'Font 6:'
+                    ParentColor = False
+                  end
+                  object cbFont6: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 126
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 5
+                    Text = 'cbFont6'
+                  end
+                  object Label20: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 152
+                    Width = 36
+                    Caption = 'Font 7:'
+                    ParentColor = False
+                  end
+                  object cbFont7: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 150
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 6
+                    Text = 'cbFont7'
+                  end
+                  object Label21: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 176
+                    Width = 36
+                    Caption = 'Font 8:'
+                    ParentColor = False
+                  end
+                  object cbFont8: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 174
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 7
+                    Text = 'cbFont8'
+                  end
+                  object Label22: TLabel
+                    Left = 8
+                    Height = 13
+                    Top = 200
+                    Width = 36
+                    Caption = 'Font 9:'
+                    ParentColor = False
+                  end
+                  object cbFont9: TComboBox
+                    Left = 56
+                    Height = 21
+                    Top = 198
+                    Width = 162
+                    Font.Height = -11
+                    ItemHeight = 13
+                    OnChange = cbFontChange
+                    ParentFont = False
+                    TabOrder = 8
+                    Text = 'cbFont9'
+                  end
+                end
+              end
             end
           end
         end
         object dtbControls: TToolBar
           Left = 348
-          Height = 707
+          Height = 700
           Top = 0
           Width = 13
           Align = alRight

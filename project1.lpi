@@ -53,7 +53,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="14">
+    <Units Count="13">
       <Unit0>
         <Filename Value="project1.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -124,14 +124,6 @@
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="VTXExportOptions"/>
       </Unit12>
-      <Unit13>
-        <Filename Value="vtxfontconfig.pas"/>
-        <IsPartOfProject Value="True"/>
-        <ComponentName Value="fFontConfig"/>
-        <HasResources Value="True"/>
-        <ResourceBaseClass Value="Form"/>
-        <UnitName Value="VTXFontConfig"/>
-      </Unit13>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

@@ -1,10 +1,10 @@
 object fFontConfig: TfFontConfig
-  Left = 721
-  Height = 257
-  Top = 489
+  Left = 1266
+  Height = 271
+  Top = 376
   Width = 232
   Caption = 'Font Select Config'
-  ClientHeight = 257
+  ClientHeight = 271
   ClientWidth = 232
   LCLVersion = '1.6.4.0'
   object Label1: TLabel

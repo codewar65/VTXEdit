@@ -96,7 +96,6 @@ uses
   VTXSupport,
   VTXEncDetect,
   VTXExportOptions,
-  VTXFontConfig,
   UnicodeHelper,
   RecList,
   LResources,
@@ -123,6 +122,15 @@ type
     bObnjMoveForward: TToolButton;
     cbCodePage: TComboBox;
     cbColorScheme: TComboBox;
+    cbFont1: TComboBox;
+    cbFont2: TComboBox;
+    cbFont3: TComboBox;
+    cbFont4: TComboBox;
+    cbFont5: TComboBox;
+    cbFont6: TComboBox;
+    cbFont7: TComboBox;
+    cbFont8: TComboBox;
+    cbFont9: TComboBox;
     cbPageType: TComboBox;
     CoolBar1: TCoolBar;
     dpAllPanels: TPanel;
@@ -142,10 +150,19 @@ type
     ilIcons8x8: TImageList;
     Label1: TLabel;
     Label10: TLabel;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
     Label14: TLabel;
     Label15: TLabel;
+    Label16: TLabel;
+    Label17: TLabel;
     Label18: TLabel;
+    Label19: TLabel;
     Label2: TLabel;
+    Label20: TLabel;
+    Label21: TLabel;
+    Label22: TLabel;
     Label3: TLabel;
     Label4: TLabel;
     Label5: TLabel;
@@ -217,6 +234,7 @@ type
     ScrollBox4: TScrollBox;
     ScrollBox5: TScrollBox;
     ScrollBox6: TScrollBox;
+    ScrollBox7: TScrollBox;
     sdObject: TSaveDialog;
     sdAnsi: TSaveDialog;
     irqBlink: TTimer;
@@ -225,6 +243,7 @@ type
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
     SpeedButton1: TSpeedButton;
+    tsFonts: TTabSheet;
     tbCodePage: TEdit;
     tbUnicode: TEdit;
     tsCurrent: TTabSheet;
@@ -279,7 +298,6 @@ type
     tbFont11: TToolButton;
     tbFont12: TToolButton;
     tbToolPaint: TToolButton;
-    tbFontConfig: TToolButton;
     ToolButton2: TToolButton;
     ToolButton3: TToolButton;
     ToolButton4: TToolButton;
@@ -291,6 +309,7 @@ type
     tsDocument: TTabSheet;
     tsObjects: TTabSheet;
 
+    procedure cbFontChange(Sender: TObject);
     function DGetDockerPanel(dockernum : integer) : TPanel;
     function DGetPageControl(dockernum : integer) : TPageControl;
     function DGetNumDockers : integer;
@@ -335,7 +354,6 @@ type
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
     procedure memSauceCommentsEditingDone(Sender: TObject);
-    procedure tbFontConfigClick(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
     procedure tbSauceGroupEditingDone(Sender: TObject);
     procedure tbSauceTitleEditingDone(Sender: TObject);
@@ -885,6 +903,7 @@ var
   gt :  pbyte;
   gts : integer;
   enc : integer;
+  str : string;
 begin
 
   // create custom cursors from imagelist
@@ -1063,6 +1082,40 @@ begin
   Clipboard.Height := 0;
   Clipboard.Data.Create(sizeof(TCell), rleDoubles);
 
+  // set font tab settings
+  cbFont1.Items.Clear;
+  cbFont2.Items.Clear;
+  cbFont3.Items.Clear;
+  cbFont4.Items.Clear;
+  cbFont5.Items.Clear;
+  cbFont6.Items.Clear;
+  cbFont7.Items.Clear;
+  cbFont8.Items.Clear;
+  cbFont9.Items.Clear;
+  for i := 0 to length(FontSelectFonts) - 1 do
+  begin
+    str := CPages[FontSelectFonts[i].CodePage].Name;
+    cbFont1.Items.Add(str);
+    cbFont2.Items.Add(str);
+    cbFont3.Items.Add(str);
+    cbFont4.Items.Add(str);
+    cbFont5.Items.Add(str);
+    cbFont6.Items.Add(str);
+    cbFont7.Items.Add(str);
+    cbFont8.Items.Add(str);
+    cbFont9.Items.Add(str);
+
+   if Fonts[1] = FontSelectFonts[i].CodePage then cbFont1.ItemIndex := i;
+   if Fonts[2] = FontSelectFonts[i].CodePage then cbFont2.ItemIndex := i;
+   if Fonts[3] = FontSelectFonts[i].CodePage then cbFont3.ItemIndex := i;
+   if Fonts[4] = FontSelectFonts[i].CodePage then cbFont4.ItemIndex := i;
+   if Fonts[5] = FontSelectFonts[i].CodePage then cbFont5.ItemIndex := i;
+   if Fonts[6] = FontSelectFonts[i].CodePage then cbFont6.ItemIndex := i;
+   if Fonts[7] = FontSelectFonts[i].CodePage then cbFont7.ItemIndex := i;
+   if Fonts[8] = FontSelectFonts[i].CodePage then cbFont8.ItemIndex := i;
+   if Fonts[9] = FontSelectFonts[i].CodePage then cbFont9.ItemIndex := i;
+  end;
+
   // set font 0
   tbFontClick(tbFont0);
 
@@ -1117,65 +1170,6 @@ begin
   bmpCharPalette := nil;
 
   Page.SauceComments.Free;
-end;
-
-procedure TfMain.tbFontConfigClick(Sender: TObject);
-var
-  fc : TfFontConfig;
-  i : integer;
-  str : string;
-begin
-  // config fonts
-  fc := TfFontConfig.Create(self);
-
-  fc.cbFont1.Items.Clear;
-  fc.cbFont2.Items.Clear;
-  fc.cbFont3.Items.Clear;
-  fc.cbFont4.Items.Clear;
-  fc.cbFont5.Items.Clear;
-  fc.cbFont6.Items.Clear;
-  fc.cbFont7.Items.Clear;
-  fc.cbFont8.Items.Clear;
-  fc.cbFont9.Items.Clear;
-  for i := 0 to length(FontSelectFonts) - 1 do
-  begin
-    str := CPages[FontSelectFonts[i].CodePage].Name;
-    fc.cbFont1.Items.Add(str);
-    fc.cbFont2.Items.Add(str);
-    fc.cbFont3.Items.Add(str);
-    fc.cbFont4.Items.Add(str);
-    fc.cbFont5.Items.Add(str);
-    fc.cbFont6.Items.Add(str);
-    fc.cbFont7.Items.Add(str);
-    fc.cbFont8.Items.Add(str);
-    fc.cbFont9.Items.Add(str);
-
-   if Fonts[1] = FontSelectFonts[i].CodePage then fc.cbFont1.ItemIndex := i;
-   if Fonts[2] = FontSelectFonts[i].CodePage then fc.cbFont2.ItemIndex := i;
-   if Fonts[3] = FontSelectFonts[i].CodePage then fc.cbFont3.ItemIndex := i;
-   if Fonts[4] = FontSelectFonts[i].CodePage then fc.cbFont4.ItemIndex := i;
-   if Fonts[5] = FontSelectFonts[i].CodePage then fc.cbFont5.ItemIndex := i;
-   if Fonts[6] = FontSelectFonts[i].CodePage then fc.cbFont6.ItemIndex := i;
-   if Fonts[7] = FontSelectFonts[i].CodePage then fc.cbFont7.ItemIndex := i;
-   if Fonts[8] = FontSelectFonts[i].CodePage then fc.cbFont8.ItemIndex := i;
-   if Fonts[9] = FontSelectFonts[i].CodePage then fc.cbFont9.ItemIndex := i;
-  end;
-
-  if fc.ShowModal = mrOK then
-  begin
-    // get any changes
-    Fonts[1] := FontSelectFonts[fc.cbFont1.ItemIndex].CodePage;
-    Fonts[2] := FontSelectFonts[fc.cbFont2.ItemIndex].CodePage;
-    Fonts[3] := FontSelectFonts[fc.cbFont3.ItemIndex].CodePage;
-    Fonts[4] := FontSelectFonts[fc.cbFont4.ItemIndex].CodePage;
-    Fonts[5] := FontSelectFonts[fc.cbFont5.ItemIndex].CodePage;
-    Fonts[6] := FontSelectFonts[fc.cbFont6.ItemIndex].CodePage;
-    Fonts[7] := FontSelectFonts[fc.cbFont7.ItemIndex].CodePage;
-    Fonts[8] := FontSelectFonts[fc.cbFont8.ItemIndex].CodePage;
-    Fonts[9] := FontSelectFonts[fc.cbFont9.ItemIndex].CodePage;
-    nop;
-  end;
-  fc.Free;
 end;
 
 procedure StrToChars(str : unicodestring; buff : PByte; len : integer);
@@ -2626,7 +2620,6 @@ begin
         tbFont10.Enabled:=false;
         tbFont11.Enabled:=false;
         tbFont12.Enabled:=false;
-        tbFontConfig.Enabled:=false;
       end;
 
     PAGETYPE_CTERM:
@@ -2656,7 +2649,6 @@ begin
         tbFont10.Enabled:=false;
         tbFont11.Enabled:=false;
         tbFont12.Enabled:=false;
-        tbFontConfig.Enabled:=true;
       end;
 
     PAGETYPE_VTX:
@@ -2686,7 +2678,6 @@ begin
         tbFont10.Enabled:=true;
         tbFont11.Enabled:=true;
         tbFont12.Enabled:=true;
-        tbFontConfig.Enabled:=true;
       end;
   end;
 
@@ -2760,6 +2751,7 @@ begin
 
   style.Layout := tlCenter;
   style.Alignment:= taLeftJustify;
+  style.RightToLeft:=false;
 
   cnv.Font.Size := -11;
   r.left += 6;
@@ -2771,7 +2763,7 @@ begin
   r.left += 128;
 
   // draw fkeys
-  str := '[' + IntToStr(CurrFKeySet+1) + ']';
+  str := '[Alt+F' + IntToStr(CurrFKeySet+1) + ']';
   cnv.TextRect(r, r.left, 0, str, style);
   r.left += cnv.TextWidth(str) + 4;
 
@@ -2785,11 +2777,10 @@ begin
     u := CP437[ch];               // unicode char
     off := GetGlyphOff(u, CPages[Fonts[0]].GlyphTable, CPages[Fonts[CurrFont]].GlyphTableSize);
     GetGlyphBmp(bmp, CPages[Fonts[0]].GlyphTable, off, $0007, false);
-    cnv.Draw(r.left, 4, bmp.Bitmap);
+    cnv.Draw(r.left, (23-16)>>1, bmp.Bitmap);
     r.left += 12;
   end;
   bmp.Free;
-
 end;
 
 procedure TfMain.sbVertChange(Sender: TObject);
@@ -9909,6 +9900,23 @@ begin
     end;
   end;
   result := nil
+end;
+
+// change font select
+procedure TfMain.cbFontChange(Sender: TObject);
+var
+  cb : TComboBox;
+  fnum : integer;
+begin
+  // set Font[] value and update page.
+
+  // which font number is this? last character of Name
+  cb := TComboBox(Sender);
+  fnum := strtoint(RightStr(cb.Name, 1));
+  Fonts[fnum] := FontSelectFonts[cb.ItemIndex].CodePage;
+
+  GenerateBmpPage;
+  pbPage.Invalidate;
 end;
 
 // return the TTabSheet
