@@ -163,7 +163,16 @@ type
     Label20: TLabel;
     Label21: TLabel;
     Label22: TLabel;
+    Label23: TLabel;
+    Label24: TLabel;
+    lBitmapName: TLabel;
+    lBitmapSize: TLabel;
+    Label26: TLabel;
+    Label27: TLabel;
+    Label28: TLabel;
+    Label29: TLabel;
     Label3: TLabel;
+    Label30: TLabel;
     Label4: TLabel;
     Label5: TLabel;
     Label6: TLabel;
@@ -173,10 +182,14 @@ type
     lvObjects: TListView;
     memSauceComments: TMemo;
     MenuItem1: TMenuItem;
+    miViewLoadBitmap: TMenuItem;
+    miViewClearBitmap: TMenuItem;
+    miShowHideBitmap: TMenuItem;
     MenuItem2: TMenuItem;
     MenuItem5: TMenuItem;
     MenuItem7: TMenuItem;
     MenuItem8: TMenuItem;
+    MenuItem9: TMenuItem;
     miFileImport: TMenuItem;
     miObjMergeAll: TMenuItem;
     miFileSaveAs: TMenuItem;
@@ -203,6 +216,7 @@ type
     miEditPaste: TMenuItem;
     odObject: TOpenDialog;
     odImage: TOpenDialog;
+    odBitmap: TOpenDialog;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
     miFileSave: TMenuItem;
@@ -235,6 +249,7 @@ type
     ScrollBox5: TScrollBox;
     ScrollBox6: TScrollBox;
     ScrollBox7: TScrollBox;
+    ScrollBox8: TScrollBox;
     sdObject: TSaveDialog;
     sdAnsi: TSaveDialog;
     irqBlink: TTimer;
@@ -243,6 +258,16 @@ type
     seRows: TSpinEdit;
     seXScale: TFloatSpinEdit;
     SpeedButton1: TSpeedButton;
+    seRefTop: TSpinEdit;
+    seRefLeft: TSpinEdit;
+    seRefWidth: TSpinEdit;
+    seRefHeight: TSpinEdit;
+    TabSheet1: TTabSheet;
+    ToolBar2: TToolBar;
+    bRefLoad: TToolButton;
+    bRefShow: TToolButton;
+    bRefRemove: TToolButton;
+    tbRefOpacity: TTrackBar;
     tsFonts: TTabSheet;
     tbCodePage: TEdit;
     tbUnicode: TEdit;
@@ -309,6 +334,8 @@ type
     tsDocument: TTabSheet;
     tsObjects: TTabSheet;
 
+    procedure bRefRemoveClick(Sender: TObject);
+    procedure bRefShowClick(Sender: TObject);
     procedure cbFontChange(Sender: TObject);
     function DGetDockerPanel(dockernum : integer) : TPanel;
     function DGetPageControl(dockernum : integer) : TPageControl;
@@ -328,6 +355,11 @@ type
     procedure dtbControlsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure InitDockers;
     procedure DeinitDockers;
+    procedure miViewLoadBitmapClick(Sender: TObject);
+    procedure seRefHeightChange(Sender: TObject);
+    procedure seRefLeftChange(Sender: TObject);
+    procedure seRefTopChange(Sender: TObject);
+    procedure seRefWidthChange(Sender: TObject);
     procedure SetActiveTab;
     procedure AddNewDockerPanel(ts : TTabSheet);
     procedure dtbClosePageClick(Sender: TObject);
@@ -354,6 +386,7 @@ type
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
     procedure memSauceCommentsEditingDone(Sender: TObject);
+    procedure tbRefOpacityChange(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
     procedure tbSauceGroupEditingDone(Sender: TObject);
     procedure tbSauceTitleEditingDone(Sender: TObject);
@@ -498,6 +531,9 @@ type
     procedure UndoPerform(pos : integer);
     procedure RedoPerform(pos : integer);
 
+    procedure CreateReference;
+    function ExtractReferenceCell(row, col : integer) : TBGRABitmap;
+
   private
     { private declarations }
 
@@ -551,10 +587,7 @@ var
   CurrFKeySet :             integer = 5;
   ToolMode :                TToolModes;
   DrawMode :                TDrawModes;
-
-  // straighten this out . need one as default.
   CurrFont :                integer;      // current font selected.
-//  CurrCodePage :            TEncoding;  // use Fonts[CurrFont]
 
   MouseLeft,
   MouseMiddle,
@@ -578,6 +611,8 @@ var
 
   bmpCharPalette :          TBitmap = nil;
 
+  // deault FKey char sets - as defined in Pablo. Uses CP437 chars. Translate
+  // as needed.
   FKeys : packed array [0..9] of TFKeySet = (
       ( $DA, $BF, $C0, $D9, $C4, $B3, $C3, $B4, $C1, $C2 ),
       ( $C9, $BB, $C8, $BC, $CD, $BA, $CC, $B9, $CA, $CB ),
@@ -594,6 +629,13 @@ var
   ObjectOutlines :          boolean = true;
 
   LastCharNum :             integer = 0;
+
+  // reference bitmap info
+  bmpReference : TBGRABitmap = nil; // original reference image
+  bmpRefScaled : TBGRABitmap = nil; // scaled to below values and opacity
+  RefTop, RefLeft : integer;
+  RefWidth, RefHeight : integer;
+  RefOpacity : byte = 128;
 
 {*****************************************************************************}
 
@@ -1168,6 +1210,12 @@ begin
   bmpPreview.Free;
   bmpCharPalette.Free;
   bmpCharPalette := nil;
+  if bmpReference <> nil then
+  begin
+    bmpReference.Free;
+    if bmpRefScaled <> nil then
+      bmpRefScaled.Free;
+  end;
 
   Page.SauceComments.Free;
 end;
@@ -1933,6 +1981,10 @@ begin
     or memSauceComments.Focused
     or tbSauceGroup.Focused
     or tbSauceTitle.Focused
+    or seRefTop.Focused
+    or seRefLeft.Focused
+    or seRefWidth.Focused
+    or seRefHeight.Focused
     or ObjectRename then
     exit;
 
@@ -2413,6 +2465,10 @@ begin
     or memSauceComments.Focused
     or tbSauceGroup.Focused
     or tbSauceTitle.Focused
+    or seRefTop.Focused
+    or seRefLeft.Focused
+    or seRefWidth.Focused
+    or seRefHeight.Focused
     or ObjectRename then
     exit;
 
@@ -3872,6 +3928,7 @@ begin
     sbHorz.Position:=PageLeft;
     sbVert.Position:=PageTop;
 
+    CreateReference;
     ResizeScrolls;
   end
   else
@@ -6448,6 +6505,7 @@ var
   objnum :    integer;
   cl1, cl2 :  TColor;
   copyrec :   TLoc;
+  bmpTemp : TBGRABitmap;
 
 begin
   if bmpPage = nil then exit;
@@ -6498,6 +6556,19 @@ begin
   tmp2.free;
 
   DrawSelectionAndObjects;
+
+  // display reference bitmap
+  if (bmpReference <> nil) and bRefShow.Down then
+  begin
+    pr.Top := (RefTop - PageTop) * CellHeightZ;
+    pr.Left := (RefLeft - PageLeft) * CellWidthZ;
+    pr.Width := RefWidth * CellWidthZ;
+    pr.Height := RefHeight * CellHeightZ;
+    bmpTemp := TBGRABitmap.Create(bmpReference);
+    bmpTemp.ApplyGlobalOpacity(RefOpacity);
+    cnv.StretchDraw(pr, bmpTemp.Bitmap);
+    bmpTemp.Free;
+  end;
 
 end;
 
@@ -6745,6 +6816,8 @@ var
   bslow, bfast :  boolean;
   cp :            TEncoding;
   fntnum :        integer;
+  pr : TRect;
+  bmpTemp : TBGRABitmap;
 begin
   if bmpPage = nil then exit; // ?!
 
@@ -6837,6 +6910,19 @@ begin
       DrawStretchedBitmap(cnv, rect, bmp);
     end;
     bmp.free;
+
+    // display reference bitmap cell
+    if (bmpReference <> nil) and bRefShow.Down then
+    begin
+      if between(row, RefTop, RefTop + RefHeight - 1)
+        and between(col, RefLeft, RefLeft + RefWidth - 1) then
+      begin
+        bmpTemp := ExtractReferenceCell(row, col);
+        cnv.Draw(x, y, bmpTemp.Bitmap);
+        bmpTemp.Free;
+      end;
+    end;
+
   end;
 end;
 
@@ -9919,6 +10005,53 @@ begin
   pbPage.Invalidate;
 end;
 
+procedure TfMain.bRefShowClick(Sender: TObject);
+begin
+  if Sender.ClassName = 'TMenuItem' then
+  begin
+    bRefShow.Enabled := false;
+    bRefShow.Down := not bRefShow.Down;
+    bRefShow.Enabled := true;
+  end;
+  pbPage.Invalidate;
+end;
+
+procedure TfMain.bRefRemoveClick(Sender: TObject);
+begin
+  if bmpReference <> nil then
+  begin
+    bmpReference.Free;
+    bmpReference := nil;
+    if bmpRefScaled <> nil then
+    begin
+      bmpRefScaled.Free;
+      bmpRefScaled := nil;
+    end;
+  end;
+  lBitmapName.Caption := '';
+  lBitmapSize.Caption := '';
+
+  RefTop := 0;
+  RefLeft := 0;
+  RefWidth := 1;
+  RefHeight := 1;
+  RefOpacity := 128;
+
+  seRefTop.Enabled := false;
+  seRefLeft.Enabled := false;
+  seRefWidth.Enabled := false;
+  seRefHeight.Enabled := false;
+  tbRefOpacity.Enabled := false;
+
+  seRefTop.Value := RefTop;
+  seRefLeft.Value := RefLeft;
+  seRefWidth.Value := RefWidth;
+  seRefHeight.Value := RefHeight;
+  tbRefOpacity.Position:=RefOpacity;
+
+  pbPage.Invalidate;
+end;
+
 // return the TTabSheet
 function TfMain.DGetTabSheet(dockernum, tabnum : integer) : TTabSheet;
 var
@@ -10268,6 +10401,136 @@ begin
     ini.WriteString(sect, 'Tabs', tabnames);
   end;
   ini.Free;
+end;
+
+// create bmpRefScaled from refwidth, refheight, refopacity
+procedure TfMain.CreateReference;
+var
+  w, h : integer;
+begin
+  if bmpReference <> nil then
+  begin
+    w := RefWidth * CellWidthZ;
+    h := RefHeight * CellHeightZ;
+    if bmpRefScaled <> nil then
+      bmpRefScaled.Free;
+    bmpReference.ResampleFilter := rfMitchell;
+    bmpRefScaled := bmpReference.Resample(w, h, rmFineResample) as TBGRABitmap;
+    bmpRefScaled.ApplyGlobalOpacity(RefOpacity);
+  end;
+end;
+
+// get a cells worth of data from bmprefscaled
+function TfMain.ExtractReferenceCell(row, col : integer) : TBGRABitmap;
+var
+  pr : TRect;
+begin
+  pr.Left := (col - RefLeft) * CellWidthZ;
+  pr.Top := (row - RefTop) * CellHeightZ;
+  pr.Width := CellWidthZ;
+  pr.Height := CellHeightZ;
+  result := bmpRefScaled.GetPart(pr) as TBGRABitmap;
+end;
+
+// load a bitmap for reference.
+procedure TfMain.miViewLoadBitmapClick(Sender: TObject);
+begin
+  if odBitmap.Execute then
+  begin
+    // clear any reference bmp already loaded
+    if bmpReference <> nil then
+      bmpReference.Free;
+
+    // load new
+    try
+      bmpReference := TBGRABitmap.Create(odBitmap.FileName);
+    except on E : Exception do
+      begin
+        ShowMessage('Invalid Bitmap File.');
+        exit;
+      end;
+    end;
+
+    RefTop := 0;
+    RefLeft := 0;
+    RefWidth := NumCols;
+    RefHeight := NumRows;
+    RefOpacity := 128;
+
+    lBitmapName.Caption := odBitmap.FileName;
+    lBitmapSize.Caption := Format('%d x %d',
+      [ bmpReference.Width, bmpReference.Height ]);
+
+    seRefTop.Enabled := false;
+    seRefLeft.Enabled := false;
+    seRefWidth.Enabled := false;
+    seRefHeight.Enabled := false;
+    tbRefOpacity.Enabled := false;
+
+    seRefTop.Value := RefTop;
+    seRefLeft.Value := RefLeft;
+    seRefWidth.Value := RefWidth;
+    seRefHeight.Value := RefHeight;
+    tbRefOpacity.Position:=RefOpacity;
+
+    seRefTop.Enabled := true;
+    seRefLeft.Enabled := true;
+    seRefWidth.Enabled := true;
+    seRefHeight.Enabled := true;
+    tbRefOpacity.Enabled := true;
+
+    CreateReference;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.seRefHeightChange(Sender: TObject);
+begin
+  if seRefHeight.Enabled then
+  begin
+    RefHeight := seRefHeight.Value;
+    CreateReference;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.seRefLeftChange(Sender: TObject);
+begin
+  if seRefLeft.Enabled then
+  begin
+    RefLeft := seRefLeft.Value;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.seRefTopChange(Sender: TObject);
+begin
+  if seRefTop.Enabled then
+  begin
+    RefTop := seRefTop.Value;
+    pbPage.Invalidate;
+  end;
+end;
+
+procedure TfMain.seRefWidthChange(Sender: TObject);
+begin
+  if seRefWidth.Enabled then
+  begin
+    RefWidth := seRefWidth.Value;
+    CreateReference;
+    pbPage.Invalidate;
+  end;
+end;
+
+// bmprefscale changed
+procedure TfMain.tbRefOpacityChange(Sender: TObject);
+begin
+  if tbRefOpacity.Enabled then
+  begin
+    RefOpacity := tbRefOpacity.Position;
+    CreateReference;
+    pbPage.Invalidate;
+  end;
 end;
 
 // set tab names and select tab for CurrDocker CurrTab
