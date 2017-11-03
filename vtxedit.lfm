@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 187
+  Left = 128
   Height = 793
-  Top = 148
+  Top = 144
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 773
@@ -752,26 +752,26 @@ object fMain: TfMain
               Height = 696
               Top = 0
               Width = 346
-              ActivePage = TabSheet1
+              ActivePage = TabSheet2
               Align = alClient
               Anchors = [akTop, akLeft, akBottom]
               Font.Height = -11
               Images = ilIcons11x11
               ParentFont = False
-              TabIndex = 7
+              TabIndex = 8
               TabOrder = 0
               OnChange = dpcTabChange
               OnMouseDown = dpcDockersMouseDown
               object tsDocument: TTabSheet
                 Caption = 'Document'
-                ClientHeight = 677
+                ClientHeight = 670
                 ClientWidth = 338
                 Font.Quality = fqAntialiased
                 ImageIndex = 0
                 ParentFont = False
                 object ScrollBox4: TScrollBox
                   Left = 0
-                  Height = 677
+                  Height = 670
                   Top = 0
                   Width = 338
                   HorzScrollBar.Page = 314
@@ -780,7 +780,7 @@ object fMain: TfMain
                   VertScrollBar.Smooth = True
                   VertScrollBar.Tracking = True
                   Align = alClient
-                  ClientHeight = 673
+                  ClientHeight = 666
                   ClientWidth = 334
                   TabOrder = 0
                   object Label6: TLabel
@@ -936,13 +936,13 @@ object fMain: TfMain
               end
               object tsColors: TTabSheet
                 Caption = 'Colors'
-                ClientHeight = 677
+                ClientHeight = 670
                 ClientWidth = 338
                 Font.Quality = fqAntialiased
                 ParentFont = False
                 object ScrollBox1: TScrollBox
                   Left = 0
-                  Height = 677
+                  Height = 670
                   Top = 0
                   Width = 338
                   HorzScrollBar.Page = 306
@@ -952,7 +952,7 @@ object fMain: TfMain
                   VertScrollBar.Tracking = True
                   Align = alClient
                   AutoSize = True
-                  ClientHeight = 673
+                  ClientHeight = 666
                   ClientWidth = 334
                   TabOrder = 0
                   object pbColors: TPaintBox
@@ -969,13 +969,13 @@ object fMain: TfMain
               end
               object tsCharacters: TTabSheet
                 Caption = 'Characters'
-                ClientHeight = 677
+                ClientHeight = 670
                 ClientWidth = 338
                 Font.Quality = fqAntialiased
                 ParentFont = False
                 object ScrollBox2: TScrollBox
                   Left = 0
-                  Height = 645
+                  Height = 638
                   Top = 32
                   Width = 336
                   HorzScrollBar.Page = 294
@@ -984,7 +984,7 @@ object fMain: TfMain
                   VertScrollBar.Smooth = True
                   VertScrollBar.Tracking = True
                   Anchors = [akTop, akLeft, akRight, akBottom]
-                  ClientHeight = 641
+                  ClientHeight = 634
                   ClientWidth = 332
                   TabOrder = 0
                   object pbChars: TPaintBox
@@ -1228,17 +1228,17 @@ object fMain: TfMain
               end
               object tsSAUCE: TTabSheet
                 Caption = 'SAUCE'
-                ClientHeight = 677
+                ClientHeight = 670
                 ClientWidth = 338
                 object ScrollBox5: TScrollBox
                   Left = 0
-                  Height = 677
+                  Height = 670
                   Top = 0
                   Width = 338
                   HorzScrollBar.Page = 310
                   VertScrollBar.Page = 202
                   Align = alClient
-                  ClientHeight = 673
+                  ClientHeight = 666
                   ClientWidth = 334
                   TabOrder = 0
                   object Label7: TLabel
@@ -1744,6 +1744,97 @@ object fMain: TfMain
                     Width = 227
                     AutoSize = False
                     ParentColor = False
+                  end
+                end
+              end
+              object TabSheet2: TTabSheet
+                Caption = 'Row'
+                ClientHeight = 670
+                ClientWidth = 338
+                object ScrollBox9: TScrollBox
+                  Left = 0
+                  Height = 670
+                  Top = 0
+                  Width = 338
+                  HorzScrollBar.Page = 327
+                  VertScrollBar.Page = 99
+                  Align = alClient
+                  ClientHeight = 666
+                  ClientWidth = 334
+                  TabOrder = 0
+                  object GroupBox1: TGroupBox
+                    Left = 6
+                    Height = 97
+                    Top = 2
+                    Width = 321
+                    Caption = 'Row Background'
+                    ClientHeight = 79
+                    ClientWidth = 317
+                    TabOrder = 0
+                    object RadioButton1: TRadioButton
+                      Left = 6
+                      Height = 19
+                      Top = 0
+                      Width = 57
+                      Caption = 'Normal'
+                      Checked = True
+                      TabOrder = 0
+                      TabStop = True
+                    end
+                    object RadioButton2: TRadioButton
+                      Left = 6
+                      Height = 19
+                      Top = 16
+                      Width = 92
+                      Caption = 'Solid (Color 1)'
+                      TabOrder = 1
+                    end
+                    object RadioButton3: TRadioButton
+                      Left = 6
+                      Height = 19
+                      Top = 34
+                      Width = 95
+                      Caption = 'Horz. Gradient'
+                      TabOrder = 2
+                    end
+                    object RadioButton4: TRadioButton
+                      Left = 6
+                      Height = 19
+                      Top = 50
+                      Width = 92
+                      Caption = 'Vert. Gradient'
+                      TabOrder = 3
+                    end
+                    object Label25: TLabel
+                      Left = 118
+                      Height = 13
+                      Top = 6
+                      Width = 37
+                      Caption = 'Color1:'
+                      ParentColor = False
+                    end
+                    object Label31: TLabel
+                      Left = 200
+                      Height = 13
+                      Top = 6
+                      Width = 37
+                      Caption = 'Color2:'
+                      ParentColor = False
+                    end
+                    object pbRowColor1: TPaintBox
+                      Left = 126
+                      Height = 42
+                      Top = 26
+                      Width = 66
+                      OnClick = pbRowColor1Click
+                    end
+                    object pbRowColor2: TPaintBox
+                      Left = 212
+                      Height = 42
+                      Top = 26
+                      Width = 66
+                      OnClick = pbRowColor2Click
+                    end
                   end
                 end
               end
@@ -2431,16 +2522,124 @@ object fMain: TfMain
       end
       object miViewLoadBitmap: TMenuItem
         Caption = 'Load Bitmap...'
+        Bitmap.Data = {
+          36040000424D3604000000000000360000002800000010000000100000000100
+          2000000000000004000064000000640000000000000000000000FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000
+          00FF000000FF000000FF0C0C0CFF000000FF000000C8FFFFFF00FFFFFF000000
+          00FFBABABAFFC2C2C2FF848383FFA3A3A3FF8B8B8BFFA4A4A4FF919191FF6867
+          67FF3C3C3CFF020202FFFDFDFDFF000000FF000000FF00000006FFFFFF000000
+          00FFC6C6C6FFC6C6C6FF787878FF8E8E8EFF9E9E9EFF959594FF9B9B9BFF1E1E
+          1EFF0C0C0CFF0E0E0EFFFDFDFDFF0C0C0CFF0C0C0CFF000000CCFFFFFF000000
+          00FFDCDCDCFFCBCBCBFF767676FF6A6969FF7C7C7CFF979797FF8F8F8FFF0202
+          02FFF3F3F3FFF3F3F3FFFFFFFFFFF3F3F3FFF1F1F1FF000000FDFFFFFF000000
+          00FFE8E8E8FFFAFAFAFFF4F3F3FFA3A2A2FF767676FF7F7F7EFF888787FF2323
+          23FF050505FF020202FFFDFDFDFF000000FF000000FF000000B8FFFFFF000000
+          00FFD8D7D7FFEBEBEAFFF8F8F8FF949494FF737373FF5D5C5CFF4F4F4FFF8282
+          82FF818181FF020202FFF1F1F1FF010101FF000000FF00000005FFFFFF000000
+          00FFCECECEFFE9E9E9FFFCFCFCFF909090FF747474FF323232FF505050FF7E7E
+          7EFFACACACFF404040FF0A0A0AFF363636FF000000FF00000005FFFFFF000000
+          00FFC5C5C5FFE0DFDFFFF9F9F8FF616161FF696868FF7D7D7DFF7A7A7AFFC0C0
+          C0FFF6F5F5FFEAEAEAFFD3D3D3FFAEAEAEFF000000FF00000005FFFFFF000000
+          00FFB8B7B7FFD8D8D8FFEAEAEAFFBFBFBFFF828282FF828282FF979696FFF0F0
+          F0FFE5E4E4FFD3D2D2FFCDCDCCFFB1B0B0FF000000FF00000005FFFFFF000000
+          00FFB9B8B8FFCECECEFFE3E3E2FFACACACFF7B7B7BFFBEBEBDFFF5F5F5FFE7E7
+          E6FFE5E4E4FFCECDCDFFC1C1C1FFAAA9A9FF000000FF00000005FFFFFF000000
+          00FF9C9C9CFFB9B9B9FFD8D7D7FF868685FF8E8E8EFFF2F2F2FFE2E2E2FF0000
+          00FF0C0C0CFF0C0C0CFF0C0C0CFF0C0C0CFF000000FF00000005FFFFFF000000
+          00FF898888FFAFAFAFFFDDDDDDFF636363FFCCCCCCFFF1F1F1FFE5E4E4FF0000
+          00FFFAFAFAFFFFFFFFFFFFFFFFFF787878FF000000C9FFFFFF00FFFFFF000000
+          00FF898888FFB7B7B7FFC9C8C8FF797979FFE4E3E3FFE8E8E8FFEDEDEDFF0000
+          00FFFAFAFAFFFFFFFFFF787878FF000000D000000013FFFFFF00FFFFFF000000
+          00FF828282FFA8A8A7FF7E7E7EFFA3A2A2FFC9C8C8FFCACACAFFD5D5D5FF0000
+          00FFFAFAFAFF787878FF000000D200000015FFFFFF00FFFFFF00FFFFFF000000
+          00FF575757FF6B6A6AFF8C8C8CFFABABABFFA6A6A6FFA9A9A8FFABABABFF0000
+          00FF747474FF000000D300000015FFFFFF00FFFFFF00FFFFFF00FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000
+          00FF000000CD00000017FFFFFF00FFFFFF00FFFFFF00FFFFFF00
+        }
         ImageIndex = 90
         OnClick = miViewLoadBitmapClick
       end
       object miShowHideBitmap: TMenuItem
         Caption = 'Show/Hide Bitmap'
+        Bitmap.Data = {
+          36040000424D3604000000000000360000002800000010000000100000000100
+          2000000000000004000064000000640000000000000000000000FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF050505FF171717FF0404
+          04FF000000FF0A0A0AFF050505FF000000FF000000C8FFFFFF00FFFFFF000000
+          00FFBABABAFFC2C2C2FF848383FF9D9D9DFF333333FF121212FF6C6C6CFF2929
+          29FF191919FF2E2E2EFF727272FF0B0B0BFF000000FF0000000BFFFFFF000000
+          00FFC6C6C6FFC6C6C6FF787878FF272727FF3B3B3BFFECECECFF3B3B3BFF0000
+          00FF000000FF000000FF505050FFF1F1F1FF333333FF080808BCFFFFFF000000
+          00FFDCDCDCFFCBCBCBFF767676FF1B1B1BFF656565FFFFFFFFFF414141FF4545
+          45FF000000FF000000FF121212FFFFFFFFFF5C5C5CFF0B0B0BBFFFFFFF000000
+          00FFE8E8E8FFFAFAFAFFF4F3F3FF949393FF121212FF5A5A5AFF484848FFC0C0
+          C0FF3C3C3CFF000000FF282828FF626262FF080808FF00000012FFFFFF000000
+          00FFD8D7D7FFEBEBEAFFF8F8F8FF949494FF696969FF1D1D1DFF000000FF2222
+          22FF4C4C4CFF000000FF020202FF313131FF000000FF00000005FFFFFF000000
+          00FFCECECEFFE9E9E9FFFCFCFCFF909090FF747474FF323232FF3E3E3EFF3D3D
+          3DFF414141FF6F6F6FFFAEAEAEFFBCBCBCFF000000FF00000005FFFFFF000000
+          00FFC5C5C5FFE0DFDFFFF9F9F8FF616161FF696868FF7D7D7DFF7A7A7AFFC0C0
+          C0FFF6F5F5FFEAEAEAFFD3D3D3FFAEAEAEFF000000FF00000005FFFFFF000000
+          00FFB8B7B7FFD8D8D8FFEAEAEAFFBFBFBFFF828282FF828282FF979696FFF0F0
+          F0FFE5E4E4FFD3D2D2FFCDCDCCFFB1B0B0FF000000FF00000005FFFFFF000000
+          00FFB9B8B8FFCECECEFFE3E3E2FFACACACFF7B7B7BFFBEBEBDFFF5F5F5FFE7E7
+          E6FFE5E4E4FFCECDCDFFC1C1C1FFAAA9A9FF000000FF00000005FFFFFF000000
+          00FF9C9C9CFFB9B9B9FFD8D7D7FF868685FF8E8E8EFFF2F2F2FFE2E2E2FF0000
+          00FF0C0C0CFF0C0C0CFF0C0C0CFF0C0C0CFF000000FF00000005FFFFFF000000
+          00FF898888FFAFAFAFFFDDDDDDFF636363FFCCCCCCFFF1F1F1FFE5E4E4FF0000
+          00FFFAFAFAFFFFFFFFFFFFFFFFFF787878FF000000C9FFFFFF00FFFFFF000000
+          00FF898888FFB7B7B7FFC9C8C8FF797979FFE4E3E3FFE8E8E8FFEDEDEDFF0000
+          00FFFAFAFAFFFFFFFFFF787878FF000000D000000013FFFFFF00FFFFFF000000
+          00FF828282FFA8A8A7FF7E7E7EFFA3A2A2FFC9C8C8FFCACACAFFD5D5D5FF0000
+          00FFFAFAFAFF787878FF000000D200000015FFFFFF00FFFFFF00FFFFFF000000
+          00FF575757FF6B6A6AFF8C8C8CFFABABABFFA6A6A6FFA9A9A8FFABABABFF0000
+          00FF747474FF000000D300000015FFFFFF00FFFFFF00FFFFFF00FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000
+          00FF000000CD00000017FFFFFF00FFFFFF00FFFFFF00FFFFFF00
+        }
         ImageIndex = 91
         OnClick = bRefShowClick
       end
       object miViewClearBitmap: TMenuItem
         Caption = 'Clear Bitmap'
+        Bitmap.Data = {
+          36040000424D3604000000000000360000002800000010000000100000000100
+          2000000000000004000064000000640000000000000000000000FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000
+          00FF000001FF000006FF000000FF000000FF000000DEFFFFFF00FFFFFF000000
+          00FFBABABAFFC2C2C2FF848383FFA3A3A3FF8B8B8BFFA2A2A2FF000002FF0000
+          CBFF0000ECFF0000FFFF0000EBFF0000C6FF000000FF00000005FFFFFF000000
+          00FFC6C6C6FFC6C6C6FF787878FF8E8E8EFF9E9E9EFF939392FF000003FF0000
+          FCFF000002FF0000FCFF000003FF0000FCFF000000FF00000005FFFFFF000000
+          00FFDCDCDCFFCBCBCBFF767676FF6A6969FF7C7C7CFF949494FF000003FF0000
+          FCFF000002FF0000FCFF000003FF0000FCFF000000FF00000005FFFFFF000000
+          00FFE8E8E8FFFAFAFAFFF4F3F3FFA3A2A2FF767676FF7D7D7DFF000003FF0000
+          FDFF00000EFF0000FDFF00000EFF0000FCFF000000FF00000005FFFFFF000000
+          00FFD8D7D7FFEBEBEAFFF8F8F8FF949494FF737373FF5C5B5BFF000003FF0000
+          FFFF0000FFFF0000FFFF0000FFFF0000FCFF000000FF00000005FFFFFF000000
+          00FFCECECEFFE9E9E9FFFCFCFCFF909090FF747474FF2F2F2FFF000002FF0000
+          F3FF0000F3FF0000F3FF0000F3FF0000F1FF000000FF00000010FFFFFF000000
+          00FFC5C5C5FFE0DFDFFFF9F9F8FF616161FF686767FF050505FF050505FF0909
+          09FF000000FF0B0B0BFF000000FF080808FF000000FF000000F2FFFFFF000000
+          00FFB8B7B7FFD8D8D8FFEAEAEAFFBFBFBFFF828282FF828282FF979696FFEFEF
+          EFFF010101FFC8C7C7FF020202FFB1B0B0FF000000FF00000005FFFFFF000000
+          00FFB9B8B8FFCECECEFFE3E3E2FFACACACFF7B7B7BFFBEBEBDFFF5F5F5FFE7E7
+          E6FF3F3E3EFF090909FF383838FFAAA9A9FF000000FF00000005FFFFFF000000
+          00FF9C9C9CFFB9B9B9FFD8D7D7FF868685FF8E8E8EFFF2F2F2FFE2E2E2FF0000
+          00FF0C0C0CFF0C0C0CFF0C0C0CFF0C0C0CFF000000FF00000005FFFFFF000000
+          00FF898888FFAFAFAFFFDDDDDDFF636363FFCCCCCCFFF1F1F1FFE5E4E4FF0000
+          00FFFAFAFAFFFFFFFFFFFFFFFFFF787878FF000000C9FFFFFF00FFFFFF000000
+          00FF898888FFB7B7B7FFC9C8C8FF797979FFE4E3E3FFE8E8E8FFEDEDEDFF0000
+          00FFFAFAFAFFFFFFFFFF787878FF000000D000000013FFFFFF00FFFFFF000000
+          00FF828282FFA8A8A7FF7E7E7EFFA3A2A2FFC9C8C8FFCACACAFFD5D5D5FF0000
+          00FFFAFAFAFF787878FF000000D200000015FFFFFF00FFFFFF00FFFFFF000000
+          00FF575757FF6B6A6AFF8C8C8CFFABABABFFA6A6A6FFA9A9A8FFABABABFF0000
+          00FF747474FF000000D300000015FFFFFF00FFFFFF00FFFFFF00FFFFFF000000
+          00C3000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000
+          00FF000000CD00000017FFFFFF00FFFFFF00FFFFFF00FFFFFF00
+        }
         ImageIndex = 92
         OnClick = bRefRemoveClick
       end

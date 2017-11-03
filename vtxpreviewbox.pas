@@ -36,8 +36,12 @@ interface
 uses
   Classes,
   {$ifdef WINDOWS} Windows, {$endif}
-  SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  VTXConst, VTXSupport, math,
+  Forms,
+  Graphics,
+  ExtCtrls,
+  VTXConst,
+  VTXSupport,
+  math,
   BGRABitmap,
   BGRABitmapTypes
   ;

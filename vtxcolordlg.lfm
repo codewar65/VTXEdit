@@ -1,0 +1,277 @@
+object fColorDialog: TfColorDialog
+  Left = 847
+  Height = 354
+  Top = 330
+  Width = 519
+  BorderStyle = bsDialog
+  Caption = 'ANSI Colors'
+  ClientHeight = 354
+  ClientWidth = 519
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  LCLVersion = '1.6.4.0'
+  object bOK: TButton
+    Left = 8
+    Height = 25
+    Top = 323
+    Width = 75
+    Caption = 'OK'
+    ModalResult = 1
+    TabOrder = 0
+  end
+  object bCancel: TButton
+    Left = 90
+    Height = 25
+    Top = 323
+    Width = 75
+    Cancel = True
+    Caption = 'Cancel'
+    ModalResult = 2
+    TabOrder = 1
+  end
+  object Label1: TLabel
+    Left = 6
+    Height = 15
+    Top = 6
+    Width = 64
+    Caption = 'ANSI colors:'
+    ParentColor = False
+  end
+  object pbColors: TPaintBox
+    Left = 8
+    Height = 297
+    Top = 22
+    Width = 261
+    OnMouseDown = pbColorsMouseDown
+    OnPaint = pbColorsPaint
+  end
+  object Label2: TLabel
+    Left = 190
+    Height = 15
+    Top = 329
+    Width = 32
+    Caption = 'Color:'
+    ParentColor = False
+  end
+  object tbANSIColor: TEdit
+    Left = 225
+    Height = 23
+    Top = 325
+    Width = 44
+    TabOrder = 2
+    Text = 'tbANSIColor'
+  end
+  object pbHS: TPaintBox
+    Left = 276
+    Height = 193
+    Top = 6
+    Width = 209
+    OnPaint = pbHSPaint
+  end
+  object pbL: TPaintBox
+    Left = 490
+    Height = 193
+    Top = 6
+    Width = 24
+    OnPaint = pbLPaint
+  end
+  object tbRed: TEdit
+    Left = 306
+    Height = 23
+    Top = 230
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 3
+    Text = 'tbRed'
+  end
+  object Label3: TLabel
+    Left = 280
+    Height = 15
+    Top = 232
+    Width = 23
+    Caption = 'Red:'
+    ParentColor = False
+  end
+  object tbHue: TEdit
+    Left = 306
+    Height = 23
+    Top = 256
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 4
+    Text = 'tbHue'
+  end
+  object Label4: TLabel
+    Left = 278
+    Height = 15
+    Top = 258
+    Width = 25
+    Caption = 'Hue:'
+    ParentColor = False
+  end
+  object tbL: TEdit
+    Left = 306
+    Height = 23
+    Top = 282
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 5
+    Text = 'tbL'
+  end
+  object Label5: TLabel
+    Left = 294
+    Height = 15
+    Top = 284
+    Width = 9
+    Caption = 'L:'
+    ParentColor = False
+  end
+  object tbB: TEdit
+    Left = 470
+    Height = 23
+    Top = 282
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 6
+    Text = 'tbB'
+  end
+  object tbBlue: TEdit
+    Left = 470
+    Height = 23
+    Top = 230
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 7
+    Text = 'tbBlue'
+  end
+  object tbLum: TEdit
+    Left = 470
+    Height = 23
+    Top = 256
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 8
+    Text = 'tbLum'
+  end
+  object Label6: TLabel
+    Left = 440
+    Height = 15
+    Top = 232
+    Width = 26
+    Caption = 'Blue:'
+    ParentColor = False
+  end
+  object Label7: TLabel
+    Left = 439
+    Height = 15
+    Top = 258
+    Width = 27
+    Caption = 'Lum:'
+    ParentColor = False
+  end
+  object Label8: TLabel
+    Left = 456
+    Height = 15
+    Top = 284
+    Width = 10
+    Caption = 'B:'
+    ParentColor = False
+  end
+  object Label9: TLabel
+    Left = 354
+    Height = 15
+    Top = 232
+    Width = 34
+    Caption = 'Green:'
+    ParentColor = False
+  end
+  object Label10: TLabel
+    Left = 368
+    Height = 15
+    Top = 258
+    Width = 19
+    Caption = 'Sat:'
+    ParentColor = False
+  end
+  object Label11: TLabel
+    Left = 376
+    Height = 15
+    Top = 284
+    Width = 11
+    Caption = 'A:'
+    ParentColor = False
+  end
+  object tbA: TEdit
+    Left = 390
+    Height = 23
+    Top = 284
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 9
+    Text = 'tbA'
+  end
+  object tbSat: TEdit
+    Left = 390
+    Height = 23
+    Top = 254
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 10
+    Text = 'tbSat'
+  end
+  object tbGreen: TEdit
+    Left = 390
+    Height = 23
+    Top = 230
+    Width = 44
+    NumbersOnly = True
+    TabOrder = 11
+    Text = 'tbGreen'
+  end
+  object pbDesiredColor: TPaintBox
+    Left = 282
+    Height = 24
+    Top = 324
+    Width = 115
+    OnPaint = pbDesiredColorPaint
+  end
+  object Label12: TLabel
+    Left = 282
+    Height = 15
+    Top = 306
+    Width = 45
+    Caption = 'Desided:'
+    ParentColor = False
+  end
+  object Label13: TLabel
+    Left = 400
+    Height = 15
+    Top = 306
+    Width = 37
+    Caption = 'Actual:'
+    ParentColor = False
+  end
+  object pbActualColor: TPaintBox
+    Left = 400
+    Height = 24
+    Top = 324
+    Width = 115
+    OnPaint = pbActualColorPaint
+  end
+  object Label14: TLabel
+    Left = 280
+    Height = 15
+    Top = 208
+    Width = 23
+    Caption = 'Hex:'
+    ParentColor = False
+  end
+  object tbHex: TEdit
+    Left = 306
+    Height = 23
+    Top = 204
+    Width = 208
+    TabOrder = 12
+    Text = 'tbHex'
+  end
+end

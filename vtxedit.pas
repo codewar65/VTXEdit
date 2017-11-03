@@ -96,6 +96,7 @@ uses
   VTXSupport,
   VTXEncDetect,
   VTXExportOptions,
+  VTXColorDlg,
   UnicodeHelper,
   RecList,
   LResources,
@@ -143,6 +144,7 @@ type
     dtbMoveDown: TToolButton;
     dtbMoveUp: TToolButton;
     dtpSauceDate: TDateTimePicker;
+    GroupBox1: TGroupBox;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
     ilCursors: TImageList;
@@ -165,6 +167,8 @@ type
     Label22: TLabel;
     Label23: TLabel;
     Label24: TLabel;
+    Label25: TLabel;
+    Label31: TLabel;
     lBitmapName: TLabel;
     lBitmapSize: TLabel;
     Label26: TLabel;
@@ -217,6 +221,8 @@ type
     odObject: TOpenDialog;
     odImage: TOpenDialog;
     odBitmap: TOpenDialog;
+    pbRowColor1: TPaintBox;
+    pbRowColor2: TPaintBox;
     Panel1: TPanel;
     miFileOpen: TMenuItem;
     miFileSave: TMenuItem;
@@ -240,6 +246,10 @@ type
     miEdit: TMenuItem;
     miHelp: TMenuItem;
     pbStatusBar: TPaintBox;
+    RadioButton1: TRadioButton;
+    RadioButton2: TRadioButton;
+    RadioButton3: TRadioButton;
+    RadioButton4: TRadioButton;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
     ScrollBox1: TScrollBox;
@@ -250,6 +260,7 @@ type
     ScrollBox6: TScrollBox;
     ScrollBox7: TScrollBox;
     ScrollBox8: TScrollBox;
+    ScrollBox9: TScrollBox;
     sdObject: TSaveDialog;
     sdAnsi: TSaveDialog;
     irqBlink: TTimer;
@@ -263,6 +274,7 @@ type
     seRefWidth: TSpinEdit;
     seRefHeight: TSpinEdit;
     TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
     ToolBar2: TToolBar;
     bRefLoad: TToolButton;
     bRefShow: TToolButton;
@@ -337,6 +349,7 @@ type
     procedure bRefRemoveClick(Sender: TObject);
     procedure bRefShowClick(Sender: TObject);
     procedure cbFontChange(Sender: TObject);
+    procedure ColorButton1Click(Sender: TObject);
     function DGetDockerPanel(dockernum : integer) : TPanel;
     function DGetPageControl(dockernum : integer) : TPageControl;
     function DGetNumDockers : integer;
@@ -356,6 +369,8 @@ type
     procedure InitDockers;
     procedure DeinitDockers;
     procedure miViewLoadBitmapClick(Sender: TObject);
+    procedure pbRowColor1Click(Sender: TObject);
+    procedure pbRowColor2Click(Sender: TObject);
     procedure seRefHeightChange(Sender: TObject);
     procedure seRefLeftChange(Sender: TObject);
     procedure seRefTopChange(Sender: TObject);
@@ -566,6 +581,7 @@ var
   // tool windows
   fPreviewBox : TfPreview;
 
+  CurrFilePath :            unicodestring;  // path to this doc.
   CurrFileName :            unicodestring;
   CurrFileChanged :         boolean;
   PageTop, PageLeft :       integer;    // upper left corner position
@@ -966,6 +982,7 @@ begin
   seRows.MaxValue := MaxRows;
   seCols.MaxValue := MaxCols;
 
+  CurrFilePath := '';
   CurrFileName := '';
   CurrFileChanged := false;
 
@@ -2887,6 +2904,7 @@ begin
 
   InitSauce;
 
+  CurrFilePath := '';
   CurrFileName := '';
   CurrFileChanged := false;
   tbSauceAuthor.Text:='';
@@ -4410,49 +4428,6 @@ begin
 
   tofill.Free;
   todo.Free;
-
-  { seed with start position }
-  //  init todo stack
-  //  init tofill stack
-  //  push r,c onto todo stack
-
-  { build fill area }
-  //  while stuff on todo stack do
-  //    pop r, c from todo stack
-  //    if r,c not on tofill stack
-  //      scan left until non fillon
-  //      remember r,c
-  //      while cell = fillon do
-
-  //        if up not on tofill stack then
-  //          if up = fillon then
-  //            if not lookedup then
-  //              push point onto todo stack
-  //              lookedup = true
-  //            endif
-  //          else
-  //            lookedup = false
-
-  //        if down not on tofill stack then
-  //          if down = fillon then
-  //            if not lookeddown then
-  //              push point onto todo stack
-  //              lookeddown = true
-  //            endif
-  //          else
-  //            lookeddown = false
-
-  //        advance to next cell
-  //      end while
-  //      push from remembered rc to this rc onto tofill stack
-  //    end if
-  //  emd while
-
-  { fill it in }
-  //  while stuff on tofill stack do
-  //    pop from fr,fc and to tr,tc
-  //    fill from fr,fc to tr,tc (fr should equal tr)
-  //  end while
 end;
 
 // x and y are in block coordinates
@@ -8114,14 +8089,16 @@ procedure TfMain.miFileOpenClick(Sender: TObject);
 begin
   CheckToSave;
 
-  odAnsi.Filter:=     'VTX File (*.vtx)|*.vtx';
-  odAnsi.Title:=      'Open VTX File';
-  odAnsi.Filename :=  '';
+  odAnsi.Filter :=     'VTX File (*.vtx)|*.vtx';
+  odAnsi.Title :=      'Open VTX File';
+  odAnsi.InitialDir := CurrFilePath;
+  odAnsi.Filename :=   '';
   if odAnsi.Execute then
   begin
     OpenVTXFile(odAnsi.Filename);
     GenerateBmpPage;
     pbPage.Invalidate;
+    CurrFilePath := ExtractFilePath(odAnsi.FileName);
     CurrFileName := ExtractFileName(odAnsi.FileName);
     CurrFileChanged := false;
     UpdateTitles;
@@ -8132,10 +8109,12 @@ procedure TfMain.SaveAsVTXFile;
 begin
   sdAnsi.Filter:=     'VTX File (*.vtx)|*.vtx';
   sdAnsi.Title:=      'Save VTX File';
-  sdAnsi.Filename :=  '';
+  sdAnsi.InitialDir:= CurrFilePath;
+  sdAnsi.Filename :=  CurrFileName;
   if sdAnsi.Execute then
   begin
     SaveVTXFile(sdAnsi.Filename);
+    CurrFilePath := ExtractFilePath(sdAnsi.FileName);
     CurrFileName := ExtractFileName(sdAnsi.FileName);
     CurrFileChanged := false;
     UpdateTitles;
@@ -8157,8 +8136,8 @@ begin
         SaveAsVTXFile
       else
       begin
-        SaveVTXFile(CurrFileName);
-        CurrFileName := ExtractFileName(sdAnsi.FileName);
+        SaveVTXFile(CurrFilePath + CurrFileName);
+//        CurrFileName := ExtractFileName(sdAnsi.FileName);
         CurrFileChanged := false;
         UpdateTitles;
       end;
@@ -8178,7 +8157,7 @@ begin
   if CurrFileName = '' then
     SaveAsVTXFile
   else
-    SaveVTXFile(CurrFileName);
+    SaveVTXFile(CurrFilePath + CurrFileName);
   CurrFileChanged := false;
   UpdateTitles;
 end;
@@ -8966,6 +8945,7 @@ begin
     ImportANSIFile(odAnsi.Filename, false);
     GenerateBmpPage;
     pbPage.Invalidate;
+    CurrFilePath := ExtractFilePath(odAnsi.FileName);
     CurrFileName := ExtractFileNameWithoutExt(odAnsi.FileName) + '.vtx';
     CurrFileChanged := true;
     UpdateTitles;
@@ -10003,6 +9983,39 @@ begin
 
   GenerateBmpPage;
   pbPage.Invalidate;
+end;
+
+procedure TfMain.ColorButton1Click(Sender: TObject);
+begin
+
+end;
+
+procedure TfMain.pbRowColor1Click(Sender: TObject);
+var
+  clrdlg : TfColorDialog;
+begin
+  // open custom color dialog
+  clrdlg := TfColorDialog.Create(self);
+  clrdlg.fColor := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR1_MASK);
+  if clrdlg.ShowModal = mrOK then
+  begin
+    nop;
+  end;
+  clrdlg.Free;
+end;
+
+procedure TfMain.pbRowColor2Click(Sender: TObject);
+var
+  clrdlg : TfColorDialog;
+begin
+  // open custom color dialog
+  clrdlg := TfColorDialog.Create(self);
+  clrdlg.fColor := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR2_MASK, 8);
+  if clrdlg.ShowModal = mrOK then
+  begin
+    nop;
+  end;
+  clrdlg.Free;
 end;
 
 procedure TfMain.bRefShowClick(Sender: TObject);

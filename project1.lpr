@@ -37,7 +37,7 @@ uses
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
   Forms,
-  VTXEdit, datetimectrls;
+  VTXEdit;
 
 {$R *.res}
 
