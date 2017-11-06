@@ -1139,6 +1139,8 @@ begin
   // clear the clipboard
   Clipboard.Width := 0;
   Clipboard.Height := 0;
+  Clipboard.Locked := false;
+  Clipboard.Hidden := false;
   Clipboard.Data.Create(sizeof(TCell), rleDoubles);
 
   // set font tab settings
@@ -4744,7 +4746,6 @@ var
   mr, mc,
   sx, sy,
   x, y :        integer;
-  cell2 :       TCell;
   DrawDataRec : TUndoCells;
   dcell :       TCell;
 begin
@@ -6470,16 +6471,8 @@ procedure TfMain.pbPagePaint(Sender: TObject);
 var
   panel :     TPaintBox;
   cnv :       TCanvas;
-  r, c :      integer;
   pr :        TRect;
   tmp, tmp2 : TBGRABitmap;
-  tmpreg :    TRecList;
-  i :         integer;
-  x, y :      integer;
-  cell :      TCell;
-  objnum :    integer;
-  cl1, cl2 :  TColor;
-  copyrec :   TLoc;
   bmpTemp : TBGRABitmap;
 
 begin
@@ -6791,7 +6784,6 @@ var
   bslow, bfast :  boolean;
   cp :            TEncoding;
   fntnum :        integer;
-  pr : TRect;
   bmpTemp : TBGRABitmap;
 begin
   if bmpPage = nil then exit; // ?!
@@ -7890,7 +7882,6 @@ var
   head :        TVTXFileHeader;
   i, j, r, c :  integer;
   numobj :      integer;
-  b :           byte;
   namein :      packed array [0..63] of char;
   cellrec :     TCell;
   cellrec2 :    TCell;
@@ -8151,8 +8142,6 @@ begin
 end;
 
 procedure TfMain.miFileSaveClick(Sender: TObject);
-var
-  ansi : unicodestring;
 begin
   if CurrFileName = '' then
     SaveAsVTXFile
@@ -8454,7 +8443,6 @@ var
   fout :        TFileStream;
   po :          PObj;
   ansi,
-  sgr,
   rowansi:      unicodestring;
   cell :        TCell;
   i, j :        integer;
@@ -10324,7 +10312,6 @@ var
   sect : string;
   tabnames : TStringArray;
   tabs : string;
-  t, h : integer;
 begin
   // build context menu
   DockerInfo.SkipTabChange := true;
@@ -10607,9 +10594,6 @@ var
   pc : TPageControl;
   ts : TTabSheet;
   t, h : integer;
-  a : TAnchors;
-  fd : TPanel;
-  fc : TControl;
   hid : boolean;
 begin
   // get active
@@ -10634,7 +10618,6 @@ begin
       // expand previous docker down to this
       if DockerInfo.CurrDocker > 0 then
       begin
-        a := p.Anchors;
         h := p.Height;
         DRemoveDocker(DockerInfo.CurrDocker);
         p := DGetDockerPanel(DockerInfo.CurrDocker - 1);

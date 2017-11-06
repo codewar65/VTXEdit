@@ -1,5 +1,5 @@
 object fPreview: TfPreview
-  Left = 1205
+  Left = 1251
   Height = 363
   Top = 269
   Width = 300

@@ -1,7 +1,7 @@
 object fColorDialog: TfColorDialog
-  Left = 847
+  Left = 681
   Height = 354
-  Top = 330
+  Top = 352
   Width = 519
   BorderStyle = bsDialog
   Caption = 'ANSI Colors'
@@ -42,6 +42,7 @@ object fColorDialog: TfColorDialog
     Height = 297
     Top = 22
     Width = 261
+    ParentColor = False
     OnMouseDown = pbColorsMouseDown
     OnPaint = pbColorsPaint
   end
@@ -58,6 +59,8 @@ object fColorDialog: TfColorDialog
     Height = 23
     Top = 325
     Width = 44
+    NumbersOnly = True
+    OnEditingDone = tbANSIColorEditingDone
     TabOrder = 2
     Text = 'tbANSIColor'
   end
@@ -66,13 +69,19 @@ object fColorDialog: TfColorDialog
     Height = 193
     Top = 6
     Width = 209
+    OnMouseDown = pbHSMouseDown
+    OnMouseMove = pbHSMouseMove
+    OnMouseUp = pbHSMouseUp
     OnPaint = pbHSPaint
   end
   object pbL: TPaintBox
     Left = 490
     Height = 193
-    Top = 6
+    Top = 8
     Width = 24
+    OnMouseDown = pbLMouseDown
+    OnMouseMove = pbLMouseMove
+    OnMouseUp = pbLMouseUp
     OnPaint = pbLPaint
   end
   object tbRed: TEdit
@@ -81,6 +90,7 @@ object fColorDialog: TfColorDialog
     Top = 230
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbRedEditingDone
     TabOrder = 3
     Text = 'tbRed'
   end
@@ -98,6 +108,7 @@ object fColorDialog: TfColorDialog
     Top = 256
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbHueEditingDone
     TabOrder = 4
     Text = 'tbHue'
   end
@@ -114,7 +125,8 @@ object fColorDialog: TfColorDialog
     Height = 23
     Top = 282
     Width = 44
-    NumbersOnly = True
+    Enabled = False
+    ReadOnly = True
     TabOrder = 5
     Text = 'tbL'
   end
@@ -131,7 +143,8 @@ object fColorDialog: TfColorDialog
     Height = 23
     Top = 282
     Width = 44
-    NumbersOnly = True
+    Enabled = False
+    ReadOnly = True
     TabOrder = 6
     Text = 'tbB'
   end
@@ -141,6 +154,7 @@ object fColorDialog: TfColorDialog
     Top = 230
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbBlueEditingDone
     TabOrder = 7
     Text = 'tbBlue'
   end
@@ -150,6 +164,7 @@ object fColorDialog: TfColorDialog
     Top = 256
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbLumEditingDone
     TabOrder = 8
     Text = 'tbLum'
   end
@@ -204,18 +219,20 @@ object fColorDialog: TfColorDialog
   object tbA: TEdit
     Left = 390
     Height = 23
-    Top = 284
+    Top = 282
     Width = 44
-    NumbersOnly = True
+    Enabled = False
+    ReadOnly = True
     TabOrder = 9
     Text = 'tbA'
   end
   object tbSat: TEdit
     Left = 390
     Height = 23
-    Top = 254
+    Top = 256
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbSatEditingDone
     TabOrder = 10
     Text = 'tbSat'
   end
@@ -225,6 +242,7 @@ object fColorDialog: TfColorDialog
     Top = 230
     Width = 44
     NumbersOnly = True
+    OnEditingDone = tbGreenEditingDone
     TabOrder = 11
     Text = 'tbGreen'
   end
@@ -271,6 +289,8 @@ object fColorDialog: TfColorDialog
     Height = 23
     Top = 204
     Width = 208
+    MaxLength = 7
+    OnEditingDone = tbHexEditingDone
     TabOrder = 12
     Text = 'tbHex'
   end

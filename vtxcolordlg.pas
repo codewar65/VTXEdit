@@ -50,6 +50,22 @@ uses
 
 type
 
+  TLAB = record
+    l, a, b : double;
+  end;
+
+  THSL = record
+    h, s, l : double;
+  end;
+
+  TRGB = record
+    r, g, b : double;
+  end;
+
+  TXYZ = record
+    x, y, z : double;
+  end;
+
   { TfColorDialog }
 
   TfColorDialog = class(TForm)
@@ -91,9 +107,30 @@ type
     procedure pbColorsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbColorsPaint(Sender: TObject);
     procedure pbDesiredColorPaint(Sender: TObject);
+    procedure pbHSMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure pbHSMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure pbHSMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbHSPaint(Sender: TObject);
+    procedure pbLMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure pbLMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure pbLMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbLPaint(Sender: TObject);
-    procedure SetANSIColor(c : integer);
+    function FindANSIColor : integer;
+    procedure SetANSIColor;
+    procedure SetHSLColor;
+    procedure SetRGBColor;
+    procedure SetLABColor;
+    procedure tbAEditingDone(Sender: TObject);
+    procedure tbANSIColorEditingDone(Sender: TObject);
+    procedure tbBEditingDone(Sender: TObject);
+    procedure tbBlueEditingDone(Sender: TObject);
+    procedure tbGreenEditingDone(Sender: TObject);
+    procedure tbHexEditingDone(Sender: TObject);
+    procedure tbHueEditingDone(Sender: TObject);
+    procedure tbLEditingDone(Sender: TObject);
+    procedure tbLumEditingDone(Sender: TObject);
+    procedure tbRedEditingDone(Sender: TObject);
+    procedure tbSatEditingDone(Sender: TObject);
   private
     { private declarations }
   public
@@ -101,26 +138,18 @@ type
     fColor : integer;       // ansi color 0-255
   end;
 
-  TLAB = record
-    l, a, b : double;
-  end;
-
-  THSL = record
-    h, s, l : double;
-  end;
-
-  TRGB = record
-    r, g, b : double;
-  end;
-
-  TXYZ = record
-    x, y, z : double;
-  end;
-
-
 var
   fColorDialog: TfColorDialog;
   bmpHS : TBitmap;
+  ANSILAB : array [0 .. 255] of TLAB;
+
+  // desired color
+  DesiredRGB : TRGB;
+  DesiredHSL : THSL;
+  DesiredXYZ : TXYZ;
+  DesiredLAB : TLAB;
+
+  drag : boolean;
 
 const
   d65: TXYZ = (
@@ -135,10 +164,20 @@ const
   function HSL2RGB(hsl: THSL): TRGB;
   function XYZ2RGB(xyz: TXYZ): TRGB;
   function LAB2XYZ(lab: TLAB): TXYZ;
+  function SetRGB(r, g, b : byte) : TRGB;
+  function doubletostr(v : double) : string;
+  function Distance3D(x1, y1, z1, x2, y2, z2 : double): double;
 
 implementation
 
 { TfColorDialog }
+
+function SetRGB(r, g, b : byte) : TRGB;
+begin
+  result.r := r / 255.0;
+  result.g := g / 255.0;
+  result.b := b / 255.0;
+end;
 
 // paint color picker + highlight selected color
 procedure TfColorDialog.pbColorsPaint(Sender: TObject);
@@ -176,8 +215,8 @@ begin
       r.Height := ch - 2;
 
       cnv.Brush.Color := ANSIColor[c];
-      cnv.Pen.Color := clBlack;
-      cnv.Rectangle(r);
+      cnv.FillRect(r);
+      Draw3DRect(cnv, r, true);
       c += 1;
     end;
   end;
@@ -188,22 +227,416 @@ var
   pb : TPaintBox;
   cnv : TCanvas;
   r, g, b : integer;
+  rect : TRect;
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
-  r := strtoint(tbRed.Text);
-  g := strtoint(tbGreen.Text);
-  b := strtoint(tbBlue.Text);
+  rect := pb.ClientRect;
+
+  r := floor(DesiredRGB.r * 255.0);
+  g := floor(DesiredRGB.g * 255.0);
+  b := floor(DesiredRGB.b * 255.0);
+
   cnv.Brush.Color := RGBToColor(r, g, b);
-  cnv.Pen.Color := clBlack;
-  cnv.Rectangle(pb.ClientRect);
+  cnv.FillRect(rect);
+  Draw3DRect(cnv, rect, true);
+end;
+
+procedure TfColorDialog.pbActualColorPaint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  r, g, b : integer;
+  rect : TRect;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+  rect := pb.ClientRect;
+
+  r := (ANSIColor[fColor]      ) and $FF;
+  g := (ANSIColor[fColor] >>  8) and $FF;
+  b := (ANSIColor[fColor] >> 16) and $FF;
+
+  cnv.Brush.Color := RGBToColor(r, g, b);
+  cnv.FillRect(rect);
+  Draw3DRect(cnv, rect, true);
+end;
+
+function Distance3D(x1, y1, z1, x2, y2, z2 : double): double;
+var
+  x, y, z : double;
+begin
+  x := (x1 - x2);
+  y := (y1 - y2);
+  z := (z1 - z2);
+  x *= x;
+  y *= y;
+  z *= z;
+  result := (x + y + z);
+end;
+
+// find closest ansi color
+function TfColorDialog.FindANSIColor : integer;
+var
+  i : integer;
+  xyz : TXYZ;
+  lab : TLAB;
+  d, mind : double;
+begin
+  mind := 9999;
+  for i := 0 to 255 do
+  begin
+    d := Distance3D(
+      DesiredLAB.l, DesiredLAB.a, DesiredLAB.b,
+      ANSILAB[i].l, ANSILAB[i].a, ANSILAB[i].b);
+    if d < mind then
+    begin
+      mind := d;
+      result := i;
+    end;
+  end;
+end;
+
+// set all colors based on fcolor
+procedure TfColorDialog.SetANSIColor;
+var
+  r, g, b : integer;
+begin
+  // load settings based on fANSIColor.
+  r := (ANSIColor[fColor]      ) and $FF;
+  g := (ANSIColor[fColor] >>  8) and $FF;
+  b := (ANSIColor[fColor] >> 16) and $FF;
+
+  DesiredRGB := SetRGB(r, g, b);
+  DesiredHSL := RGB2HSL(DesiredRGB);
+  DesiredXYZ := RGB2XYZ(DesiredRGB);
+  DesiredLAB := XYZ2LAB(DesiredXYZ);
+
+  tbANSIColor.Text := inttostr(fColor);
+  tbHex.Text := Format('#%2.2X%2.2X%2.2X', [r, g, b]);
+
+  tbRed.Text := inttostr(r);
+  tbGreen.Text := inttostr(g);
+  tbBlue.Text := inttostr(b);
+
+  tbHue.Text := doubletostr(DesiredHSL.h * 100);
+  tbSat.Text := doubletostr(DesiredHSL.s * 100);
+  tbLum.Text := doubletostr(DesiredHSL.l * 100);
+
+  tbL.Text := doubletostr(DesiredLAB.l);
+  tbA.Text := doubletostr(DesiredLAB.a);
+  tbB.Text := doubletostr(DesiredLAB.b);
+
+  pbDesiredColor.Invalidate;
+  pbActualColor.Invalidate;
+  pbHS.Invalidate;
+  pbL.Invalidate;
+end;
+
+procedure TfColorDialog.SetRGBColor;
+var
+  r, g, b : integer;
+begin
+  DesiredHSL := RGB2HSL(DesiredRGB);
+  DesiredXYZ := RGB2XYZ(DesiredRGB);
+  DesiredLAB := XYZ2LAB(DesiredXYZ);
+
+  // find closest ANSI color
+  fColor := FindANSIColor;
+
+  // fill in values
+  tbANSIColor.Text := inttostr(fColor);
+
+  r := floor(DesiredRGB.r * 255.0);
+  g := floor(DesiredRGB.g * 255.0);
+  b := floor(DesiredRGB.b * 255.0);
+  tbHex.Text := Format('#%2.2X%2.2X%2.2X', [r, g, b]);
+
+  tbRed.Text := inttostr(r);
+  tbGreen.Text := inttostr(g);
+  tbBlue.Text := inttostr(b);
+
+  tbHue.Text := doubletostr(DesiredHSL.h * 100);
+  tbSat.Text := doubletostr(DesiredHSL.s * 100);
+  tbLum.Text := doubletostr(DesiredHSL.l * 100);
+
+  tbL.Text := doubletostr(DesiredLAB.l);
+  tbA.Text := doubletostr(DesiredLAB.a);
+  tbB.Text := doubletostr(DesiredLAB.b);
+
+  pbColors.Invalidate;
+  pbDesiredColor.Invalidate;
+  pbActualColor.Invalidate;
+  pbHS.Invalidate;
+  pbL.Invalidate;
+end;
+
+procedure TfColorDialog.SetLABColor;
+var
+  r, g, b : integer;
+begin
+  DesiredXYZ := LAB2XYZ(DesiredLAB);
+  DesiredRGB := XYZ2RGB(DesiredXYZ);
+  DesiredHSL := RGB2HSL(DesiredRGB);
+
+  // find closest ANSI color
+  fColor := FindANSIColor;
+
+  // fill in values
+  tbANSIColor.Text := inttostr(fColor);
+
+  r := floor(DesiredRGB.r * 255.0);
+  g := floor(DesiredRGB.g * 255.0);
+  b := floor(DesiredRGB.b * 255.0);
+  tbHex.Text := Format('#%2.2X%2.2X%2.2X', [r, g, b]);
+
+  tbRed.Text := inttostr(r);
+  tbGreen.Text := inttostr(g);
+  tbBlue.Text := inttostr(b);
+
+  tbHue.Text := doubletostr(DesiredHSL.h * 100);
+  tbSat.Text := doubletostr(DesiredHSL.s * 100);
+  tbLum.Text := doubletostr(DesiredHSL.l * 100);
+
+  tbL.Text := doubletostr(DesiredLAB.l);
+  tbA.Text := doubletostr(DesiredLAB.a);
+  tbB.Text := doubletostr(DesiredLAB.b);
+
+  pbColors.Invalidate;
+  pbDesiredColor.Invalidate;
+  pbActualColor.Invalidate;
+  pbHS.Invalidate;
+  pbL.Invalidate;
+end;
+
+// set all colors based on desiredhsl
+procedure TfColorDialog.SetHSLColor;
+var
+  r, g, b : integer;
+begin
+  DesiredRGB := HSL2RGB(DesiredHSL);
+  DesiredXYZ := RGB2XYZ(DesiredRGB);
+  DesiredLAB := XYZ2LAB(DesiredXYZ);
+
+  // find closest ANSI color
+  fColor := FindANSIColor;
+
+  // fill in values
+  tbANSIColor.Text := inttostr(fColor);
+
+  r := floor(DesiredRGB.r * 255.0);
+  g := floor(DesiredRGB.g * 255.0);
+  b := floor(DesiredRGB.b * 255.0);
+  tbHex.Text := Format('#%2.2X%2.2X%2.2X', [r, g, b]);
+
+  tbRed.Text := inttostr(r);
+  tbGreen.Text := inttostr(g);
+  tbBlue.Text := inttostr(b);
+
+  tbHue.Text := doubletostr(DesiredHSL.h * 100);
+  tbSat.Text := doubletostr(DesiredHSL.s * 100);
+  tbLum.Text := doubletostr(DesiredHSL.l * 100);
+
+  tbL.Text := doubletostr(DesiredLAB.l);
+  tbA.Text := doubletostr(DesiredLAB.a);
+  tbB.Text := doubletostr(DesiredLAB.b);
+
+  pbColors.Invalidate;
+  pbDesiredColor.Invalidate;
+  pbActualColor.Invalidate;
+  pbHS.Invalidate;
+  pbL.Invalidate;
+end;
+
+procedure TfColorDialog.tbANSIColorEditingDone(Sender: TObject);
+var
+  v : integer;
+begin
+  v := StrToInt(tbANSIColor.Text);
+  if v < 0 then
+    v := 0;
+  if v > 255 then
+    v := 255;
+  fColor := v;
+  SetANSIColor;
+  pbColors.Invalidate;
+end;
+
+function HexChar(ch : char) : integer;
+var
+  c : integer;
+begin
+  ch := UpCase(ch);
+  result := string('0123456789ABCDEF').IndexOf(ch);
+end;
+
+procedure TfColorDialog.tbHexEditingDone(Sender: TObject);
+var
+  hex : string;
+  i : integer;
+  v : longint;
+  r, g, b : integer;
+begin
+  // validate hex
+  hex := tbHex.Text;
+  if (hex.Length = 7) and (LeftStr(hex,1) = '#') then
+    hex := RightStr(hex, 6);
+  if hex.Length = 6 then
+  begin
+    for i := 0 to 5 do
+      if HexChar(hex.Chars[i]) = -1 then
+        exit;
+    v := StrToInt('$' + hex);
+    r := (v >> 16) and $FF;
+    g := (v >>  8) and $FF;
+    b := (v      ) and $FF;
+    DesiredRGB := SetRGB(r, g, b);
+    SetRGBColor;
+  end;
+end;
+
+procedure TfColorDialog.tbRedEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbRed.Text) / 255;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredRGB.r := v;
+  SetRGBColor;
+end;
+
+procedure TfColorDialog.tbGreenEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbGreen.Text) / 255;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredRGB.g := v;
+  SetRGBColor;
+end;
+
+procedure TfColorDialog.tbBlueEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbBlue.Text) / 255;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredRGB.b := v;
+  SetRGBColor;
+end;
+
+procedure TfColorDialog.tbHueEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbHue.Text) / 100;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredHSL.h := v;
+  SetHSLColor;
+end;
+
+procedure TfColorDialog.tbSatEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbSat.Text) / 100;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredHSL.s := v;
+  SetHSLColor;
+end;
+
+procedure TfColorDialog.tbLumEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbLum.Text) / 100;
+  if v < 0 then v := 0;
+  if v > 1 then v := 1;
+  DesiredHSL.l := v;
+  SetHSLColor;
+end;
+
+procedure TfColorDialog.tbLEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbL.Text);
+  if v < 0 then v := 0;
+  if v > 100 then v := 100;
+  DesiredLAB.l := v;
+  SetLABColor;
+end;
+
+procedure TfColorDialog.tbAEditingDone(Sender: TObject);
+var
+  v : double;
+begin
+  v := StrToFloat(tbA.Text);
+  if v < -100 then v := -100;
+  if v > 100 then v := 100;
+  DesiredLAB.a := v;
+  SetLABColor;
+end;
+
+procedure TfColorDialog.tbBEditingDone(Sender: TObject);
+begin
+  DesiredLAB.b := StrToFloat(tbB.Text);
+  SetLABColor;
+end;
+
+
+procedure TfColorDialog.pbHSMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  pb : TPaintBox;
+  w, h : integer;
+begin
+  // pick this color. mark as moving
+  drag := true;
+
+  pb := TPaintBox(Sender);
+  w := pb.ClientRect.Width;
+  h := pb.ClientRect.Height;
+
+  // get hs
+  DesiredHSL.h := x / w;
+  DesiredHSL.s := y / h;
+  SetHSLColor;
+end;
+
+procedure TfColorDialog.pbHSMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var
+  pb : TPaintBox;
+  w, h : integer;
+begin
+  // pick this color. mark as moving
+  pb := TPaintBox(Sender);
+  w := pb.ClientRect.Width;
+  h := pb.ClientRect.Height;
+
+  if drag and between(X, 0, w - 1) and between(Y, 0, h - 1) then
+  begin
+    // get hs
+    DesiredHSL.h := x / w;
+    DesiredHSL.s := y / h;
+    SetHSLColor;
+  end;
+end;
+
+procedure TfColorDialog.pbHSMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  // pick this color. mark as moving
+  drag := false;
 end;
 
 procedure TfColorDialog.pbHSPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  hsl : THSL;
+  pb :   TPaintBox;
+  cnv :  TCanvas;
   w, h : integer;
   x, y : integer;
   rect : TRect;
@@ -214,9 +647,7 @@ begin
   h := pb.ClientRect.Height;
 
   cnv.Draw(0, 0, bmpHS);
-  cnv.Pen.Color := clBlack;
-  cnv.Brush.Style := bsClear;
-  cnv.Rectangle(pb.ClientRect);
+  Draw3DRect(cnv, pb.ClientRect, true);
 
   x := floor((StrToFloat(tbHue.Text) / 100.0) * w);
   y := floor((StrToFloat(tbSat.Text) / 100.0) * h);
@@ -232,6 +663,48 @@ begin
   cnv.Rectangle(rect);
 end;
 
+procedure TfColorDialog.pbLMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  pb : TPaintBox;
+  h : integer;
+begin
+  // pick this color. mark as moving
+  drag := true;
+
+  pb := TPaintBox(Sender);
+  h := pb.ClientRect.Height;
+
+  // get hs
+  DesiredHSL.l := y / h;
+
+  SetHSLColor;
+end;
+
+procedure TfColorDialog.pbLMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var
+  pb : TPaintBox;
+  w, h : integer;
+begin
+  pb := TPaintBox(Sender);
+  w := pb.ClientRect.Width;
+  h := pb.ClientRect.Height;
+
+  if drag and between(X, 0, w - 1) and between(Y, 0, h - 1) then
+  begin
+    // get hs
+    DesiredHSL.l := y / h;
+
+    SetHSLColor;
+  end;
+end;
+
+procedure TfColorDialog.pbLMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  drag := false;
+end;
+
 procedure TfColorDialog.pbLPaint(Sender: TObject);
 var
   w, h : integer;
@@ -240,7 +713,7 @@ var
   y : integer;
   hsl : THSL;
   rgb : TRGB;
-  r, g, b : integer;
+  r, g, b : byte;
   rect : TRect;
 begin
   // need to draw this custom every time
@@ -258,12 +731,12 @@ begin
     r := floor(rgb.r * 255.0);
     g := floor(rgb.g * 255.0);
     b := floor(rgb.b * 255.0);
+    cnv.Pen.Mode := pmCopy;
+    cnv.Pen.Width := 1;
     cnv.Pen.Color := RGBToColor(r, g, b);
     cnv.Line(0, y, w - 1, y);
   end;
-  cnv.Pen.Color := clBlack;
-  cnv.Brush.Style := bsClear;
-  cnv.Rectangle(pb.ClientRect);
+  Draw3DRect(cnv, pb.ClientRect, true);
 
   y := floor((StrToFloat(tbLum.Text) / 100.0) * h);
   rect.Top := y - 1;
@@ -276,23 +749,6 @@ begin
   cnv.Pen.Mode:= pmXor;
   cnv.Rectangle(rect);
 end;
-
-procedure TfColorDialog.pbActualColorPaint(Sender: TObject);
-var
-  pb : TPaintBox;
-  cnv : TCanvas;
-  r, g, b : integer;
-begin
-  pb := TPaintBox(Sender);
-  cnv := pb.Canvas;
-  r := (ANSIColor[fColor]      ) and $FF;
-  g := (ANSIColor[fColor] >>  8) and $FF;
-  b := (ANSIColor[fColor] >> 16) and $FF;
-  cnv.Brush.Color := RGBToColor(r, g, b);
-  cnv.Pen.Color := clBlack;
-  cnv.Rectangle(pb.ClientRect);
-end;
-
 
 { CONVERT RGB TO XYZ }
 function RGB2XYZ(rgb: TRGB): TXYZ;
@@ -488,51 +944,9 @@ begin
   result.z := _FLABADJ(fz, d65.z);
 end;
 
-function SetRGB(r, g, b : byte) : TRGB;
-begin
-  result.r := r / 255.0;
-  result.g := g / 255.0;
-  result.b := b / 255.0;
-end;
-
 function doubletostr(v : double) : string;
 begin
-  result := Format('%.1f', [ v ]);
-end;
-
-procedure TfColorDialog.SetANSIColor(c : integer);
-var
-  r, g, b : integer;
-  rgb : TRGB;
-  hsl : THSL;
-  xyz : TXYZ;
-  lab : TLAB;
-begin
-  // load settings based on fANSIColor.
-  r := (ANSIColor[fColor]      ) and $FF;
-  g := (ANSIColor[fColor] >>  8) and $FF;
-  b := (ANSIColor[fColor] >> 16) and $FF;
-
-  rgb := SetRGB(r, g, b);
-  hsl := RGB2HSL(rgb);
-  xyz := RGB2XYZ(rgb);
-  lab := XYZ2LAB(xyz);
-
-  tbANSIColor.Text := inttostr(c);
-  tbHex.Text := Format('$%2.2X%2.2X%2.2X', [r, g, b]);
-  tbRed.Text := inttostr(r);
-  tbGreen.Text := inttostr(g);
-  tbBlue.Text := inttostr(b);
-  tbHue.Text := doubletostr(hsl.h * 100);
-  tbSat.Text := doubletostr(hsl.s * 100);
-  tbLum.Text := doubletostr(hsl.l * 100);
-  tbL.Text := doubletostr(lab.l);
-  tbA.Text := doubletostr(lab.a);
-  tbB.Text := doubletostr(lab.b);
-  pbDesiredColor.Invalidate;
-  pbActualColor.Invalidate;
-  pbHS.Invalidate;
-  pbL.Invalidate;
+  result := Format('%.2f', [ v ]);
 end;
 
 procedure TfColorDialog.FormCreate(Sender: TObject);
@@ -540,13 +954,15 @@ var
   w, h : integer;
   x, y : integer;
   r, g, b : integer;
+  i : integer;
   hsl : THSL;
   rgb : TRGB;
+  xyz : TXYZ;
 begin
   w := pbHS.Width;
   h := pbHS.Height;
 
-  SetANSIColor(fColor);
+  SetANSIColor;
   bmpHS := TBitmap.Create;
   bmpHS.Width := w;
   bmpHS.Height := h;
@@ -563,6 +979,17 @@ begin
       b := floor(rgb.b * 255);
       bmpHS.Canvas.Pixels[x, y] := RGBToColor(r, g, b);
     end;
+
+  // ansi lab lut
+  for i := 0 to 255 do
+  begin
+    r := (ANSIColor[i]      ) and $FF;
+    g := (ANSIColor[i] >>  8) and $FF;
+    b := (ANSIColor[i] >> 16) and $FF;
+    rgb := SetRGB(r, g, b);
+    xyz := RGB2XYZ(rgb);
+    ANSILAB[i] := XYZ2LAB(xyz);
+  end;
 end;
 
 procedure TfColorDialog.FormDestroy(Sender: TObject);
@@ -585,7 +1012,7 @@ begin
   if between(x1, 0, 15) and between(y1, 0, 15) then
   begin
     fColor := x1 + (y1 << 4);
-    SetANSIColor(fColor);
+    SetANSIColor;
     pbColors.Invalidate;
   end;
 end;
@@ -594,17 +1021,4 @@ initialization
 {$R *.lfm}
 
 end.
-
-
-
-
-
-
-
-
-
-
-
-
-
 

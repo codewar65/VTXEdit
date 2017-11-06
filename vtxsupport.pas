@@ -44,9 +44,8 @@ uses
   VTXConst,
   BGRABitmap,
   BGRABitmapTypes,
-  Types,
   RecList,
-  Memory,
+  Math,
   {$ifdef WINDOWS}
   Windows,
   {$else}
@@ -97,6 +96,8 @@ procedure DrawStretchedBitmap(cnv : TCanvas; r : TRect; bmp : TBGRABitmap);
 function GetObjectCell(row, col : integer; var cell : TCell) : integer;
 function InRect(x, y, rx, ry, rw, rh : integer) : boolean; inline;
 operator =(cell1, cell2 : TCell) : boolean;
+procedure Draw3DRect(cnv : TCanvas; rect : TRect; sunk : boolean);
+procedure Draw3DRect(cnv : TCanvas; x1, y1, x2, y2 : integer; sunk : boolean);
 
 var
   // various settings
@@ -889,6 +890,42 @@ begin
   tmpbmp := bmp.Resample(r.Width, r.Height, rmSimpleStretch) as TBGRABitmap;
   tmpbmp.Draw(cnv, r.left, r.top);
   tmpbmp.free;
+end;
+
+procedure Draw3DRect(cnv : TCanvas; rect : TRect; sunk : boolean);
+begin
+  Draw3DRect(cnv, rect.Left, rect.Top, rect.Right, rect.Bottom, sunk);
+end;
+
+procedure Draw3DRect(cnv : TCanvas; x1, y1, x2, y2 : integer; sunk : boolean);
+var
+  c1, c2 : TBGRAPixel;
+  bmp : TBGRABitmap;
+  w, h : integer;
+begin
+  w := x2 - x1;
+  h := y2 - y1;
+
+  bmp := TBGRABitmap.Create(w, h, BGRAPixelTransparent);
+
+  if sunk then
+  begin
+    c1 := BGRA(0, 0, 0, 192);
+    c2 := BGRA(255, 255, 255, 192);
+  end
+  else
+  begin
+    c1 := BGRA(255, 255, 255, 192);
+    c2 := BGRA(0, 0, 0, 192);
+  end;
+
+  bmp.DrawLine(0, h - 2, 0, 0, c1, true, dmSet);
+  bmp.DrawLine(0, 0, w - 2, 0, c1, true, dmSet);
+  bmp.DrawLine(1, h - 1, w - 1, h - 1, c2, true, dmSet);
+  bmp.DrawLine(w - 1, h - 1, w - 1, 1, c2, true, dmSet);
+
+  cnv.Draw(x1, y1, bmp.Bitmap);
+  bmp.Free;
 end;
 
 end.

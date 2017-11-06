@@ -1,7 +1,7 @@
 object fMain: TfMain
-  Left = 128
+  Left = 60
   Height = 793
-  Top = 144
+  Top = 131
   Width = 1062
   Caption = 'VTXEdit'
   ClientHeight = 773
@@ -752,13 +752,13 @@ object fMain: TfMain
               Height = 696
               Top = 0
               Width = 346
-              ActivePage = TabSheet2
+              ActivePage = tsDocument
               Align = alClient
               Anchors = [akTop, akLeft, akBottom]
               Font.Height = -11
               Images = ilIcons11x11
               ParentFont = False
-              TabIndex = 8
+              TabIndex = 0
               TabOrder = 0
               OnChange = dpcTabChange
               OnMouseDown = dpcDockersMouseDown
