@@ -6341,9 +6341,13 @@ begin
 end;
 
 procedure TfMain.lvObjectsEdited(Sender: TObject; Item: TListItem; var AValue: string);
+var
+  i : integer;
 begin
   ObjectRename := false;
-  Objects[Item.Index].Name := AValue;
+  i := length(Objects) - Item.Index - 1;
+  Objects[i].Name := AValue;
+//  Objects[Item.Index].Name := AValue;
   nop;
 end;
 
