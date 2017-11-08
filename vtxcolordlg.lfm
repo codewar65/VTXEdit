@@ -1,7 +1,7 @@
 object fColorDialog: TfColorDialog
-  Left = 681
+  Left = 639
   Height = 354
-  Top = 352
+  Top = 354
   Width = 519
   BorderStyle = bsDialog
   Caption = 'ANSI Colors'

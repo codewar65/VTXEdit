@@ -760,19 +760,34 @@ begin
   cnv.Brush.Color := ANSIColor[GetBits(Page.CrsrAttr, A_CURSOR_COLOR_MASK)];
   case GetBits(Page.CrsrAttr, A_CURSOR_VERTICAL or A_CURSOR_SIZE_MASK, 8) of
       1:  // horz thin
-        cnv.FillRect(x, y + CellHeightZ - h1, x + CellWidthZ, y + CellHeightZ);
+        begin
+          cnv.FillRect(x, y + CellHeightZ - h1, x + CellWidthZ, y + CellHeightZ);
+          Draw3DRect(cnv, x, y + CellHeightZ - h1, x + CellWidthZ, y + CellHeightZ, false);
+        end;
 
       2:  // horz thick
-        cnv.FillRect(x, y + CellHeightZ - h2, x + CellWidthZ, y + CellHeightZ);
+        begin
+          cnv.FillRect(x, y + CellHeightZ - h2, x + CellWidthZ, y + CellHeightZ);
+          Draw3DRect(cnv, x, y + CellHeightZ - h2, x + CellWidthZ, y + CellHeightZ, false);
+        end;
 
       5:  // vert thin
-        cnv.FillRect(x, y, x + v1, y + CellHeightZ);
+        begin
+          cnv.FillRect(x, y, x + v1, y + CellHeightZ);
+          Draw3DRect(cnv, x, y, x + v1, y + CellHeightZ, false);
+        end;
 
       6:  // vert thick
-        cnv.FillRect(x, y, x + v2, y + CellHeight);
+        begin
+          cnv.FillRect(x, y, x + v2, y + CellHeight);
+          Draw3DRect(cnv, x, y, x + v2, y + CellHeight, false);
+        end;
 
       3, 7: // full
-        cnv.FillRect(x, y, x + CellWidthZ, y + CellHeightZ);
+        begin
+          cnv.FillRect(x, y, x + CellWidthZ, y + CellHeightZ);
+          Draw3DRect(cnv, x, y, x + CellWidthZ, y + CellHeightZ, false);
+        end;
   end;
 end;
 
@@ -3799,141 +3814,156 @@ begin
         begin
           // commit new line from FirstDrawX,Y to DrawX,Y
           // draw line
-          case DrawMode of
-            dmChars:
-              begin
-                SaveUndoKeys;
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  SaveUndoKeys;
 
-                dcell.chr := iif(MouseLeft, CurrChar, $20);
-                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                  dcell.chr := iif(MouseLeft, CurrChar, $20);
+                  dcell.attr := iif(MouseLeft, CurrAttr, $0007);
 
-                DrawCharLine(FirstDrawx, FirstDrawY, DrawX, DrawY, dcell, false);
+                  DrawCharLine(FirstDrawx, FirstDrawY, DrawX, DrawY, dcell, false);
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
 
-            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-              begin
-                SaveUndoKeys;
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin
+                  SaveUndoKeys;
 
-                // get color to draw in
-                bcolor := iif(MouseLeft,
-                  GetBits(CurrAttr, A_CELL_FG_MASK),
-                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                  // get color to draw in
+                  bcolor := iif(MouseLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                DrawData.Create(sizeof(TUndoCells), rleAdds);
-                DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
-                DrawData.Free;
+                  DrawData.Create(sizeof(TUndoCells), rleAdds);
+                  DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
+                  DrawData.Free;
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
-          end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
+            end;
+          end
+          else
+            pbPage.Invalidate;
           dragDraw := false;
         end;
 
       tmRect:
         begin
-          case DrawMode of
-            dmChars:
-              begin
-                SaveUndoKeys;
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  SaveUndoKeys;
 
-                // draw proposed line -
-                dcell.chr := iif(MouseLeft, CurrChar, $20);
-                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                  // draw proposed line -
+                  dcell.chr := iif(MouseLeft, CurrChar, $20);
+                  dcell.attr := iif(MouseLeft, CurrAttr, $0007);
 
-                DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell, false);
-                DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell, false);
-                DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell, false);
-                DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell, false);
+                  DrawCharLine(FirstDrawX, FirstDrawY, FirstDrawX, DrawY, dcell, false);
+                  DrawCharLine(FirstDrawX, DrawY, DrawX, DrawY, dcell, false);
+                  DrawCharLine(DrawX, DrawY, DrawX, FirstDrawY, dcell, false);
+                  DrawCharLine(DrawX, FirstDrawY, FirstDrawX, FirstDrawY, dcell, false);
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
 
-            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-              begin
-                SaveUndoKeys;
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin
+                  SaveUndoKeys;
 
-                // get color to draw in
-                bcolor := iif(MouseLeft,
-                  GetBits(CurrAttr, A_CELL_FG_MASK),
-                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                  // get color to draw in
+                  bcolor := iif(MouseLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                DrawData.Create(sizeof(TUndoCells), rleAdds);
-                DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor, false);
-                DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor, false);
-                DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor, false);
-                DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor, false);
-                DrawData.Free;
+                  DrawData.Create(sizeof(TUndoCells), rleAdds);
+                  DrawBlockLine(DrawData, FirstDrawX, FirstDrawY, FirstDrawX, DrawY, bcolor, false);
+                  DrawBlockLine(DrawData, FirstDrawX, DrawY, DrawX, DrawY, bcolor, false);
+                  DrawBlockLine(DrawData, DrawX, DrawY, DrawX, FirstDrawY, bcolor, false);
+                  DrawBlockLine(DrawData, DrawX, FirstDrawY, FirstDrawX, FirstDrawY, bcolor, false);
+                  DrawData.Free;
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
-          end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
+            end;
+          end
+          else
+            pbPage.Invalidate;
           dragDraw := false;
         end;
 
       tmEllipse:
         begin
-          case DrawMode of
-            dmChars:
-              begin
-                SaveUndoKeys;
+          if between(MouseRow, 0, NumRows-1) and between(MouseCol, 0, NumCols-1) then
+          begin
+            case DrawMode of
+              dmChars:
+                begin
+                  SaveUndoKeys;
 
-                // draw proposed line -
-                dcell.chr := iif(MouseLeft, CurrChar, $20);
-                dcell.attr := iif(MouseLeft, CurrAttr, $0007);
+                  // draw proposed line -
+                  dcell.chr := iif(MouseLeft, CurrChar, $20);
+                  dcell.attr := iif(MouseLeft, CurrAttr, $0007);
 
-                DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell, false);
+                  DrawCharEllipse(FirstDrawX, FirstDrawY, DrawX, DrawY, dcell, false);
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
 
-            dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
-              begin
-                SaveUndoKeys;
+              dmLeftRights, dmTopBottoms, dmQuarters, dmSixels:
+                begin
+                  SaveUndoKeys;
 
-                // get color to draw in
-                bcolor := iif(MouseLeft,
-                  GetBits(CurrAttr, A_CELL_FG_MASK),
-                  GetBits(CurrAttr, A_CELL_BG_MASK, 8));
+                  // get color to draw in
+                  bcolor := iif(MouseLeft,
+                    GetBits(CurrAttr, A_CELL_FG_MASK),
+                    GetBits(CurrAttr, A_CELL_BG_MASK, 8));
 
-                DrawData.Create(sizeof(TUndoCells), rleAdds);
-                DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
-                DrawData.Free;
+                  DrawData.Create(sizeof(TUndoCells), rleAdds);
+                  DrawBlockEllipse(DrawData, FirstDrawX, FirstDrawY, DrawX, DrawY, bcolor, false);
+                  DrawData.Free;
 
-                undoblk.UndoType := utCells;
-                undoblk.CellData := CurrUndoData.Copy;
-                undoblk.CellData.Trim;
-                UndoAdd(undoblk);
-                CurrUndoData.Clear;
-                DrawSelectionAndObjects;
-              end;
-          end;
+                  undoblk.UndoType := utCells;
+                  undoblk.CellData := CurrUndoData.Copy;
+                  undoblk.CellData.Trim;
+                  UndoAdd(undoblk);
+                  CurrUndoData.Clear;
+                  DrawSelectionAndObjects;
+                end;
+            end;
+          end
+          else
+            pbPage.Invalidate;
           dragDraw := false;
         end;
     end;
