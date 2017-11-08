@@ -9,6 +9,7 @@ object fColorDialog: TfColorDialog
   ClientWidth = 519
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnShow = FormShow
   LCLVersion = '1.6.4.0'
   object bOK: TButton
     Left = 8

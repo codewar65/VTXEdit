@@ -133,6 +133,7 @@ type
     cbFont8: TComboBox;
     cbFont9: TComboBox;
     cbPageType: TComboBox;
+    CheckBox1: TCheckBox;
     CoolBar1: TCoolBar;
     dpAllPanels: TPanel;
     dPanel0: TPanel;
@@ -145,6 +146,7 @@ type
     dtbMoveUp: TToolButton;
     dtpSauceDate: TDateTimePicker;
     GroupBox1: TGroupBox;
+    GroupBox2: TGroupBox;
     ilButtons: TImageList;
     ilDisabledButtons: TImageList;
     ilCursors: TImageList;
@@ -169,6 +171,7 @@ type
     Label24: TLabel;
     Label25: TLabel;
     Label31: TLabel;
+    Label32: TLabel;
     lBitmapName: TLabel;
     lBitmapSize: TLabel;
     Label26: TLabel;
@@ -250,6 +253,10 @@ type
     RadioButton2: TRadioButton;
     RadioButton3: TRadioButton;
     RadioButton4: TRadioButton;
+    rbRowWidth50: TRadioButton;
+    rbRowWidth100: TRadioButton;
+    rbRowWidth150: TRadioButton;
+    rbRowWidth200: TRadioButton;
     sbHorz: TScrollBar;
     sbVert: TScrollBar;
     ScrollBox1: TScrollBox;
@@ -273,8 +280,10 @@ type
     seRefLeft: TSpinEdit;
     seRefWidth: TSpinEdit;
     seRefHeight: TSpinEdit;
-    TabSheet1: TTabSheet;
-    TabSheet2: TTabSheet;
+    ToolBar3: TToolBar;
+    bFindColor: TToolButton;
+    tsReferenceImage: TTabSheet;
+    tsRowAttr: TTabSheet;
     ToolBar2: TToolBar;
     bRefLoad: TToolButton;
     bRefShow: TToolButton;
@@ -346,6 +355,7 @@ type
     tsDocument: TTabSheet;
     tsObjects: TTabSheet;
 
+    procedure bFindColorClick(Sender: TObject);
     procedure bRefRemoveClick(Sender: TObject);
     procedure bRefShowClick(Sender: TObject);
     procedure cbFontChange(Sender: TObject);
@@ -369,8 +379,11 @@ type
     procedure InitDockers;
     procedure DeinitDockers;
     procedure miViewLoadBitmapClick(Sender: TObject);
+    procedure pbPageClick(Sender: TObject);
     procedure pbRowColor1Click(Sender: TObject);
+    procedure pbRowColor1Paint(Sender: TObject);
     procedure pbRowColor2Click(Sender: TObject);
+    procedure pbRowColor2Paint(Sender: TObject);
     procedure seRefHeightChange(Sender: TObject);
     procedure seRefLeftChange(Sender: TObject);
     procedure seRefTopChange(Sender: TObject);
@@ -401,6 +414,8 @@ type
     function ComputeSGR(currattr, targetattr : DWORD) : unicodestring;
     procedure FormDestroy(Sender: TObject);
     procedure memSauceCommentsEditingDone(Sender: TObject);
+    procedure tsReferenceImageContextPopup(Sender: TObject; MousePos: TPoint;
+      var Handled: Boolean);
     procedure tbRefOpacityChange(Sender: TObject);
     procedure tbSauceAuthorEditingDone(Sender: TObject);
     procedure tbSauceGroupEditingDone(Sender: TObject);
@@ -927,6 +942,7 @@ begin
   if CursorCol >= NumCols then CursorCol := NumCols - 1;
   GenerateBmpPage;
   pbPage.Invalidate;
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.ResizePage(row, col : integer);
@@ -1301,6 +1317,12 @@ begin
   Page.SauceComments.Clear;
   for i := 0 to Page.Sauce.Comments - 1 do
     Page.SauceComments.Add(memSauceComments.Lines[i]);
+end;
+
+procedure TfMain.tsReferenceImageContextPopup(Sender: TObject; MousePos: TPoint;
+  var Handled: Boolean);
+begin
+
 end;
 
 // create new bmpPage of page at zoom 1
@@ -1817,6 +1839,7 @@ begin
   DrawCell(CursorRow, CursorCol);
   ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.CursorLeft;
@@ -1855,6 +1878,7 @@ begin
   DrawCell(CursorRow, CursorCol);
   ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.CursorDown;
@@ -1872,6 +1896,7 @@ begin
   DrawCell(CursorRow, CursorCol);
   ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.CursorNewLine;
@@ -1890,6 +1915,7 @@ begin
   DrawCell(CursorRow, CursorCol);
   ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.CursorForwardTab;
@@ -1935,6 +1961,7 @@ begin
   DrawCell(CursorRow, CursorCol);
   ResetBlink;
   ScrollToCursor; // keep cursor on screen if typing
+  tsRowAttr.Invalidate;
 end;
 
 procedure TfMain.CursorStatus;
@@ -2520,6 +2547,7 @@ begin
       seRows.Value := CursorRow + 1;
       ResizePage;
     end;
+    tsRowAttr.Invalidate;
   end;
 end;
 
@@ -2680,6 +2708,9 @@ begin
         tbAttrTop.Enabled := false;
         tbAttrBottom.Enabled := false;
 
+        // vtx only stuff
+        tsRowAttr.Enabled := false;
+
         // no fonts
         tbFontClick(tbFont0);
         tbFont0.Enabled:=false;
@@ -2711,6 +2742,9 @@ begin
         tbAttrTop.Enabled := false;
         tbAttrBottom.Enabled := false;
 
+        // vtx only stuff
+        tsRowAttr.Enabled := false;
+
         tbFont0.Enabled:=true;
         tbFont1.Enabled:=true;
         tbFont2.Enabled:=true;
@@ -2739,6 +2773,9 @@ begin
         tbAttrShadow.Enabled := true;
         tbAttrTop.Enabled := true;
         tbAttrBottom.Enabled := true;
+
+        // vtx only stuff
+        tsRowAttr.Enabled := true;
 
         tbFont0.Enabled:=true;
         tbFont1.Enabled:=true;
@@ -3228,8 +3265,9 @@ begin
 
       cnv.Brush.Color := ANSIColor[cl];
       cnv.FillRect(rect);
-      cnv.pen.color := clBlack;
-      cnv.Rectangle(rect);
+      Draw3DRect(cnv, rect, true);
+//      cnv.pen.color := clBlack;
+//      cnv.Rectangle(rect);
 
       if cl = fg then
       begin
@@ -9877,7 +9915,7 @@ begin
   cbPageType.ItemIndex := ptype;
   ColorScheme := pcolors;
   cbColorScheme.ItemIndex := pcolors;
-
+  tsRowAttr.Invalidate;
 end;
 
 procedure nop; begin end;
@@ -9888,20 +9926,6 @@ begin
   nop;
 
 end;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const
   MAXDOCKERS = 4;
@@ -9985,29 +10009,77 @@ end;
 procedure TfMain.pbRowColor1Click(Sender: TObject);
 var
   clrdlg : TfColorDialog;
+  c : integer;
 begin
   // open custom color dialog
   clrdlg := TfColorDialog.Create(self);
   clrdlg.fColor := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR1_MASK);
+  clrdlg.fMaxColors := 256;
   if clrdlg.ShowModal = mrOK then
   begin
-    nop;
+    c := clrdlg.fColor;
+    SetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR1_MASK, c);
+    tsRowAttr.Invalidate;
+    CurrFileChanged := true;
+    UpdateTitles;
   end;
   clrdlg.Free;
+end;
+
+procedure TfMain.pbRowColor1Paint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  c, r, g, b : integer;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+
+  c := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR1_MASK);
+  r := (ANSIColor[c]      ) and $FF;
+  g := (ANSIColor[c] >>  8) and $FF;
+  b := (ANSIColor[c] >> 16) and $FF;
+  cnv.Brush.Color := RGBToColor(r, g, b);
+  cnv.FillRect(pb.ClientRect);
+  Draw3DRect(cnv, pb.ClientRect, true);
 end;
 
 procedure TfMain.pbRowColor2Click(Sender: TObject);
 var
   clrdlg : TfColorDialog;
+  c : integer;
 begin
   // open custom color dialog
   clrdlg := TfColorDialog.Create(self);
   clrdlg.fColor := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR2_MASK, 8);
+  clrdlg.fMaxColors := 256;
   if clrdlg.ShowModal = mrOK then
   begin
-    nop;
+    c := clrdlg.fColor;
+    SetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR2_MASK, c, 8);
+    tsRowAttr.Invalidate;
+    CurrFileChanged := true;
+    UpdateTitles;
   end;
   clrdlg.Free;
+end;
+
+procedure TfMain.pbRowColor2Paint(Sender: TObject);
+var
+  pb : TPaintBox;
+  cnv : TCanvas;
+  c, r, g, b : integer;
+begin
+  pb := TPaintBox(Sender);
+  cnv := pb.Canvas;
+
+  c := GetBits(Page.Rows[CursorRow].Attr, A_ROW_COLOR2_MASK, 8);
+  r := (ANSIColor[c]      ) and $FF;
+  g := (ANSIColor[c] >>  8) and $FF;
+  b := (ANSIColor[c] >> 16) and $FF;
+  cnv.Brush.Color := RGBToColor(r, g, b);
+  cnv.FillRect(pb.ClientRect);
+  Draw3DRect(cnv, pb.ClientRect, true);
 end;
 
 procedure TfMain.bRefShowClick(Sender: TObject);
@@ -10055,6 +10127,32 @@ begin
   tbRefOpacity.Position:=RefOpacity;
 
   pbPage.Invalidate;
+end;
+
+// find foreground color
+procedure TfMain.bFindColorClick(Sender: TObject);
+var
+  clrdlg : TfColorDialog;
+  c : integer;
+  cls : integer;
+begin
+  clrdlg := TfColorDialog.Create(self);
+  clrdlg.fColor := GetBits(CurrAttr, A_CELL_FG_MASK);
+  case ColorScheme of
+    COLORSCHEME_BASIC:  cls := 8;
+    COLORSCHEME_BBS:    cls := 16;
+    COLORSCHEME_ICE:    cls := 16;
+    COLORSCHEME_256:    cls := 256;
+  end;
+  clrdlg.fMaxColors := cls;
+  if clrdlg.ShowModal = mrOK then
+  begin
+    c := clrdlg.fColor;
+    SetBits(CurrAttr, A_CELL_FG_MASK, c);
+    pbColors.Invalidate;
+    pbCurrCell.Invalidate;
+  end;
+  clrdlg.Free;
 end;
 
 // return the TTabSheet
@@ -10486,6 +10584,11 @@ begin
     CreateReference;
     pbPage.Invalidate;
   end;
+end;
+
+procedure TfMain.pbPageClick(Sender: TObject);
+begin
+
 end;
 
 procedure TfMain.seRefHeightChange(Sender: TObject);
@@ -10941,22 +11044,7 @@ begin
     DockerInfo.CurrTab := 0;
     SetActiveTab;
   end;
-
 end;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 initialization
 {$I vtxcursors.lrs}

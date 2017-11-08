@@ -103,6 +103,7 @@ type
     pbActualColor: TPaintBox;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
     procedure pbActualColorPaint(Sender: TObject);
     procedure pbColorsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure pbColorsPaint(Sender: TObject);
@@ -136,12 +137,15 @@ type
   public
     { public declarations }
     fColor : integer;       // ansi color 0-255
+    fMaxColors : integer;
   end;
 
 var
   fColorDialog: TfColorDialog;
   bmpHS : TBitmap;
   ANSILAB : array [0 .. 255] of TLAB;
+
+  rows : integer;
 
   // desired color
   DesiredRGB : TRGB;
@@ -182,11 +186,11 @@ end;
 // paint color picker + highlight selected color
 procedure TfColorDialog.pbColorsPaint(Sender: TObject);
 var
-  pb : TPaintBox;
-  cnv : TCanvas;
+  pb :      TPaintBox;
+  cnv :     TCanvas;
   x, y, c : integer;
-  cw, ch : integer;
-  r : TRect;
+  cw, ch :  integer;
+  r :       TRect;
 begin
   pb := TPaintBox(Sender);
   cnv := pb.Canvas;
@@ -205,7 +209,7 @@ begin
   cnv.DrawFocusRect(r);
 
   c := 0;
-  for y := 0 to 15 do
+  for y := 0 to rows do
   begin
     for x := 0 to 15 do
     begin
@@ -278,13 +282,11 @@ end;
 // find closest ansi color
 function TfColorDialog.FindANSIColor : integer;
 var
-  i : integer;
-  xyz : TXYZ;
-  lab : TLAB;
+  i :       integer;
   d, mind : double;
 begin
   mind := 9999;
-  for i := 0 to 255 do
+  for i := 0 to fMaxColors - 1 do
   begin
     d := Distance3D(
       DesiredLAB.l, DesiredLAB.a, DesiredLAB.b,
@@ -455,8 +457,8 @@ begin
   v := StrToInt(tbANSIColor.Text);
   if v < 0 then
     v := 0;
-  if v > 255 then
-    v := 255;
+  if v > fMaxColors - 1 then
+    v := fMaxColors - 1;
   fColor := v;
   SetANSIColor;
   pbColors.Invalidate;
@@ -990,6 +992,7 @@ begin
     xyz := RGB2XYZ(rgb);
     ANSILAB[i] := XYZ2LAB(xyz);
   end;
+
 end;
 
 procedure TfColorDialog.FormDestroy(Sender: TObject);
@@ -997,23 +1000,36 @@ begin
   bmpHS.Free;
 end;
 
+procedure TfColorDialog.FormShow(Sender: TObject);
+begin
+  // number of rows to display for colors
+  rows := iif(fMaxColors = 256, 15, 0);
+  if fColor > fMaxColors then
+    fColor := fMaxColors - 1;
+end;
+
 procedure TfColorDialog.pbColorsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  pb : TPaintBox;
-  x1, y1 : integer;
-  cw, ch : integer;
+  pb :      TPaintBox;
+  x1, y1 :  integer;
+  cw, ch :  integer;
+  c :       integer;
 begin
   pb := TPaintBox(Sender);
   cw := pb.Width >> 4;
   ch := pb.Height >> 4;
   x1 := x div cw;
   y1 := y div ch;
-  if between(x1, 0, 15) and between(y1, 0, 15) then
+  if between(x1, 0, 15) and between(y1, 0, rows) then
   begin
-    fColor := x1 + (y1 << 4);
-    SetANSIColor;
-    pbColors.Invalidate;
+    c := x1 + (y1 << 4);
+    if between(c, 0, fMaxColors - 1) then
+    begin
+      fColor := c;
+      SetANSIColor;
+      pbColors.Invalidate;
+    end;
   end;
 end;
 
