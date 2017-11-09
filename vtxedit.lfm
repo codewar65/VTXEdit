@@ -2355,6 +2355,7 @@ object fMain: TfMain
           FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 63
+        OnClick = miEditUndoClick
       end
       object miEditRedo: TMenuItem
         Caption = 'Redo'
@@ -2395,6 +2396,7 @@ object fMain: TfMain
           00440000003CFFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 64
+        OnClick = miEditRedoClick
       end
       object MenuItem4: TMenuItem
         Caption = '-'
@@ -2438,6 +2440,7 @@ object fMain: TfMain
           006B0000008AFFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 66
+        OnClick = miEditCutClick
       end
       object miEditCopy: TMenuItem
         Caption = 'Copy'
@@ -2478,6 +2481,7 @@ object fMain: TfMain
           00FFFFFFFFFF000000FF000000FFFFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 65
+        OnClick = miEditCopyClick
       end
       object miEditPaste: TMenuItem
         Caption = 'Paste'
@@ -2518,6 +2522,7 @@ object fMain: TfMain
           FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 67
+        OnClick = miEditPasteClick
       end
       object miEditDelete: TMenuItem
         Caption = 'Delete'
@@ -2558,6 +2563,7 @@ object fMain: TfMain
           00FFEEEEEEFF000000FF000000FFFFFFFF00FFFFFF00FFFFFF00
         }
         ImageIndex = 68
+        OnClick = miEditDeleteClick
       end
     end
     object miView: TMenuItem

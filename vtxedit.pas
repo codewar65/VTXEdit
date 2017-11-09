@@ -378,6 +378,12 @@ type
     procedure dtbControlsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure InitDockers;
     procedure DeinitDockers;
+    procedure miEditCopyClick(Sender: TObject);
+    procedure miEditCutClick(Sender: TObject);
+    procedure miEditDeleteClick(Sender: TObject);
+    procedure miEditPasteClick(Sender: TObject);
+    procedure miEditRedoClick(Sender: TObject);
+    procedure miEditUndoClick(Sender: TObject);
     procedure miViewLoadBitmapClick(Sender: TObject);
     procedure pbPageClick(Sender: TObject);
     procedure pbRowColor1Click(Sender: TObject);
@@ -2030,6 +2036,7 @@ var
   pagebottom,
   pageright :   integer;
   undoblk :     TUndoBlock;
+  cell :        TCell;
 begin
 
   // for update meta indicators
@@ -2478,6 +2485,21 @@ begin
             GenerateBmpPage;
             CopySelection.Clear;
             pbPage.Invalidate;
+          end
+          else
+          begin
+            // typing mode.
+            for c := CursorCol + 1 to NumCols - 1 do
+            begin
+              cell := Page.Rows[CursorRow].Cells[c];
+              RecordUndoCell(CursorRow, c - 1, cell);
+              Page.Rows[CursorRow].Cells[c - 1] := cell;
+              DrawCell(CursorRow, c - 1, false);
+            end;
+            cell := BLANK;
+            RecordUndoCell(CursorRow, NumCols - 1, cell);
+            Page.Rows[CursorRow].Cells[NumCols - 1] := cell;
+            DrawCell(CursorRow, NumCols - 1, false);
           end;
         end;
       end;
@@ -2539,7 +2561,7 @@ begin
   if Between(Key, ' ', '~') then
   begin
     // break on spaces
-    if Key = ' ' then
+//    if Key = ' ' then
       SaveUndoKeys;
 
     PutChar(ord(Key));
@@ -2651,6 +2673,7 @@ begin
   cell := AdjustCellIgnores(cell, CursorRow, CursorCol);
   SetBits(cell.attr, A_CELL_FONT_MASK, CurrFont, 28);
   RecordUndoCell(CursorRow, CursorCol, cell);
+  SaveUndoKeys;
   Page.Rows[CursorRow].Cells[CursorCol] := cell;
   DrawCell(CursorRow, CursorCol, false);
 
@@ -10567,6 +10590,186 @@ begin
     ini.WriteString(sect, 'Tabs', tabnames);
   end;
   ini.Free;
+end;
+
+procedure TfMain.miEditCopyClick(Sender: TObject);
+begin
+  SaveUndoKeys;
+  if SelectedObject >= 0 then
+  begin
+    // copy object to clipboard
+    Clipboard.Data.Free;
+    CopyObject(Objects[SelectedObject], Clipboard);
+  end
+  else if CopySelection.Count > 0 then
+  begin
+    Clipboard.Data.Free;
+    Clipboard := CopySelectionToObject;
+  end;
+end;
+
+procedure TfMain.miEditCutClick(Sender: TObject);
+var
+  i, r, c :   integer;
+  copyrec :   TLoc;
+  undoblk :   TUndoBlock;
+begin
+  SaveUndoKeys;
+  if SelectedObject >= 0 then
+  begin
+    Clipboard.Data.Free;
+    CopyObject(Objects[SelectedObject], Clipboard);
+    RemoveObject(SelectedObject);
+    LoadlvObjects;
+    SelectedObject := -1;
+    lvObjects.ItemIndex := lvObjIndex(selectedObject);
+    pbPage.Invalidate;
+  end
+  else if CopySelection.Count > 0 then
+  begin
+    Clipboard.Data.Free;
+    Clipboard := CopySelectionToObject;
+    for i := 0 to CopySelection.Count - 1 do
+    begin
+      CopySelection.Get(@copyrec, i);
+      r := copyrec.Row;
+      c := copyrec.Col;
+      RecordUndoCell(r, c, BLANK);
+      Page.Rows[r].Cells[c] := BLANK;
+      DrawCell(r, c, false);
+    end;
+
+    undoblk.UndoType := utCells;
+    undoblk.CellData := CurrUndoData.Copy;
+    undoblk.CellData.Trim;
+    UndoAdd(undoblk);
+    CurrUndoData.Clear;
+  end;
+end;
+
+procedure TfMain.miEditDeleteClick(Sender: TObject);
+var
+  i, r, c :   integer;
+  copyrec :   TLoc;
+  undoblk :   TUndoBlock;
+  cell : TCell;
+begin
+  if ToolMode = tmSelect then
+  begin
+    SaveUndoKeys;
+    if SelectedObject >= 0 then
+    begin
+      // delete object
+      if not Objects[SelectedObject].Locked then
+      begin
+
+        undoblk.UndoType := utObjRemove;
+        undoblk.OldRow := Objects[SelectedObject].Row;
+        undoblk.OldCol := Objects[SelectedObject].Col;
+        undoblk.OldNum := SelectedObject;
+        CopyObject(Objects[SelectedObject], undoblk.Obj);
+        UndoAdd(undoblk);
+
+        RemoveObject(SelectedObject);
+        SelectedObject := -1;
+        LoadlvObjects;
+        pbPage.Invalidate;
+      end;
+    end
+    else if CopySelection.Count > 0 then
+    begin
+      // delete selected area
+      for i := CopySelection.Count - 1 downto 0 do
+      begin
+        CopySelection.Get(@copyrec, i);
+        r := copyrec.Row;
+        c := copyrec.Col;
+
+        RecordUndoCell(r, c, BLANK);
+
+        Page.Rows[r].Cells[c] := BLANK;
+      end;
+
+      undoblk.UndoType := utCells;
+      undoblk.CellData := CurrUndoData.Copy;
+      undoblk.CellData.Trim;
+      UndoAdd(undoblk);
+
+      GenerateBmpPage;
+      CopySelection.Clear;
+      pbPage.Invalidate;
+    end
+    else
+    begin
+      // typing mode.
+      for c := CursorCol + 1 to NumCols - 1 do
+      begin
+        cell := Page.Rows[CursorRow].Cells[c];
+        RecordUndoCell(CursorRow, c - 1, cell);
+        Page.Rows[CursorRow].Cells[c - 1] := cell;
+        DrawCell(CursorRow, c - 1, false);
+      end;
+      cell := BLANK;
+      RecordUndoCell(CursorRow, NumCols - 1, cell);
+      Page.Rows[CursorRow].Cells[NumCols - 1] := cell;
+      DrawCell(CursorRow, NumCols - 1, false);
+    end;
+  end;
+end;
+
+procedure TfMain.miEditPasteClick(Sender: TObject);
+var
+  l : integer;
+  pagebottom, pageright : integer;
+  undoblk :   TUndoBlock;
+begin
+  SaveUndoKeys;
+  if (Clipboard.Width > 0) and (Clipboard.Height > 0) then
+  begin
+    // paste as new object.
+    l := length(Objects);
+    setlength(Objects, l + 1);
+    CopyObject(Clipboard, Objects[l]);
+
+    // drop it onto window. top left for now
+    pagebottom := min(PageTop + WindowRows, NumRows);
+    pageright := min(PageLeft + WindowCols, NumCols);
+    Objects[l].Row := ((pagebottom + PageTop) >> 1) - (Objects[l].Height >> 1);
+    Objects[l].Col := ((pageright + PageLeft) >> 1) - (Objects[l].Width >> 1);
+
+    undoblk.UndoType := utObjAdd;
+    undoblk.OldRow := Objects[l].Row;
+    undoblk.OldCol := Objects[l].Col;
+    CopyObject(Objects[l], undoblk.Obj);
+    UndoAdd(undoblk);
+
+    LoadlvObjects;
+    SelectedObject := l;
+    lvObjects.ItemIndex := lvObjIndex(SelectedObject);
+    pbPage.Invalidate;
+    fPreviewBox.Invalidate;
+  end;
+end;
+
+procedure TfMain.miEditRedoClick(Sender: TObject);
+begin
+  SaveUndoKeys;
+  if UndoPos < Undo.Count then
+  begin
+    RedoPerform(UndoPos);
+    UndoPos += 1;
+  end;
+end;
+
+procedure TfMain.miEditUndoClick(Sender: TObject);
+begin
+  SaveUndoKeys;
+  if UndoPos > 0 then
+  begin
+    // only if there is some undo to be done.
+    UndoPerform(UndoPos - 1);
+    UndoPos -= 1;
+  end;
 end;
 
 // create bmpRefScaled from refwidth, refheight, refopacity

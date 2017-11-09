@@ -10055,7 +10055,7 @@ const
   DRAG_ADD    = 1;
   DRAG_REMOVE = 2;
 
-  UNDO_LEVELS = 50;
+  UNDO_LEVELS = 100;
 
   // editing cursors
   CURSOR_ARROW =      2;
