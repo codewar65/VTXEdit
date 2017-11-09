@@ -2032,6 +2032,9 @@ var
   undoblk :     TUndoBlock;
 begin
 
+  // for update meta indicators
+  pbStatusBar.Invalidate;
+
   // let system handle these controls
   if seRows.Focused
     or seCols.Focused
@@ -2617,11 +2620,29 @@ begin
 end;
 
 // called from keypress or Print in keybinds
+// be sure to check insert state.
 procedure TfMain.PutChar(ch : integer);
 var
-  cell :    TCell;
+  ins :   boolean;
+  cell :  TCell;
+  c :     integer;
 begin
-//  ScrollToCursor; // keep cursor on screen if typing
+  //  ScrollToCursor; // keep cursor on screen if typing
+
+  ins := odd(GetKeyState(VK_INSERT));
+
+  if ins then
+  begin
+    // insert blank space - move everything from cursor right, right one pos.
+    // for now, truncate at eol.
+    for c := NumCols - 1 downto CursorCol + 1 do
+    begin
+      cell := Page.Rows[CursorRow].Cells[c - 1];
+      RecordUndoCell(CursorRow, c, cell);
+      Page.Rows[CursorRow].Cells[c] := cell;
+      DrawCell(CursorRow, c, false);
+    end;
+  end;
 
   cell.chr := ch;
   cell.attr := CurrAttr;
@@ -2632,6 +2653,7 @@ begin
   RecordUndoCell(CursorRow, CursorCol, cell);
   Page.Rows[CursorRow].Cells[CursorCol] := cell;
   DrawCell(CursorRow, CursorCol, false);
+
   CursorRight;
 end;
 
@@ -2908,6 +2930,18 @@ begin
     r.left += 12;
   end;
   bmp.Free;
+
+  // meta key indicators - draw right to left
+  // CAP NUM INS
+  str := iif(odd(GetKeyState(VK_INSERT)), 'INS', '');
+  cnv.TextRect(r, r.right - (32 * 1), r.top, str, style);
+
+  str := iif(odd(GetKeyState(VK_NUMLOCK)), 'NUM', '');
+  cnv.TextRect(r, r.right - (32 * 2), r.top, str, style);
+
+  str := iif(odd(GetKeyState(VK_CAPITAL)), 'CAP', '');
+  cnv.TextRect(r, r.right - (32 * 3), r.top, str, style);
+
 end;
 
 procedure TfMain.sbVertChange(Sender: TObject);
