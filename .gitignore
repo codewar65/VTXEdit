@@ -9,6 +9,7 @@
 *.cgi
 *.exe
 *.log
+*.ini
 *.bak*
 fp.ini
 fp.cfg
